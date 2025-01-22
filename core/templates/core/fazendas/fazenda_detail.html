@@ -1,0 +1,373 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block extra_head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #map {
+        height: 500px;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    .pasto-label {
+        font-size: 12px;
+        font-weight: bold;
+        color: #000;
+        text-align: center;
+        border: 1px solid #fff;
+        border-radius: 3px;
+        padding: 2px 5px;
+        background-color: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Dados dos pastos
+        var pastosData = {{ pastos_json|safe }};
+        
+        // Inicializar o mapa
+        var map = L.map('map').setView([-15.7801, -47.9292], 4);
+        var pastosLayer = L.featureGroup().addTo(map);
+
+        // Adicionar camada de satélite do Google
+        var googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: 'Google Maps'
+        }).addTo(map);
+
+        // Função para criar popup
+        function criarPopup(pasto) {
+            return `
+                <strong>${pasto.id_pasto}</strong><br>
+                ${pasto.nome ? `Nome: ${pasto.nome}<br>` : ''}
+                Área: ${pasto.area.toFixed(2)} ha<br>
+                Capacidade: ${pasto.capacidade_ua.toFixed(2)} UA/ha<br>
+                <a href="/pastos/${pasto.id}" class="btn btn-sm btn-info mt-2">Ver Detalhes</a>
+            `;
+        }
+
+        // Desenhar os pastos no mapa
+        if (pastosData && pastosData.length > 0) {
+            pastosData.forEach(function(pasto) {
+                if (pasto.coordenadas && pasto.coordenadas.length > 0) {
+                    // Criar o polígono
+                    var polygon = L.polygon(pasto.coordenadas, {
+                        color: pasto.cor,
+                        fillColor: pasto.cor,
+                        fillOpacity: 0.2,
+                        weight: 2
+                    }).addTo(pastosLayer);
+
+                    // Adicionar popup
+                    polygon.bindPopup(criarPopup(pasto));
+                    
+                    // Adicionar hover effect
+                    polygon.on('mouseover', function() {
+                        this.setStyle({
+                            fillOpacity: 0.5,
+                            weight: 3
+                        });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({
+                            fillOpacity: 0.2,
+                            weight: 2
+                        });
+                    });
+
+                    // Criar rótulo para o pasto
+                    var center = polygon.getBounds().getCenter();
+                    var label = L.divIcon({
+                        className: 'pasto-label',
+                        html: pasto.nome || pasto.id_pasto,
+                        iconSize: [100, 20],
+                        iconAnchor: [50, 10]
+                    });
+                    L.marker(center, { icon: label }).addTo(pastosLayer);
+                }
+            });
+
+            // Ajustar o zoom para mostrar todos os pastos
+            var bounds = pastosLayer.getBounds();
+            if (bounds.isValid()) {
+                map.fitBounds(bounds);
+            }
+        }
+    });
+</script>
+{% endblock %}
+
+{% block title %}Detalhes da Fazenda{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">{{ fazenda.nome }}</h4>
+                <div>
+                    <a href="{% url 'fazenda_edit' fazenda.pk %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-edit"></i> Editar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mapa -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Mapa da Fazenda</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div id="map"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Informações Básicas -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h6 class="mb-0">Informações Básicas</h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Cidade/UF</dt>
+                        <dd class="col-sm-8">{{ fazenda.cidade }}/{{ fazenda.estado }}</dd>
+
+                        <dt class="col-sm-4">Área Total</dt>
+                        <dd class="col-sm-8">{{ fazenda.area_total|floatformat:2 }} ha</dd>
+
+                        <dt class="col-sm-4">Inscrição Estadual</dt>
+                        <dd class="col-sm-8">{{ fazenda.inscricao_estadual|default:"-" }}</dd>
+
+                        <dt class="col-sm-4">Status</dt>
+                        <dd class="col-sm-8">
+                            {% if fazenda.arrendada %}
+                            <span class="badge bg-info">Arrendada</span>
+                            {% else %}
+                            <span class="badge bg-success">Própria</span>
+                            {% endif %}
+                        </dd>
+
+                        {% if not fazenda.arrendada %}
+                        <dt class="col-sm-4">Valor do Hectare</dt>
+                        <dd class="col-sm-8">R$ {{ fazenda.valor_hectare|floatformat:2|default:"-" }}</dd>
+
+                        <dt class="col-sm-4">Valor Total</dt>
+                        <dd class="col-sm-8">R$ {{ fazenda.valor_total|floatformat:2|default:"-" }}</dd>
+                        {% endif %}
+
+                        <dt class="col-sm-4">Custo Oportunidade</dt>
+                        <dd class="col-sm-8">R$ {{ fazenda.custo_oportunidade|floatformat:2|default:"-" }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pastos -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Pastos</h6>
+                    <a href="{% url 'pasto_create' %}?fazenda={{ fazenda.pk }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> Novo Pasto
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if fazenda.pastos.all %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nome</th>
+                                    <th>Área (ha)</th>
+                                    <th>Capacidade (UA/ha)</th>
+                                    <th>Capim</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pasto in fazenda.pastos.all %}
+                                <tr>
+                                    <td>{{ pasto.id_pasto }}</td>
+                                    <td>{{ pasto.nome|default:"-" }}</td>
+                                    <td>{{ pasto.area|floatformat:2 }}</td>
+                                    <td>{{ pasto.capacidade_ua|floatformat:2 }}</td>
+                                    <td>{{ pasto.variedade_capim|default:"-" }}</td>
+                                    <td>
+                                        <a href="{% url 'pasto_detail' pasto.pk %}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">Nenhum pasto cadastrado.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Lotes -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Lotes</h6>
+                    <a href="{% url 'lote_create' %}?fazenda={{ fazenda.pk }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> Novo Lote
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if lotes %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Data Criação</th>
+                                    <th>Finalidade</th>
+                                    <th>Qtd. Animais</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for lote in lotes %}
+                                <tr>
+                                    <td>{{ lote.id_lote }}</td>
+                                    <td>{{ lote.data_criacao|date:"d/m/Y" }}</td>
+                                    <td>{{ lote.finalidade }}</td>
+                                    <td>{{ lote.quantidade_atual }}</td>
+                                    <td>
+                                        <a href="{% url 'lote_detail' lote.pk %}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">Nenhum lote cadastrado.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Máquinas e Benfeitorias -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h6 class="mb-0">Máquinas e Benfeitorias</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs" id="myTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="maquinas-tab" data-bs-toggle="tab" data-bs-target="#maquinas" type="button" role="tab">
+                                Máquinas
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="benfeitorias-tab" data-bs-toggle="tab" data-bs-target="#benfeitorias" type="button" role="tab">
+                                Benfeitorias
+                            </button>
+                        </li>
+                    </ul>
+                    <div class="tab-content pt-3" id="myTabContent">
+                        <!-- Máquinas -->
+                        <div class="tab-pane fade show active" id="maquinas" role="tabpanel">
+                            {% if maquinas %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Nome</th>
+                                            <th>Valor Mercado</th>
+                                            <th>Depreciação Anual</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for maquina in maquinas %}
+                                        <tr>
+                                            <td>{{ maquina.id_maquina }}</td>
+                                            <td>{{ maquina.nome }}</td>
+                                            <td>R$ {{ maquina.valor_mercado|floatformat:2 }}</td>
+                                            <td>R$ {{ maquina.depreciacao_anual|floatformat:2 }}</td>
+                                            <td>
+                                                <a href="#" class="btn btn-sm btn-info">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted mb-0">Nenhuma máquina cadastrada.</p>
+                            {% endif %}
+                        </div>
+                        <!-- Benfeitorias -->
+                        <div class="tab-pane fade" id="benfeitorias" role="tabpanel">
+                            {% if benfeitorias %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Nome</th>
+                                            <th>Valor Compra</th>
+                                            <th>Depreciação Anual</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for benfeitoria in benfeitorias %}
+                                        <tr>
+                                            <td>{{ benfeitoria.id_benfeitoria }}</td>
+                                            <td>{{ benfeitoria.nome }}</td>
+                                            <td>R$ {{ benfeitoria.valor_compra|floatformat:2 }}</td>
+                                            <td>R$ {{ benfeitoria.depreciacao_anual|floatformat:2 }}</td>
+                                            <td>
+                                                <a href="#" class="btn btn-sm btn-info">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted mb-0">Nenhuma benfeitoria cadastrada.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

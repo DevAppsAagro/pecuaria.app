@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% if unidade %}Editar{% else %}Nova{% endif %} Unidade de Medida</h2>
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="nome" class="form-label">Nome</label>
+                    <input type="text" class="form-control" id="nome" name="nome" value="{{ unidade.nome|default:'' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="sigla" class="form-label">Sigla</label>
+                    <input type="text" class="form-control" id="sigla" name="sigla" value="{{ unidade.sigla|default:'' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="tipo" class="form-label">Tipo</label>
+                    <select class="form-select" id="tipo" name="tipo" required>
+                        <option value="">Selecione um tipo</option>
+                        <option value="PESO" {% if unidade.tipo == 'PESO' %}selected{% endif %}>Peso</option>
+                        <option value="AREA" {% if unidade.tipo == 'AREA' %}selected{% endif %}>Área</option>
+                        <option value="VOLUME" {% if unidade.tipo == 'VOLUME' %}selected{% endif %}>Volume</option>
+                        <option value="COMPRIMENTO" {% if unidade.tipo == 'COMPRIMENTO' %}selected{% endif %}>Comprimento</option>
+                        <option value="TEMPERATURA" {% if unidade.tipo == 'TEMPERATURA' %}selected{% endif %}>Temperatura</option>
+                        <option value="TEMPO" {% if unidade.tipo == 'TEMPO' %}selected{% endif %}>Tempo</option>
+                        <option value="MONETARIO" {% if unidade.tipo == 'MONETARIO' %}selected{% endif %}>Monetário</option>
+                        <option value="OUTROS" {% if unidade.tipo == 'OUTROS' %}selected{% endif %}>Outros</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="descricao" class="form-label">Descrição</label>
+                    <textarea class="form-control" id="descricao" name="descricao" rows="3">{{ unidade.descricao|default:'' }}</textarea>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <a href="{% url 'unidade-medida-list' %}" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

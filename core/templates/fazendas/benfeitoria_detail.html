@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Detalhes da Benfeitoria</h5>
+            <div>
+                <a href="{% url 'benfeitoria_edit' benfeitoria.pk %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-pencil"></i> Editar
+                </a>
+                <a href="{% url 'benfeitorias_list' %}" class="btn btn-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-3">Informações Gerais</h6>
+                    <dl class="row">
+                        <dt class="col-sm-4">Fazenda</dt>
+                        <dd class="col-sm-8">{{ benfeitoria.fazenda.nome }}</dd>
+
+                        <dt class="col-sm-4">Tipo</dt>
+                        <dd class="col-sm-8">{{ benfeitoria.get_tipo_display }}</dd>
+
+                        <dt class="col-sm-4">Área</dt>
+                        <dd class="col-sm-8">{{ benfeitoria.area|default:"-" }} m²</dd>
+
+                        <dt class="col-sm-4">Data de Construção</dt>
+                        <dd class="col-sm-8">{{ benfeitoria.data_construcao|date:"d/m/Y"|default:"-" }}</dd>
+                    </dl>
+                </div>
+
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-3">Valores</h6>
+                    <dl class="row">
+                        <dt class="col-sm-4">Valor de Construção</dt>
+                        <dd class="col-sm-8" id="valorConstrucao">{{ benfeitoria.valor_construcao|default:"0" }}</dd>
+
+                        <dt class="col-sm-4">Total Gasto</dt>
+                        <dd class="col-sm-8" id="totalGasto">{{ total_gasto|default:"0" }}</dd>
+
+                        <dt class="col-sm-4">Total Pendente</dt>
+                        <dd class="col-sm-8" id="totalPendente">{{ total_pendente|default:"0" }}</dd>
+
+                        <dt class="col-sm-4">Total Pago</dt>
+                        <dd class="col-sm-8" id="totalPago">{{ total_pago|default:"0" }}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Filtros</h6>
+                        </div>
+                        <div class="card-body">
+                            <form method="get" class="row g-3">
+                                <div class="col-md-3">
+                                    <label for="data_inicio" class="form-label">Data Início</label>
+                                    <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ filtros.data_inicio }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="data_fim" class="form-label">Data Fim</label>
+                                    <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ filtros.data_fim }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="categoria" class="form-label">Categoria</label>
+                                    <select class="form-select" id="categoria" name="categoria">
+                                        <option value="">Todas</option>
+                                        {% for cat in categorias %}
+                                        <option value="{{ cat.id }}" {% if filtros.categoria == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="status" class="form-label">Status</label>
+                                    <select class="form-select" id="status" name="status">
+                                        <option value="">Todos</option>
+                                        <option value="PENDENTE" {% if filtros.status == 'PENDENTE' %}selected{% endif %}>Pendente</option>
+                                        <option value="PAGO" {% if filtros.status == 'PAGO' %}selected{% endif %}>Pago</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-primary">Filtrar</button>
+                                    <a href="{% url 'benfeitoria_detail' benfeitoria.id %}" class="btn btn-secondary">Limpar</a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Histórico de Despesas</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-centered table-nowrap mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Categoria</th>
+                                            <th>Subcategoria</th>
+                                            <th>Valor</th>
+                                            <th>Status</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in despesas %}
+                                        <tr>
+                                            <td>{{ item.despesa.data_emissao|date:"d/m/Y" }}</td>
+                                            <td>{{ item.categoria.nome }}</td>
+                                            <td>{{ item.subcategoria.nome|default:"-" }}</td>
+                                            <td class="valor-monetario">{{ item.valor_total }}</td>
+                                            <td>
+                                                <span class="badge {% if item.despesa.status == 'PENDENTE' %}bg-warning{% else %}bg-success{% endif %}">
+                                                    {{ item.despesa.get_status_display }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'despesa_detail' item.despesa.id %}" class="btn btn-sm btn-info">Ver</a>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="6" class="text-center">Nenhuma despesa encontrada</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Formatação de valores monetários
+        const formatter = new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        });
+
+        // Formatar valores monetários na tabela
+        document.querySelectorAll('.valor-monetario').forEach(element => {
+            const valor = parseFloat(element.textContent);
+            element.textContent = formatter.format(valor);
+        });
+
+        // Formatar totais
+        const valorConstrucao = document.getElementById('valorConstrucao');
+        const totalGasto = document.getElementById('totalGasto');
+        const totalPendente = document.getElementById('totalPendente');
+        const totalPago = document.getElementById('totalPago');
+
+        if (valorConstrucao) valorConstrucao.textContent = formatter.format(parseFloat(valorConstrucao.textContent));
+        if (totalGasto) totalGasto.textContent = formatter.format(parseFloat(totalGasto.textContent));
+        if (totalPendente) totalPendente.textContent = formatter.format(parseFloat(totalPendente.textContent));
+        if (totalPago) totalPago.textContent = formatter.format(parseFloat(totalPago.textContent));
+    });
+</script>
+{% endblock %}

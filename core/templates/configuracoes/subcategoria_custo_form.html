@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% if subcategoria %}Editar{% else %}Nova{% endif %} Subcategoria de Custo</h2>
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="nome" class="form-label">Nome</label>
+                    <input type="text" class="form-control" id="nome" name="nome" value="{{ subcategoria.nome|default:'' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="categoria" class="form-label">Categoria</label>
+                    <select class="form-select" id="categoria" name="categoria" required>
+                        <option value="">Selecione uma categoria</option>
+                        {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}" {% if subcategoria.categoria_id == categoria.id %}selected{% endif %}>
+                                {{ categoria.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <a href="{% url 'subcategoria-custo-list' %}" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

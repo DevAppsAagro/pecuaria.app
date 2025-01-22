@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">{% if compra %}Editar{% else %}Nova{% endif %} Compra</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.data.id_for_label }}" class="form-label">Data da Compra</label>
+                                {{ form.data }}
+                                {% if form.data.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.data.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.data_vencimento.id_for_label }}" class="form-label">Data de Vencimento</label>
+                                {{ form.data_vencimento }}
+                                {% if form.data_vencimento.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.data_vencimento.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.data_pagamento.id_for_label }}" class="form-label">Data de Pagamento</label>
+                                {{ form.data_pagamento }}
+                                {% if form.data_pagamento.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.data_pagamento.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.tipo_compra.id_for_label }}" class="form-label">Tipo de Compra</label>
+                                {{ form.tipo_compra }}
+                                {% if form.tipo_compra.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.tipo_compra.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.valor_unitario.id_for_label }}" class="form-label">Valor Unitário</label>
+                                {{ form.valor_unitario }}
+                                {% if form.valor_unitario.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.valor_unitario.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.vendedor.id_for_label }}" class="form-label">Vendedor</label>
+                                {{ form.vendedor }}
+                                {% if form.vendedor.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.vendedor.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="{{ form.conta_bancaria.id_for_label }}" class="form-label">Conta Bancária</label>
+                                {{ form.conta_bancaria }}
+                                {% if form.conta_bancaria.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.conta_bancaria.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <label for="{{ form.numero_parcelas.id_for_label }}" class="form-label">Número de Parcelas</label>
+                                {{ form.numero_parcelas }}
+                                {% if form.numero_parcelas.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.numero_parcelas.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <label for="{{ form.intervalo_parcelas.id_for_label }}" class="form-label">Intervalo entre Parcelas</label>
+                                {{ form.intervalo_parcelas }}
+                                {% if form.intervalo_parcelas.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.intervalo_parcelas.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label">Selecione os Animais</label>
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th><input type="checkbox" id="select-all"></th>
+                                                <th>Brinco</th>
+                                                <th>Categoria</th>
+                                                <th>Raça</th>
+                                                <th>Peso (kg)</th>
+                                                <th>Valor Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for animal in animais_disponiveis %}
+                                            <tr>
+                                                <td>
+                                                    <input type="checkbox" name="animal" value="{{ animal.id }}" 
+                                                           class="animal-checkbox" data-peso="{{ animal.peso_entrada|default:0 }}"
+                                                           {% if animal.id in animais_selecionados %}checked{% endif %}>
+                                                </td>
+                                                <td>{{ animal.brinco_visual }}</td>
+                                                <td>{{ animal.categoria_animal }}</td>
+                                                <td>{{ animal.raca }}</td>
+                                                <td>{{ animal.peso_entrada|default:"--" }}</td>
+                                                <td class="valor-total-animal">--</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% if form.animal.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.animal.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-12 text-end">
+                                <h5>Valor Total: R$ <span id="valor-total-geral">0.00</span></h5>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a href="{% url 'compras_list' %}" class="btn btn-secondary me-md-2">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const tipoCompraSelect = document.getElementById('{{ form.tipo_compra.id_for_label }}');
+        const valorUnitarioInput = document.getElementById('{{ form.valor_unitario.id_for_label }}');
+        const checkboxes = document.querySelectorAll('.animal-checkbox');
+        const selectAllCheckbox = document.getElementById('select-all');
+        
+        function calcularValorTotal(checkbox) {
+            const row = checkbox.closest('tr');
+            const valorTotalCell = row.querySelector('.valor-total-animal');
+            const peso = parseFloat(checkbox.getAttribute('data-peso')) || 0;
+            const valorUnitario = parseFloat(valorUnitarioInput.value) || 0;
+            const tipoCompra = tipoCompraSelect.value;
+            
+            let valorTotal = 0;
+            if (checkbox.checked) {
+                if (tipoCompra === 'KG') {
+                    valorTotal = peso * valorUnitario;
+                } else {
+                    valorTotal = valorUnitario;
+                }
+            }
+            
+            valorTotalCell.textContent = valorTotal.toFixed(2);
+            return valorTotal;
+        }
+        
+        function atualizarValorTotalGeral() {
+            let valorTotalGeral = 0;
+            checkboxes.forEach(checkbox => {
+                valorTotalGeral += calcularValorTotal(checkbox);
+            });
+            document.getElementById('valor-total-geral').textContent = valorTotalGeral.toFixed(2);
+        }
+        
+        // Event Listeners
+        selectAllCheckbox.addEventListener('change', function() {
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            atualizarValorTotalGeral();
+        });
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', atualizarValorTotalGeral);
+        });
+        
+        tipoCompraSelect.addEventListener('change', atualizarValorTotalGeral);
+        valorUnitarioInput.addEventListener('input', atualizarValorTotalGeral);
+
+        // Calcula os valores iniciais
+        atualizarValorTotalGeral();
+    });
+</script>
+{% endblock %}
+{% endblock %}

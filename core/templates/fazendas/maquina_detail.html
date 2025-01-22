@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Detalhes da Máquina</h5>
+            <div>
+                <a href="{% url 'maquina_edit' maquina.pk %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-pencil"></i> Editar
+                </a>
+                <a href="{% url 'maquinas_list' %}" class="btn btn-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-3">Identificação</h6>
+                    <dl class="row">
+                        <dt class="col-sm-4">ID da Máquina</dt>
+                        <dd class="col-sm-8">{{ maquina.id_maquina }}</dd>
+
+                        <dt class="col-sm-4">Nome</dt>
+                        <dd class="col-sm-8">{{ maquina.nome }}</dd>
+
+                        <dt class="col-sm-4">Fazenda</dt>
+                        <dd class="col-sm-8">{{ maquina.fazenda.nome }}</dd>
+
+                        <dt class="col-sm-4">Data de Aquisição</dt>
+                        <dd class="col-sm-8">{{ maquina.data_aquisicao|date:"d/m/Y" }}</dd>
+                    </dl>
+                </div>
+
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-3">Valores</h6>
+                    <dl class="row">
+                        <dt class="col-sm-4">Valor de Mercado</dt>
+                        <dd class="col-sm-8 valor-monetario">{{ maquina.valor_mercado }}</dd>
+
+                        <dt class="col-sm-4">Valor de Compra</dt>
+                        <dd class="col-sm-8 valor-monetario">{{ maquina.valor_compra }}</dd>
+
+                        <dt class="col-sm-4">Valor Residual</dt>
+                        <dd class="col-sm-8 valor-monetario">{{ maquina.valor_residual }}</dd>
+
+                        <dt class="col-sm-4">Vida Útil</dt>
+                        <dd class="col-sm-8">{{ maquina.vida_util }} anos</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2">Valor Atual</h6>
+                                    <h4 class="card-title valor-monetario mb-0">{{ maquina.valor_mercado|floatformat:2 }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2">Depreciação/Mês</h6>
+                                    <h4 class="card-title valor-monetario mb-0">{{ maquina.depreciacao_mensal|floatformat:2 }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2">Total Pago</h6>
+                                    <h4 class="card-title valor-monetario mb-0">{{ total_pago|floatformat:2 }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2">Total Pendente</h6>
+                                    <h4 class="card-title valor-monetario mb-0">{{ total_pendente|floatformat:2 }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Filtros</h6>
+                        </div>
+                        <div class="card-body">
+                            <form method="get" class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Data Início</label>
+                                    <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Data Fim</label>
+                                    <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Categoria</label>
+                                    <select name="categoria" class="form-select">
+                                        <option value="">Todas</option>
+                                        {% for cat in categorias %}
+                                        <option value="{{ cat.id }}" {% if filtros.categoria|stringformat:"s" == cat.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ cat.nome }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Status</label>
+                                    <select name="status" class="form-select">
+                                        <option value="">Todos</option>
+                                        <option value="PENDENTE" {% if filtros.status == 'PENDENTE' %}selected{% endif %}>Pendente</option>
+                                        <option value="PAGO" {% if filtros.status == 'PAGO' %}selected{% endif %}>Pago</option>
+                                        <option value="VENCIDO" {% if filtros.status == 'VENCIDO' %}selected{% endif %}>Vencido</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-1 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Histórico de Transações</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if despesas %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Data</th>
+                                                <th>Descrição</th>
+                                                <th>Categoria</th>
+                                                <th>Valor</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in despesas %}
+                                            <tr>
+                                                <td>{{ item.despesa.data_emissao|date:"d/m/Y" }}</td>
+                                                <td>
+                                                    {{ item.subcategoria.nome }}
+                                                    {% if item.despesa.observacao %}
+                                                    <br><small class="text-muted">{{ item.despesa.observacao }}</small>
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ item.categoria.nome }}</td>
+                                                <td class="valor-monetario">{{ item.valor_total }}</td>
+                                                <td>
+                                                    <span class="badge {% if item.despesa.status == 'PAGO' %}bg-success{% elif item.despesa.status == 'PENDENTE' %}bg-warning{% else %}bg-danger{% endif %}">
+                                                        {{ item.despesa.status }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr>
+                                                <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                                                <td colspan="2" class="valor-monetario"><strong>{{ total_gasto }}</strong></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info">
+                                    Nenhuma transação registrada para esta máquina.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Formata todos os valores monetários
+        document.querySelectorAll('.valor-monetario').forEach(element => {
+            const valor = parseFloat(element.textContent.trim());
+            if (!isNaN(valor)) {
+                element.textContent = new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }).format(valor);
+            }
+        });
+    });
+</script>
+{% endblock %}

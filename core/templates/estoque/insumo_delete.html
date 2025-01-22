@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4>Excluir Insumo</h4>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">
+                        Tem certeza que deseja excluir o insumo <strong>{{ insumo.nome }}</strong>?
+                    </p>
+                    <p class="mb-3">
+                        Esta ação não poderá ser desfeita.
+                    </p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="text-end">
+                            <a href="{% url 'estoque_list' %}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-danger">Confirmar Exclusão</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

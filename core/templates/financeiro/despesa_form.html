@@ -1,0 +1,550 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h4>Nova Despesa</h4>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" id="despesaForm">
+                {% csrf_token %}
+                
+                <!-- Documentação -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label for="forma_pagamento">Forma de Pagamento</label>
+                        <select name="forma_pagamento" id="forma_pagamento" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            {% for value, text in form.fields.forma_pagamento.choices %}
+                                <option value="{{ value }}" {% if form.forma_pagamento.value == value %}selected{% endif %}>{{ text }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_numero_nf">Número NF</label>
+                        <input type="text" name="numero_nf" id="id_numero_nf" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_data_emissao">Data de Emissão</label>
+                        <input type="date" name="data_emissao" id="id_data_emissao" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_contato">Contato</label>
+                        <select name="contato" id="id_contato" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            {% for contato in contatos %}
+                            <option value="{{ contato.id }}">{{ contato.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3" id="div_data_vencimento">
+                        <label for="id_data_vencimento">Data de Vencimento</label>
+                        <input type="date" name="data_vencimento" id="id_data_vencimento" class="form-control">
+                    </div>
+                    <div class="col-md-9">
+                        <label for="id_arquivo">Arquivo</label>
+                        <input type="file" name="arquivo" id="id_arquivo" class="form-control">
+                    </div>
+                </div>
+
+                <!-- Seção de Parcelas (visível apenas quando forma_pagamento = PR) -->
+                <div id="secao_parcelas" class="mt-4" style="display: none;">
+                    <h5>Parcelas</h5>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label for="num_parcelas" class="form-label">Número de Parcelas</label>
+                            <input type="number" class="form-control" id="num_parcelas" name="num_parcelas" min="2" max="24">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="primeira_parcela" class="form-label">Data 1ª Parcela</label>
+                            <input type="date" class="form-control" id="primeira_parcela" name="primeira_parcela">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="intervalo_dias" class="form-label">Intervalo (dias)</label>
+                            <input type="number" class="form-control" id="intervalo_dias" name="intervalo_dias" value="30">
+                        </div>
+                    </div>
+                    <div id="lista_parcelas" class="table-responsive">
+                        <!-- As parcelas serão adicionadas aqui via JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Itens da Nota -->
+                <h5 class="mb-3">Itens da Nota</h5>
+                <div id="itensContainer">
+                    <div class="item-row border p-3 mb-3">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label>Categoria</label>
+                                <select class="form-control categoria-select" name="categoria" required>
+                                    <option value="">Selecione...</option>
+                                    {% for categoria in categorias %}
+                                    <option value="{{ categoria.id }}" 
+                                            data-tipo="{{ categoria.tipo|upper }}"
+                                            data-alocacao="{{ categoria.alocacao }}">
+                                        {{ categoria.nome }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label>Subcategoria</label>
+                                <select class="form-control subcategoria-select" name="subcategoria" required>
+                                    <option value="">Selecione a categoria primeiro...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label>Destino</label>
+                                <select class="form-control destino-select" name="destino" required>
+                                    <option value="">Selecione a categoria primeiro...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-12 insumo-field" style="display: none;">
+                                <label>Nome do Insumo</label>
+                                <div class="input-group">
+                                    <select class="form-control insumo-select" name="insumo">
+                                        <option value="">Selecione um insumo existente ou digite um novo...</option>
+                                    </select>
+                                    <input type="text" class="form-control insumo-input" name="novo_insumo" style="display: none;" placeholder="Digite o nome do novo insumo">
+                                    <button type="button" class="btn btn-outline-secondary toggle-insumo-input">
+                                        <i class="bi bi-plus-circle"></i> Novo
+                                    </button>
+                                </div>
+                                <div class="unidade-medida-field mt-2" style="display: none;">
+                                    <label>Unidade de Medida</label>
+                                    <div class="input-group">
+                                        <select class="form-control unidade-medida-select" name="unidade_medida">
+                                            <option value="">Selecione a unidade de medida...</option>
+                                            {% for unidade in unidades %}
+                                            <option value="{{ unidade.id }}">{{ unidade.nome }} ({{ unidade.sigla }})</option>
+                                            {% endfor %}
+                                        </select>
+                                        <a href="{% url 'unidade-medida-create' %}" class="btn btn-outline-secondary" target="_blank">
+                                            <i class="fas fa-plus"></i> Nova Unidade
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label>Quantidade</label>
+                                <input type="number" class="form-control quantidade-input" required step="0.01" min="0">
+                            </div>
+                            <div class="col-md-3">
+                                <label>Valor Unitário</label>
+                                <input type="number" class="form-control valor-unitario-input" required step="0.01" min="0">
+                            </div>
+                            <div class="col-md-3">
+                                <label>Valor Total</label>
+                                <input type="number" class="form-control valor-total-input" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <button type="button" class="btn btn-success" id="addItemBtn">
+                        <i class="fas fa-plus"></i> Adicionar Item
+                    </button>
+                </div>
+
+                <!-- Hidden input para os itens -->
+                <input type="hidden" name="itens_despesa" id="itensData">
+
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Salvar
+                    </button>
+                    <a href="{% url 'despesas_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Função para atualizar a lista de unidades de medida
+    function atualizarUnidadesMedida() {
+        $.get('{% url "get_unidades_medida" %}')
+            .done(function(data) {
+                $('.unidade-medida-select').each(function() {
+                    const select = $(this);
+                    const selectedValue = select.val();
+                    select.empty().append('<option value="">Selecione a unidade de medida...</option>');
+                    data.forEach(function(unidade) {
+                        select.append(`<option value="${unidade.id}">${unidade.nome} (${unidade.sigla})</option>`);
+                    });
+                    if (selectedValue) select.val(selectedValue);
+                });
+            })
+            .fail(function(jqXHR, textStatus, errorThrown) {
+                console.error('Erro ao carregar unidades de medida:', errorThrown);
+            });
+    }
+
+    // Chama a função quando a página carrega
+    atualizarUnidadesMedida();
+
+    const formaPagamento = document.getElementById('forma_pagamento');
+    const dataEmissaoInput = document.getElementById('id_data_emissao');
+    const divDataVencimento = document.getElementById('div_data_vencimento');
+    const secaoParcelas = document.getElementById('secao_parcelas');
+    const numParcelas = document.getElementById('num_parcelas');
+    const primeiraParcela = document.getElementById('primeira_parcela');
+    const intervaloDias = document.getElementById('intervalo_dias');
+    const listaParcelas = document.getElementById('lista_parcelas');
+    const itensContainer = document.getElementById('itensContainer');
+    const addItemBtn = document.getElementById('addItemBtn');
+    const form = document.getElementById('despesaForm');
+
+    if (dataEmissaoInput) {
+        const hoje = new Date().toISOString().split('T')[0];
+        dataEmissaoInput.value = hoje;
+    }
+
+    // Controla visibilidade do campo data_vencimento
+    formaPagamento.addEventListener('change', function() {
+        const isParcela = this.value === 'PR';
+        divDataVencimento.style.display = isParcela ? 'none' : 'block';
+        secaoParcelas.style.display = isParcela ? 'block' : 'none';
+        
+        if (isParcela) {
+            document.getElementById('id_data_vencimento').value = '';
+            atualizarParcelas();
+        }
+    });
+
+    // Adiciona classes do Bootstrap aos selects
+    document.querySelectorAll('select').forEach(select => {
+        select.classList.add('form-select');
+    });
+
+    // Função para adicionar novo item
+    addItemBtn.addEventListener('click', function() {
+        const itemTemplate = itensContainer.querySelector('.item-row');
+        const newItem = itemTemplate.cloneNode(true);
+        
+        // Limpa os valores do novo item
+        newItem.querySelectorAll('input').forEach(input => input.value = '');
+        newItem.querySelectorAll('select').forEach(select => {
+            select.selectedIndex = 0;
+            select.classList.add('form-select');
+        });
+        
+        // Adiciona botão de remover no novo item
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-danger mt-2';
+        removeBtn.innerHTML = '<i class="fas fa-trash"></i> Remover';
+        removeBtn.onclick = function() {
+            if (itensContainer.children.length > 1) {
+                newItem.remove();
+                atualizarParcelas();
+            } else {
+                alert('É necessário ter pelo menos um item na despesa.');
+            }
+        };
+        newItem.querySelector('.row:last-child').appendChild(removeBtn);
+        
+        // Adiciona event listeners no novo item
+        setupItemEventListeners(newItem);
+        
+        // Adiciona o novo item ao container
+        itensContainer.appendChild(newItem);
+    });
+
+    function setupItemEventListeners(item) {
+        const categoriaSelect = item.querySelector('.categoria-select');
+        const subcategoriaSelect = item.querySelector('.subcategoria-select');
+        const destinoSelect = item.querySelector('.destino-select');
+        const insumoField = item.querySelector('.insumo-field');
+        const insumoSelect = item.querySelector('.insumo-select');
+        const insumoInput = item.querySelector('.insumo-input');
+        const toggleInsumoBtn = item.querySelector('.toggle-insumo-input');
+        const unidadeMedidaField = item.querySelector('.unidade-medida-field');
+        const unidadeMedidaSelect = item.querySelector('.unidade-medida-select');
+        
+        // Setup insumo toggle
+        toggleInsumoBtn.addEventListener('click', function() {
+            const isNovoInsumo = insumoInput.style.display !== 'none';
+            insumoSelect.style.display = isNovoInsumo ? 'none' : 'block';
+            insumoInput.style.display = isNovoInsumo ? 'none' : 'block';
+            unidadeMedidaField.style.display = isNovoInsumo ? 'none' : 'block';
+            toggleInsumoBtn.innerHTML = isNovoInsumo ? 
+                '<i class="bi bi-plus-circle"></i> Novo' : 
+                '<i class="bi bi-arrow-left-circle"></i> Voltar';
+                
+            if (isNovoInsumo) {
+                insumoInput.value = '';
+                unidadeMedidaSelect.value = '';
+                unidadeMedidaSelect.removeAttribute('required');
+            } else {
+                unidadeMedidaSelect.setAttribute('required', 'required');
+            }
+        });
+
+        // Quando selecionar um insumo existente
+        insumoSelect.addEventListener('change', function() {
+            // Se selecionou um insumo existente, esconde o campo de unidade de medida
+            if (this.value) {
+                unidadeMedidaField.style.display = 'none';
+                unidadeMedidaSelect.removeAttribute('required');
+                unidadeMedidaSelect.value = '';
+            } else {
+                unidadeMedidaField.style.display = 'block';
+                unidadeMedidaSelect.setAttribute('required', 'required');
+            }
+        });
+
+        categoriaSelect.addEventListener('change', function() {
+            const categoriaId = this.value;
+            const alocacao = this.options[this.selectedIndex].dataset.alocacao;
+            
+            // Mostra/esconde campo de insumo baseado na alocação
+            if (insumoField) {
+                insumoField.style.display = alocacao === 'estoque' ? 'block' : 'none';
+                
+                if (alocacao !== 'estoque') {
+                    // Se não for estoque, limpa e desabilita os campos de insumo
+                    insumoSelect.value = '';
+                    insumoInput.value = '';
+                    unidadeMedidaSelect.value = '';
+                    unidadeMedidaField.style.display = 'none';
+                    unidadeMedidaSelect.removeAttribute('required');
+                } else {
+                    // Se for estoque, carrega os insumos
+                    fetch('{% url "get_insumos" %}')
+                        .then(response => response.json())
+                        .then(data => {
+                            insumoSelect.innerHTML = '<option value="">Selecione um insumo existente ou digite um novo...</option>';
+                            data.forEach(insumo => {
+                                insumoSelect.innerHTML += `<option value="${insumo.id}">${insumo.nome}</option>`;
+                            });
+                            insumoSelect.disabled = false;
+                            
+                            // Mostra o campo de unidade de medida apenas se for um novo insumo
+                            if (insumoInput.style.display !== 'none') {
+                                unidadeMedidaField.style.display = 'block';
+                                unidadeMedidaSelect.setAttribute('required', 'required');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Erro ao carregar insumos:', error);
+                            insumoSelect.innerHTML = '<option value="">Erro ao carregar insumos</option>';
+                            insumoSelect.disabled = true;
+                        });
+                }
+            }
+            
+            // Limpa e desabilita os selects
+            subcategoriaSelect.innerHTML = '<option value="">Carregando...</option>';
+            destinoSelect.innerHTML = '<option value="">Carregando...</option>';
+            subcategoriaSelect.disabled = true;
+            
+            // Carrega subcategorias
+            if (categoriaId) {
+                fetch(`/api/financeiro/categorias/${categoriaId}/subcategorias/`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Erro ao carregar subcategorias');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (Array.isArray(data)) {
+                            subcategoriaSelect.innerHTML = '<option value="">Selecione...</option>';
+                            data.forEach(sub => {
+                                subcategoriaSelect.innerHTML += `<option value="${sub.id}">${sub.nome}</option>`;
+                            });
+                            subcategoriaSelect.disabled = false;
+                        } else {
+                            throw new Error('Formato de dados inválido');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar subcategorias:', error);
+                        subcategoriaSelect.innerHTML = '<option value="">Erro ao carregar subcategorias</option>';
+                        subcategoriaSelect.disabled = true;
+                    });
+                
+                // Carrega destinos baseado no tipo de alocação
+                if (alocacao) {
+                    fetch(`/api/financeiro/despesas/get_destinos/?tipo_alocacao=${alocacao.toLowerCase()}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            destinoSelect.innerHTML = '<option value="">Selecione...</option>';
+                            data.forEach(destino => {
+                                destinoSelect.innerHTML += `<option value="${destino.id}">${destino.nome}</option>`;
+                            });
+                            destinoSelect.disabled = false;
+                        })
+                        .catch(error => {
+                            console.error('Erro ao carregar destinos:', error);
+                            destinoSelect.innerHTML = '<option value="">Erro ao carregar destinos</option>';
+                            destinoSelect.disabled = true;
+                        });
+                } else {
+                    destinoSelect.innerHTML = '<option value="">Selecione a categoria primeiro...</option>';
+                    destinoSelect.disabled = true;
+                }
+            }
+        });
+
+        // Atualiza valor total quando quantidade ou valor unitário mudam
+        function atualizarValorTotal() {
+            const quantidade = parseFloat(item.querySelector('.quantidade-input').value) || 0;
+            const valorUnitario = parseFloat(item.querySelector('.valor-unitario-input').value) || 0;
+            item.querySelector('.valor-total-input').value = (quantidade * valorUnitario).toFixed(2);
+            atualizarParcelas();
+        }
+
+        item.querySelector('.quantidade-input').addEventListener('input', atualizarValorTotal);
+        item.querySelector('.valor-unitario-input').addEventListener('input', atualizarValorTotal);
+    }
+
+    // Configura os event listeners para o primeiro item
+    setupItemEventListeners(itensContainer.querySelector('.item-row'));
+
+    // Event listener para submit do formulário
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        // Coleta dados dos itens
+        const itens = [];
+        document.querySelectorAll('.item-row').forEach(item => {
+            const categoriaSelect = item.querySelector('.categoria-select');
+            const alocacao = categoriaSelect.options[categoriaSelect.selectedIndex].dataset.alocacao;
+            
+            let insumoData = null;
+            if (alocacao === 'estoque') {
+                const insumoSelect = item.querySelector('.insumo-select');
+                const insumoInput = item.querySelector('.insumo-input');
+                
+                if (insumoInput.style.display !== 'none') {
+                    insumoData = {
+                        id: null,
+                        nome: insumoInput.value,
+                        unidade_medida_id: item.querySelector('.unidade-medida-select').value
+                    };
+                } else {
+                    insumoData = {
+                        id: insumoSelect.value,
+                        nome: insumoSelect.options[insumoSelect.selectedIndex].text
+                    };
+                }
+            }
+            
+            itens.push({
+                categoria_id: item.querySelector('.categoria-select').value,
+                subcategoria_id: item.querySelector('.subcategoria-select').value,
+                destino_id: item.querySelector('.destino-select').value,
+                quantidade: item.querySelector('.quantidade-input').value,
+                valor_unitario: item.querySelector('.valor-unitario-input').value,
+                valor_total: item.querySelector('.valor-total-input').value,
+                insumo: insumoData
+            });
+        });
+
+        // Adiciona os dados dos itens ao hidden input
+        document.getElementById('itensData').value = JSON.stringify(itens);
+
+        // Validar parcelas se forma de pagamento for parcelado
+        if (formaPagamento.value === 'PR') {
+            if (!numParcelas.value || !primeiraParcela.value) {
+                if (!numParcelas.value) numParcelas.classList.add('is-invalid');
+                if (!primeiraParcela.value) primeiraParcela.classList.add('is-invalid');
+                return;
+            }
+        }
+
+        // Submit do formulário
+        this.submit();
+    });
+
+    // Função para calcular datas das parcelas
+    function calcularDataParcela(dataBase, numeroParcela, intervalo) {
+        const data = new Date(dataBase);
+        data.setDate(data.getDate() + (numeroParcela - 1) * intervalo);
+        return data.toISOString().split('T')[0];
+    }
+
+    // Função para atualizar tabela de parcelas
+    function atualizarParcelas() {
+        if (formaPagamento.value !== 'PR') return;
+
+        const numParc = parseInt(numParcelas.value) || 0;
+        const dataPrimeira = primeiraParcela.value;
+        const intervalo = parseInt(intervaloDias.value) || 30;
+        
+        // Calcula o valor total somando todos os itens
+        let valorTotal = 0;
+        const itemRows = itensContainer.querySelectorAll('.item-row');
+        itemRows.forEach(row => {
+            const quantidade = parseFloat(row.querySelector('.quantidade-input').value) || 0;
+            const valorUnitario = parseFloat(row.querySelector('.valor-unitario-input').value) || 0;
+            valorTotal += quantidade * valorUnitario;
+        });
+
+        const valorParcela = (valorTotal / numParc).toFixed(2);
+
+        if (numParc > 0 && dataPrimeira) {
+            let html = `
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Parcela</th>
+                            <th>Vencimento</th>
+                            <th>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            for (let i = 1; i <= numParc; i++) {
+                const dataVenc = calcularDataParcela(dataPrimeira, i, intervalo);
+                html += `
+                    <tr>
+                        <td>${i}/${numParc}</td>
+                        <td>${dataVenc}</td>
+                        <td>R$ ${valorParcela}</td>
+                        <input type="hidden" name="parcela_${i}_data" value="${dataVenc}">
+                        <input type="hidden" name="parcela_${i}_valor" value="${valorParcela}">
+                    </tr>
+                `;
+            }
+
+            html += '</tbody></table>';
+            listaParcelas.innerHTML = html;
+        } else {
+            listaParcelas.innerHTML = '';
+        }
+    }
+
+    // Eventos para atualizar parcelas
+    formaPagamento.addEventListener('change', function() {
+        const isParcela = this.value === 'PR';
+        secaoParcelas.style.display = isParcela ? 'block' : 'none';
+        if (isParcela) {
+            atualizarParcelas();
+        }
+    });
+
+    numParcelas.addEventListener('change', atualizarParcelas);
+    primeiraParcela.addEventListener('change', atualizarParcelas);
+    intervaloDias.addEventListener('change', atualizarParcelas);
+
+    // Inicializar visibilidade
+    secaoParcelas.style.display = formaPagamento.value === 'PR' ? 'block' : 'none';
+});
+</script>
+{% endblock %}

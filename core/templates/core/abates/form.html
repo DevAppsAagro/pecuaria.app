@@ -1,0 +1,303 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>{{ abate.pk|yesno:"Editar,Novo" }} Abate</h2>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="{{ form.data.id_for_label }}" class="form-label">Data do Abate</label>
+                        {{ form.data }}
+                        {% if form.data.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.data.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.data_vencimento.id_for_label }}" class="form-label">Data de Vencimento</label>
+                        {{ form.data_vencimento }}
+                        {% if form.data_vencimento.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.data_vencimento.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.numero_parcelas.id_for_label }}" class="form-label">Número de Parcelas</label>
+                        {{ form.numero_parcelas }}
+                        {% if form.numero_parcelas.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.numero_parcelas.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="{{ form.rendimento_padrao.id_for_label }}" class="form-label">Rendimento Padrão (%)</label>
+                        {{ form.rendimento_padrao }}
+                        {% if form.rendimento_padrao.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.rendimento_padrao.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.valor_arroba.id_for_label }}" class="form-label">Valor da Arroba (R$)</label>
+                        {{ form.valor_arroba }}
+                        {% if form.valor_arroba.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.valor_arroba.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.conta_bancaria.id_for_label }}" class="form-label">Conta Bancária</label>
+                        {{ form.conta_bancaria }}
+                        {% if form.conta_bancaria.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.conta_bancaria.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="{{ form.comprador.id_for_label }}" class="form-label">Comprador</label>
+                        {{ form.comprador }}
+                        {% if form.comprador.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.comprador.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col">
+                        <label class="form-label">Selecione os Animais</label>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="fazenda_filter" class="form-label">Filtrar por Fazenda</label>
+                                <select class="form-select" id="fazenda_filter">
+                                    <option value="">Todas as Fazendas</option>
+                                    {% for fazenda in fazendas %}
+                                    <option value="{{ fazenda.id }}">{{ fazenda.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="lote_filter" class="form-label">Filtrar por Lote</label>
+                                <select class="form-select" id="lote_filter">
+                                    <option value="">Todos os Lotes</option>
+                                    {% for lote in lotes %}
+                                    <option value="{{ lote.id }}">{{ lote.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="animaisTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px;">
+                                            <input type="checkbox" class="form-check-input" id="selectAll">
+                                        </th>
+                                        <th>Brinco</th>
+                                        <th>Fazenda</th>
+                                        <th>Lote</th>
+                                        <th>Peso Atual</th>
+                                        <th>Peso em @</th>
+                                        <th>Valor Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for animal in animais_disponiveis %}
+                                    <tr data-fazenda="{{ animal.fazenda_atual.id }}" data-lote="{{ animal.lote.id|default:'' }}">
+                                        <td>
+                                            <input type="checkbox" name="animal" value="{{ animal.id }}" 
+                                                   class="form-check-input animal-checkbox"
+                                                   {% if animal.id in animais_selecionados %}checked{% endif %}>
+                                        </td>
+                                        <td>{{ animal.brinco_visual }}</td>
+                                        <td>{{ animal.fazenda_atual.nome }}</td>
+                                        <td>{{ animal.lote.nome|default:"-" }}</td>
+                                        <td class="peso-atual">Carregando...</td>
+                                        <td class="peso-arroba">-</td>
+                                        <td class="valor-total">-</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col">
+                        <button type="submit" class="btn btn-primary">Salvar</button>
+                        <a href="{% url 'abates_list' %}" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const animalCheckboxes = document.querySelectorAll('.animal-checkbox');
+    const rendimentoInput = document.getElementById('{{ form.rendimento_padrao.id_for_label }}');
+    const valorArrobaInput = document.getElementById('{{ form.valor_arroba.id_for_label }}');
+    const fazendaSelect = document.getElementById('fazenda_filter');
+    const loteSelect = document.getElementById('lote_filter');
+
+    // Função para calcular os valores de um animal
+    function calcularValoresAnimal(row) {
+        const pesoAtualEl = row.querySelector('.peso-atual');
+        const pesoAtualText = pesoAtualEl.textContent;
+        const checkbox = row.querySelector('.animal-checkbox');
+        
+        if (!pesoAtualText || pesoAtualText === 'Carregando...' || pesoAtualText === 'Erro' || !checkbox.checked) {
+            row.querySelector('.peso-arroba').textContent = '-';
+            row.querySelector('.valor-total').textContent = '-';
+            return;
+        }
+
+        const pesoAtual = parseFloat(pesoAtualText.replace(' kg', ''));
+        const rendimento = parseFloat(rendimentoInput.value) || 0;
+        const valorArroba = parseFloat(valorArrobaInput.value) || 0;
+
+        if (pesoAtual > 0 && rendimento > 0) {
+            const pesoArroba = (pesoAtual * (rendimento / 100)) / 15;
+            row.querySelector('.peso-arroba').textContent = `${pesoArroba.toFixed(2)} @`;
+            
+            if (valorArroba > 0) {
+                const valorTotal = pesoArroba * valorArroba;
+                row.querySelector('.valor-total').textContent = `R$ ${valorTotal.toFixed(2)}`;
+            } else {
+                row.querySelector('.valor-total').textContent = '-';
+            }
+        } else {
+            row.querySelector('.peso-arroba').textContent = '-';
+            row.querySelector('.valor-total').textContent = '-';
+        }
+    }
+
+    // Função para carregar o peso do animal
+    async function carregarPesoAnimal(animalId, row) {
+        try {
+            const response = await fetch(`{% url 'animal_peso_api' %}?animal_id=${animalId}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            const pesoAtual = data.peso || 0;
+            row.querySelector('.peso-atual').textContent = pesoAtual > 0 ? `${pesoAtual.toFixed(2)} kg` : 'Sem peso';
+            calcularValoresAnimal(row);
+        } catch (error) {
+            console.error('Erro ao carregar peso:', error);
+            row.querySelector('.peso-atual').textContent = 'Erro';
+            row.querySelector('.peso-arroba').textContent = '-';
+            row.querySelector('.valor-total').textContent = '-';
+        }
+    }
+
+    // Função para filtrar os animais
+    function filtrarAnimais() {
+        const fazendaId = fazendaSelect.value;
+        const loteId = loteSelect.value;
+        const rows = document.querySelectorAll('#animaisTable tbody tr');
+
+        rows.forEach(row => {
+            const rowFazendaId = row.getAttribute('data-fazenda');
+            const rowLoteId = row.getAttribute('data-lote');
+            
+            const fazendaMatch = !fazendaId || rowFazendaId === fazendaId;
+            const loteMatch = !loteId || rowLoteId === loteId;
+            
+            row.style.display = fazendaMatch && loteMatch ? '' : 'none';
+        });
+    }
+
+    // Event listener para os checkboxes
+    function handleCheckboxChange(e) {
+        const checkbox = e.target;
+        const row = checkbox.closest('tr');
+        if (row) {
+            calcularValoresAnimal(row);
+        }
+    }
+
+    // Event listeners para os filtros
+    fazendaSelect.addEventListener('change', filtrarAnimais);
+    loteSelect.addEventListener('change', filtrarAnimais);
+
+    // Event listener para o checkbox "Selecionar Todos"
+    selectAllCheckbox.addEventListener('change', function() {
+        const isChecked = this.checked;
+        animalCheckboxes.forEach(checkbox => {
+            checkbox.checked = isChecked;
+            const row = checkbox.closest('tr');
+            if (row) {
+                calcularValoresAnimal(row);
+            }
+        });
+    });
+
+    // Event listeners para os checkboxes individuais
+    animalCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', handleCheckboxChange);
+    });
+
+    // Event listeners para recalcular valores quando rendimento ou valor da arroba mudar
+    rendimentoInput.addEventListener('change', function() {
+        animalCheckboxes.forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            if (row) {
+                calcularValoresAnimal(row);
+            }
+        });
+    });
+
+    valorArrobaInput.addEventListener('change', function() {
+        animalCheckboxes.forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            if (row) {
+                calcularValoresAnimal(row);
+            }
+        });
+    });
+
+    // Carrega os pesos iniciais
+    animalCheckboxes.forEach(checkbox => {
+        const row = checkbox.closest('tr');
+        const animalId = checkbox.value;
+        carregarPesoAnimal(animalId, row);
+    });
+
+    // Filtra os animais inicialmente
+    filtrarAnimais();
+});
+</script>
+{% endblock %}

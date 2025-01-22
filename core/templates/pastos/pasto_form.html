@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+<style>
+    #map {
+        height: 500px;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    .form-label {
+        font-weight: bold;
+    }
+    .pasto-label {
+        font-size: 12px;
+        font-weight: bold;
+        color: #000;
+        text-align: center;
+        border: 1px solid #fff;
+        border-radius: 3px;
+        padding: 2px 5px;
+        background-color: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% if pasto %}Editar{% else %}Cadastrar{% endif %} Pasto</h2>
+    
+    <form method="post" class="mt-4 needs-validation" novalidate>
+        {% csrf_token %}
+        
+        <!-- Seleção da Fazenda -->
+        <div class="form-group">
+            <label for="fazenda" class="form-label">Fazenda:</label>
+            <select name="fazenda" id="fazenda" class="form-select" required>
+                <option value="">Selecione uma fazenda</option>
+                {% for fazenda in fazendas %}
+                    <option value="{{ fazenda.id }}" {% if pasto.fazenda.id == fazenda.id %}selected{% endif %}>
+                        {{ fazenda.nome }}
+                    </option>
+                {% endfor %}
+            </select>
+            <div class="invalid-feedback">
+                Por favor, selecione uma fazenda.
+            </div>
+        </div>
+
+        <!-- ID do Pasto -->
+        <div class="form-group">
+            <label for="id_pasto" class="form-label">ID do Pasto:</label>
+            <input type="text" name="id_pasto" id="id_pasto" class="form-control" value="{{ pasto.id_pasto }}" required>
+            <div class="invalid-feedback">
+                Por favor, informe o ID do Pasto.
+            </div>
+        </div>
+
+        <!-- Variedade do Capim -->
+        <div class="form-group">
+            <label for="variedade_capim" class="form-label">Variedade do Capim:</label>
+            <select class="form-select" id="variedade_capim" name="variedade_capim" required>
+                <option value="">Selecione uma variedade</option>
+                {% for variedade in variedades_capim %}
+                    <option value="{{ variedade.id }}" {% if pasto.variedade_capim_id == variedade.id %}selected{% endif %}>
+                        {{ variedade.nome }}{% if variedade.nome_cientifico %} ({{ variedade.nome_cientifico }}){% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+            <div class="invalid-feedback">
+                Por favor, selecione uma variedade de capim.
+            </div>
+        </div>
+
+        <!-- Capacidade UA -->
+        <div class="form-group">
+            <label for="capacidade_ua" class="form-label">Capacidade (UA/ha):</label>
+            <input type="number" name="capacidade_ua" id="capacidade_ua" class="form-control" step="0.1" min="0" value="{{ pasto.capacidade_ua|default:'' }}" required>
+            <div class="invalid-feedback">
+                Por favor, informe a capacidade em UA/ha.
+            </div>
+        </div>
+
+        <!-- Mapa -->
+        <div class="form-group">
+            <label class="form-label">Área do Pasto:</label>
+            <div id="map"></div>
+        </div>
+
+        <!-- Área Calculada -->
+        <div class="form-group">
+            <label for="area" class="form-label">Área Calculada (ha):</label>
+            <input type="number" name="area" id="area" class="form-control" step="0.01" value="{{ pasto.area|default:'' }}" required readonly>
+            <div class="invalid-feedback">
+                A área é calculada automaticamente ao desenhar no mapa.
+            </div>
+        </div>
+
+        <!-- Campo oculto para coordenadas -->
+        <input type="hidden" name="coordenadas" id="coordenadas">
+
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+            <a href="{% url 'pasto_list' %}" class="btn btn-secondary me-2">
+                <i class="bi bi-x-lg"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i> Salvar
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Leaflet JS e plugins -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Ativar validação do Bootstrap
+    var forms = document.querySelectorAll('.needs-validation');
+    Array.from(forms).forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        }, false);
+    });
+
+    // Verificar se uma fazenda está selecionada e se o elemento do mapa existe
+    var mapElement = document.getElementById('map');
+    if (!mapElement) return;
+
+    // Inicializar variáveis
+    var map, drawnItems, drawControl;
+    var pastosLayer = L.featureGroup();
+    
+    // Coordenadas existentes (para edição)
+    var coordenadasExistentes = JSON.parse('{% if coordenadas_existentes %}{{ coordenadas_existentes|safe }}{% else %}null{% endif %}');
+    var centroMapa = JSON.parse('{% if centro_mapa %}{{ centro_mapa|safe }}{% else %}null{% endif %}');
+    var pastosExistentes = JSON.parse('{% if pastos_existentes %}{{ pastos_existentes|safe }}{% else %}[]{% endif %}');
+
+    // Inicializar o mapa
+    map = L.map('map').setView([-15.7801, -47.9292], 4);  // Centro do Brasil com zoom mais aberto
+    
+    // Adicionar camada híbrida do Google Maps (satélite + ruas)
+    L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+        attribution: 'Google Maps'
+    }).addTo(map);
+
+    // Adicionar camada para os polígonos
+    drawnItems = L.featureGroup().addTo(map);
+    pastosLayer.addTo(map);
+
+    // Função para desenhar os pastos existentes
+    function desenharPastosExistentes(pastos) {
+        try {
+            pastosLayer.clearLayers();
+            var bounds = L.latLngBounds();
+            var temPastos = false;
+
+            pastos.forEach(function(pasto) {
+                if (pasto.coordenadas && pasto.coordenadas.length > 0) {
+                    temPastos = true;
+                    var polygon = L.polygon(pasto.coordenadas, {
+                        color: pasto.cor,
+                        fillOpacity: 0.2,
+                        weight: 2
+                    });
+
+                    // Adicionar tooltip com informações do pasto
+                    var tooltipContent = `
+                        <strong>${pasto.id_pasto}</strong><br>
+                        Área: ${pasto.area.toFixed(2)} ha<br>
+                        Capacidade: ${pasto.capacidade_ua.toFixed(2)} UA/ha
+                    `;
+                    polygon.bindTooltip(tooltipContent, {
+                        permanent: true,
+                        direction: 'center',
+                        className: 'pasto-label'
+                    });
+
+                    polygon.addTo(pastosLayer);
+                    bounds.extend(polygon.getBounds());
+                }
+            });
+
+            // Ajustar zoom se houver polígonos
+            if (temPastos) {
+                map.fitBounds(bounds, {
+                    padding: [50, 50]  // Adiciona um padding para melhor visualização
+                });
+            }
+        } catch (error) {
+            console.error('Erro ao desenhar pastos:', error);
+        }
+    }
+
+    // Carregar pastos existentes (exceto o atual sendo editado)
+    if (pastosExistentes && pastosExistentes.length > 0) {
+        desenharPastosExistentes(pastosExistentes);
+    }
+
+    // Configurar controles de desenho
+    drawControl = new L.Control.Draw({
+        draw: {
+            polygon: {
+                allowIntersection: false,
+                drawError: {
+                    color: '#e1e100',
+                    message: '<strong>Erro:</strong> não é permitido que os limites se cruzem!'
+                },
+                shapeOptions: {
+                    color: '#0000ff'
+                }
+            },
+            circle: false,
+            rectangle: false,
+            circlemarker: false,
+            marker: false,
+            polyline: false
+        },
+        edit: {
+            featureGroup: drawnItems,
+            remove: true
+        }
+    });
+    map.addControl(drawControl);
+
+    // Carregar coordenadas existentes se estiver editando
+    if (coordenadasExistentes) {
+        try {
+            var polygon = L.polygon(coordenadasExistentes, {
+                color: '#0000ff'
+            }).addTo(drawnItems);
+            map.fitBounds(polygon.getBounds());
+            calcularArea(polygon);
+        } catch (error) {
+            console.error('Erro ao carregar coordenadas existentes:', error);
+        }
+    }
+
+    // Eventos de desenho
+    map.on('draw:created', function(e) {
+        drawnItems.clearLayers();
+        var layer = e.layer;
+        drawnItems.addLayer(layer);
+        calcularArea(layer);
+        atualizarCoordenadas(layer);
+    });
+
+    map.on('draw:edited', function(e) {
+        var layers = e.layers;
+        layers.eachLayer(function(layer) {
+            calcularArea(layer);
+            atualizarCoordenadas(layer);
+        });
+    });
+
+    map.on('draw:deleted', function(e) {
+        document.getElementById('area').value = '';
+        document.getElementById('coordenadas').value = '';
+    });
+
+    // Evento de mudança da fazenda
+    document.getElementById('fazenda').addEventListener('change', function() {
+        var fazendaId = this.value;
+        if (fazendaId) {
+            // Limpar camadas existentes
+            drawnItems.clearLayers();
+            pastosLayer.clearLayers();
+            
+            // Fazer uma requisição AJAX para obter as coordenadas da fazenda
+            fetch(`/api/get-cidade-coordenadas/?fazenda_id=${fazendaId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Atualizar o centro do mapa
+                        map.setView([data.latitude, data.longitude], 13);
+                        
+                        // Carregar os pastos da fazenda selecionada
+                        if (data.pastos && data.pastos.length > 0) {
+                            desenharPastosExistentes(data.pastos);
+                        }
+                    } else {
+                        console.error('Erro:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar dados da fazenda:', error);
+                });
+        }
+    });
+
+    function calcularArea(layer) {
+        try {
+            var coords = layer.getLatLngs()[0];
+            var coordsArray = coords.map(function(coord) {
+                return [coord.lng, coord.lat];
+            });
+            coordsArray.push(coordsArray[0]); // Fechar o polígono
+
+            var polygon = turf.polygon([coordsArray]);
+            var area = turf.area(polygon);
+            var areaHectares = (area / 10000).toFixed(2);
+            
+            document.getElementById('area').value = areaHectares;
+        } catch (error) {
+            console.error('Erro ao calcular área:', error);
+        }
+    }
+
+    function atualizarCoordenadas(layer) {
+        try {
+            var coords = layer.getLatLngs()[0];
+            var coordsArray = coords.map(function(coord) {
+                return [coord.lat, coord.lng];
+            });
+            document.getElementById('coordenadas').value = JSON.stringify(coordsArray);
+        } catch (error) {
+            console.error('Erro ao atualizar coordenadas:', error);
+        }
+    }
+});
+</script>
+{% endblock %}

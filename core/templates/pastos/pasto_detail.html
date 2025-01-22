@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #map {
+        height: 400px;
+        width: 100%;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .info-box {
+        background: white;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+    .table-responsive {
+        margin-top: 1rem;
+    }
+    .table th {
+        background-color: #f8f9fa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Detalhes do Pasto</h2>
+        <div>
+            <a href="{% url 'pasto_edit' pk=pasto.id %}" class="btn btn-primary">
+                <i class="bi bi-pencil"></i> Editar
+            </a>
+            <a href="{% url 'pasto_list' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Informações Básicas -->
+        <div class="col-md-6">
+            <div class="info-box">
+                <h5 class="mb-3">Informações Básicas</h5>
+                <p><strong>ID do Pasto:</strong> {{ pasto.id_pasto }}</p>
+                <p><strong>Fazenda:</strong> {{ pasto.fazenda.nome }}</p>
+                <p><strong>Área:</strong> {{ pasto.area|floatformat:2 }} ha</p>
+                <p><strong>Capacidade:</strong> {{ capacidade_ua_ha|floatformat:2 }} UA/ha</p>
+                <p><strong>Lotação Atual:</strong> {{ ua_ha_atual|floatformat:2 }} UA/ha 
+                    <small class="{% if porcentagem_ocupacao > 100 %}text-danger{% elif porcentagem_ocupacao > 90 %}text-warning{% else %}text-success{% endif %}">
+                        ({{ porcentagem_ocupacao }}% ocupado)
+                    </small>
+                </p>
+                <p><strong>Peso Total:</strong> {{ soma_pesos|floatformat:0 }} kg ({{ ua_total|floatformat:1 }} UA)</p>
+                <p><strong>Variedade de Capim:</strong> {{ pasto.variedade_capim.nome|default:"-" }}</p>
+                <p><strong>Quantidade de Animais:</strong> {{ qtd_animais }} animais</p>
+                {% if lote_atual %}
+                <p><strong>Lote Atual:</strong> {{ lote_atual.id_lote }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Mapa -->
+        <div class="col-md-6">
+            <div class="info-box">
+                <h5 class="mb-3">Localização</h5>
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Histórico de Custos -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="info-box">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Histórico de Custos</h5>
+                    <div>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosDespesas">
+                            <i class="bi bi-funnel"></i> Filtros
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filtros Collapse -->
+                <div class="collapse mb-3" id="filtrosDespesas">
+                    <div class="card card-body">
+                        <form method="get" class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Data Inicial</label>
+                                <input type="date" name="data_inicial" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Data Final</label>
+                                <input type="date" name="data_final" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Categoria</label>
+                                <select name="categoria" class="form-select form-select-sm">
+                                    <option value="">Todas</option>
+                                    {% for item in despesas %}
+                                        <option value="{{ item.categoria.id }}">{{ item.categoria.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Status</label>
+                                <select name="status" class="form-select form-select-sm">
+                                    <option value="">Todos</option>
+                                    <option value="PENDENTE">Pendente</option>
+                                    <option value="PAGO">Pago</option>
+                                    <option value="VENCIDO">Vencido</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+                                <button type="reset" class="btn btn-secondary btn-sm">Limpar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Resumo dos Custos -->
+                <div class="row mb-3">
+                    <div class="col">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Total de Despesas</h6>
+                                <h4 class="mb-0">R$ {{ total_despesas|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card bg-success text-white">
+                            <div class="card-body">
+                                <h6 class="card-title">Despesas Pagas</h6>
+                                <h4 class="mb-0">R$ {{ total_pagas|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card bg-warning">
+                            <div class="card-body">
+                                <h6 class="card-title">Despesas Pendentes</h6>
+                                <h4 class="mb-0">R$ {{ total_pendentes|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card bg-danger text-white">
+                            <div class="card-body">
+                                <h6 class="card-title">Despesas Vencidas</h6>
+                                <h4 class="mb-0">R$ {{ total_vencidas|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card bg-info text-white">
+                            <div class="card-body">
+                                <h6 class="card-title">Vence Hoje</h6>
+                                <h4 class="mb-0">R$ {{ total_vence_hoje|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Categoria</th>
+                                <th>Subcategoria</th>
+                                <th>Quantidade</th>
+                                <th>Valor Unit.</th>
+                                <th>Valor Total</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in despesas %}
+                            <tr>
+                                <td>{{ item.despesa.data_emissao|date:"d/m/Y" }}</td>
+                                <td>
+                                    <div>{{ item.despesa.observacao|default:"-" }}</div>
+                                    {% if item.despesa.numero_nf %}
+                                        <small class="text-muted">NF: {{ item.despesa.numero_nf }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.categoria.nome }}</td>
+                                <td>{{ item.subcategoria.nome|default:"-" }}</td>
+                                <td>{{ item.quantidade|floatformat:2 }}</td>
+                                <td>R$ {{ item.valor_unitario|floatformat:2 }}</td>
+                                <td>R$ {{ item.valor_total|floatformat:2 }}</td>
+                                <td>
+                                    {% if item.despesa.status == 'PENDENTE' %}
+                                        <span class="badge bg-warning">Pendente</span>
+                                    {% elif item.despesa.status == 'PAGO' %}
+                                        <span class="badge bg-success">Pago</span>
+                                    {% elif item.despesa.status == 'VENCIDO' %}
+                                        <span class="badge bg-danger">Vencido</span>
+                                    {% elif item.despesa.status == 'VENCE_HOJE' %}
+                                        <span class="badge bg-info">Vence Hoje</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'despesa_detail' item.despesa.id %}" class="btn btn-outline-info" title="Ver Detalhes">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{% url 'despesa_update' item.despesa.id %}" class="btn btn-outline-warning" title="Editar">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center">Nenhuma despesa registrada para este pasto.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        {% if despesas %}
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="6" class="text-end"><strong>Total:</strong></td>
+                                <td colspan="3"><strong>R$ {{ total_despesas|floatformat:2 }}</strong></td>
+                            </tr>
+                        </tfoot>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializa o mapa
+    var map = L.map('map').setView([-15.7801, -47.9292], 4);
+    
+    // Adiciona a camada do Google Maps Híbrido
+    L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+        attribution: 'Google Maps'
+    }).addTo(map);
+
+    {% if pasto_json %}
+    var pastoData = {{ pasto_json|safe }};
+    if (pastoData && pastoData.length > 0) {
+        var pasto = pastoData[0];
+        if (pasto.coordenadas) {
+            // Cria o polígono do pasto
+            var polygon = L.polygon(pasto.coordenadas, {
+                color: pasto.cor,
+                fillOpacity: 0.3,
+                weight: 2
+            }).addTo(map);
+
+            // Ajusta o zoom para mostrar todo o polígono
+            map.fitBounds(polygon.getBounds());
+
+            // Adiciona um popup com informações
+            polygon.bindPopup(`
+                <strong>${pasto.id_pasto}</strong><br>
+                Fazenda: ${pasto.fazenda_nome}<br>
+                Área: ${pasto.area.toFixed(2)} ha<br>
+                UA/ha: ${pasto.ua_ha.toFixed(2)}
+            `);
+        }
+    }
+    {% endif %}
+});
+</script>
+{% endblock %}

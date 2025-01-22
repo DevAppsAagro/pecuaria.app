@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Nova Saída de Estoque</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="insumo" class="form-label">Insumo</label>
+                            <select class="form-select" id="insumo" name="insumo" required>
+                                <option value="">Selecione um insumo</option>
+                                {% for insumo in insumos %}
+                                <option value="{{ insumo.id }}" data-saldo="{{ insumo.saldo_estoque }}" data-unidade="{{ insumo.unidade_medida.sigla }}">
+                                    {{ insumo.nome }} (Saldo: {{ insumo.saldo_estoque }} {{ insumo.unidade_medida.sigla }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="data" class="form-label">Data</label>
+                                <input type="date" class="form-control" id="data" name="data" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="quantidade" class="form-label">Quantidade</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="quantidade" name="quantidade" step="0.01" required>
+                                    <span class="input-group-text unidade-medida"></span>
+                                </div>
+                                <div class="form-text text-muted">Saldo disponível: <span id="saldo-disponivel">0</span></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="destino" class="form-label">Destino</label>
+                            <select class="form-select" id="destino" name="destino" required>
+                                <option value="">Selecione um destino</option>
+                                {% for destino in destinos %}
+                                <option value="{{ destino.id }}">{{ destino.id_lote }} - {{ destino.pasto }} - {{ destino.fazenda }} ({{ destino.qtd_animais }} animais)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="observacao" class="form-label">Observação</label>
+                            <textarea class="form-control" id="observacao" name="observacao" rows="3"></textarea>
+                        </div>
+
+                        <div class="text-end">
+                            <a href="{% url 'estoque_list' %}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const insumoSelect = document.getElementById('insumo');
+    const quantidadeInput = document.getElementById('quantidade');
+    const saldoDisponivelSpan = document.getElementById('saldo-disponivel');
+    const unidadeMedidaSpan = document.querySelector('.unidade-medida');
+    const dataInput = document.getElementById('data');
+
+    // Define a data atual como valor padrão
+    const hoje = new Date().toISOString().split('T')[0];
+    dataInput.value = hoje;
+
+    insumoSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const saldo = selectedOption.dataset.saldo;
+        const unidade = selectedOption.dataset.unidade;
+
+        saldoDisponivelSpan.textContent = `${saldo} ${unidade}`;
+        unidadeMedidaSpan.textContent = unidade;
+        
+        // Limita a quantidade ao saldo disponível
+        quantidadeInput.max = saldo;
+    });
+
+    quantidadeInput.addEventListener('input', function() {
+        const saldo = parseFloat(insumoSelect.options[insumoSelect.selectedIndex].dataset.saldo);
+        const quantidade = parseFloat(this.value);
+
+        if (quantidade > saldo) {
+            this.value = saldo;
+            alert('A quantidade não pode ser maior que o saldo disponível.');
+        }
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}

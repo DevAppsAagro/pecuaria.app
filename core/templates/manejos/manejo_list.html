@@ -1,0 +1,355 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+{% csrf_token %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ title }}</h2>
+        <a href="{% url 'manejo_create' %}" class="btn btn-success">
+            <i class="fas fa-plus"></i> Novo Manejo
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Lista de Pesagens -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Pesagens</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Animal</th>
+                                    <th>Peso</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pesagem in pesagens %}
+                                <tr>
+                                    <td>{{ pesagem.data|date:"d/m/Y" }}</td>
+                                    <td>{{ pesagem.animal.brinco_visual }}</td>
+                                    <td>{{ pesagem.peso|floatformat:3 }} kg</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-sm btn-warning" 
+                                                    onclick="editarPesagem({{ pesagem.id }})">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-danger" 
+                                                    onclick="confirmarExclusao('{% url 'pesagem_delete' pesagem.id %}', 'pesagem')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center">Nenhuma pesagem registrada</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista de Manejos Sanitários -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Manejos Sanitários</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Animal</th>
+                                    <th>Tipo</th>
+                                    <th>Insumo</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for manejo in manejos %}
+                                <tr>
+                                    <td>{{ manejo.data|date:"d/m/Y" }}</td>
+                                    <td>{{ manejo.animal.brinco_visual }}</td>
+                                    <td>{{ manejo.tipo_manejo }}</td>
+                                    <td>{{ manejo.insumo }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-sm btn-warning" 
+                                                    onclick="editarManejo({{ manejo.id }})">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-danger" 
+                                                    onclick="confirmarExclusao('{% url 'manejo_delete' manejo.id %}', 'manejo')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">Nenhum manejo sanitário registrado</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Edição de Pesagem -->
+<div class="modal fade" id="editarPesagemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Pesagem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarPesagem">
+                    <input type="hidden" id="pesagem_id">
+                    <div class="mb-3">
+                        <label for="edit_data_pesagem" class="form-label">Data</label>
+                        <input type="date" class="form-control" id="edit_data_pesagem" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_animal_pesagem" class="form-label">Animal (Brinco)</label>
+                        <input type="text" class="form-control" id="edit_animal_pesagem" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_peso" class="form-label">Peso (kg)</label>
+                        <input type="number" class="form-control" id="edit_peso" step="0.001" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="salvarPesagem()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Edição de Manejo -->
+<div class="modal fade" id="editarManejoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Manejo Sanitário</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarManejo">
+                    <input type="hidden" id="manejo_id">
+                    <div class="mb-3">
+                        <label for="edit_data_manejo" class="form-label">Data</label>
+                        <input type="date" class="form-control" id="edit_data_manejo" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_animal_manejo" class="form-label">Animal (Brinco)</label>
+                        <input type="text" class="form-control" id="edit_animal_manejo" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_tipo_manejo" class="form-label">Tipo de Manejo</label>
+                        <input type="text" class="form-control" id="edit_tipo_manejo" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_insumo" class="form-label">Insumo</label>
+                        <input type="text" class="form-control" id="edit_insumo" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_dias_proximo" class="form-label">Dias para Próximo Manejo</label>
+                        <input type="number" class="form-control" id="edit_dias_proximo">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_observacao" class="form-label">Observação</label>
+                        <textarea class="form-control" id="edit_observacao" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="salvarManejo()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação de Exclusão -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Exclusão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Tem certeza que deseja excluir este registro?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" onclick="excluirRegistro()">Excluir</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let deleteUrl = '';
+let deleteType = '';
+const modalPesagem = new bootstrap.Modal(document.getElementById('editarPesagemModal'));
+const modalManejo = new bootstrap.Modal(document.getElementById('editarManejoModal'));
+const modalDelete = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+
+async function editarPesagem(id) {
+    try {
+        const response = await fetch(`/pesagens/${id}/update/`);
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('pesagem_id').value = id;
+            document.getElementById('edit_data_pesagem').value = data.pesagem.data;
+            document.getElementById('edit_animal_pesagem').value = data.pesagem.animal;
+            document.getElementById('edit_peso').value = data.pesagem.peso;
+            
+            modalPesagem.show();
+        } else {
+            alert(data.message || 'Erro ao carregar dados da pesagem');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao carregar dados da pesagem');
+    }
+}
+
+async function salvarPesagem() {
+    const id = document.getElementById('pesagem_id').value;
+    const formData = new FormData();
+    formData.append('data', document.getElementById('edit_data_pesagem').value);
+    formData.append('animal', document.getElementById('edit_animal_pesagem').value);
+    formData.append('peso', document.getElementById('edit_peso').value);
+    
+    try {
+        const response = await fetch(`/pesagens/${id}/update/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: formData
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            modalPesagem.hide();
+            window.location.reload();
+        } else {
+            alert(result.message || 'Erro ao salvar pesagem');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao salvar pesagem');
+    }
+}
+
+async function editarManejo(id) {
+    try {
+        const response = await fetch(`/manejos/${id}/update/`);
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('manejo_id').value = id;
+            document.getElementById('edit_data_manejo').value = data.manejo.data;
+            document.getElementById('edit_animal_manejo').value = data.manejo.animal;
+            document.getElementById('edit_tipo_manejo').value = data.manejo.tipo_manejo;
+            document.getElementById('edit_insumo').value = data.manejo.insumo;
+            document.getElementById('edit_dias_proximo').value = data.manejo.dias_proximo;
+            document.getElementById('edit_observacao').value = data.manejo.observacao;
+            
+            modalManejo.show();
+        } else {
+            alert(data.message || 'Erro ao carregar dados do manejo');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao carregar dados do manejo');
+    }
+}
+
+async function salvarManejo() {
+    const id = document.getElementById('manejo_id').value;
+    const formData = new FormData();
+    formData.append('data', document.getElementById('edit_data_manejo').value);
+    formData.append('animal', document.getElementById('edit_animal_manejo').value);
+    formData.append('tipo_manejo', document.getElementById('edit_tipo_manejo').value);
+    formData.append('insumo', document.getElementById('edit_insumo').value);
+    formData.append('dias_proximo', document.getElementById('edit_dias_proximo').value);
+    formData.append('observacao', document.getElementById('edit_observacao').value);
+    
+    try {
+        const response = await fetch(`/manejos/${id}/update/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: formData
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            modalManejo.hide();
+            window.location.reload();
+        } else {
+            alert(result.message || 'Erro ao salvar manejo');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao salvar manejo');
+    }
+}
+
+function confirmarExclusao(url, tipo) {
+    deleteUrl = url;
+    deleteType = tipo;
+    modalDelete.show();
+}
+
+async function excluirRegistro() {
+    try {
+        const response = await fetch(deleteUrl, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            modalDelete.hide();
+            window.location.reload();
+        } else {
+            alert(result.message || `Erro ao excluir ${deleteType}`);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert(`Erro ao excluir ${deleteType}`);
+    }
+}
+</script>
+{% endblock %}

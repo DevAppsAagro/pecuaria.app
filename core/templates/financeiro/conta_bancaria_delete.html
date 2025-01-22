@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Excluir Conta Bancária</h2>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title mb-4">Confirmar Exclusão</h5>
+            <p>Você tem certeza que deseja excluir a conta bancária abaixo?</p>
+            
+            <div class="mb-4">
+                <dl class="row">
+                    <dt class="col-sm-3">Banco</dt>
+                    <dd class="col-sm-9">{{ object.banco }}</dd>
+
+                    <dt class="col-sm-3">Agência</dt>
+                    <dd class="col-sm-9">{{ object.agencia|default:"-" }}</dd>
+
+                    <dt class="col-sm-3">Conta</dt>
+                    <dd class="col-sm-9">{{ object.conta|default:"-" }}</dd>
+
+                    <dt class="col-sm-3">Tipo</dt>
+                    <dd class="col-sm-9">{{ object.get_tipo_display }}</dd>
+
+                    <dt class="col-sm-3">Saldo Atual</dt>
+                    <dd class="col-sm-9">R$ {{ object.saldo|floatformat:2 }}</dd>
+
+                    <dt class="col-sm-3">Data do Saldo</dt>
+                    <dd class="col-sm-9">{{ object.data_saldo|date:"d/m/Y" }}</dd>
+
+                    <dt class="col-sm-3">Fazenda</dt>
+                    <dd class="col-sm-9">{{ object.fazenda|default:"Não vinculada" }}</dd>
+
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9">
+                        {% if object.ativa %}
+                        <span class="badge bg-success">Ativa</span>
+                        {% else %}
+                        <span class="badge bg-danger">Inativa</span>
+                        {% endif %}
+                    </dd>
+                </dl>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Confirmar Exclusão
+                </button>
+                <a href="{% url 'contas_bancarias_list' %}" class="btn btn-secondary">
+                    Cancelar
+                </a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

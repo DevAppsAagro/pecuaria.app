@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4>Detalhes da Saída</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="card-title">Informações Gerais</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Insumo:</th>
+                                    <td>{{ saida.insumo.nome }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Data:</th>
+                                    <td>{{ saida.data|date:"d/m/Y" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Quantidade:</th>
+                                    <td>{{ saida.quantidade }} {{ saida.insumo.unidade_medida.sigla }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Valor Unitário:</th>
+                                    <td>R$ {{ saida.valor_unitario|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Valor Total:</th>
+                                    <td>R$ {{ saida.valor_total|floatformat:2 }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5 class="card-title">Informações Adicionais</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Destino:</th>
+                                    <td>
+                                        {% if saida.destino_lote %}
+                                            Lote: {{ saida.destino_lote.id_lote }}
+                                        {% else %}
+                                            {{ saida.destino|default:"-" }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Observação:</th>
+                                    <td>{{ saida.observacao|default:"-" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Registrado por:</th>
+                                    <td>{{ saida.usuario.get_full_name|default:saida.usuario.username }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer text-end">
+                    <a href="{% url 'saida_list' %}" class="btn btn-secondary">Voltar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

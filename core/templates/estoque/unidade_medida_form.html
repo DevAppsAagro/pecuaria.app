@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h4>{% if unidade %}Editar{% else %}Nova{% endif %} Unidade de Medida</h4>
+        </div>
+        <div class="card-body">
+            <form method="post" id="unidadeForm">
+                {% csrf_token %}
+                
+                <div class="form-group mb-3">
+                    <label for="nome">Nome</label>
+                    <input type="text" class="form-control" id="nome" name="nome" value="{{ unidade.nome|default:'' }}" required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="sigla">Sigla</label>
+                    <input type="text" class="form-control" id="sigla" name="sigla" value="{{ unidade.sigla|default:'' }}" required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="tipo">Tipo</label>
+                    <select class="form-control" id="tipo" name="tipo" required>
+                        <option value="">Selecione...</option>
+                        {% for tipo, label in unidade.TIPO_CHOICES %}
+                            <option value="{{ tipo }}" {% if unidade.tipo == tipo %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="descricao">Descrição</label>
+                    <textarea class="form-control" id="descricao" name="descricao" rows="3">{{ unidade.descricao|default:'' }}</textarea>
+                </div>
+
+                <div class="d-flex justify-content-between">
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('unidadeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    fetch(window.location.href, {
+        method: 'POST',
+        body: new FormData(this),
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            if (window.opener && !window.opener.closed) {
+                window.opener.location.reload();
+            }
+            window.close();
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Motivos de Morte</h2>
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-end mb-3">
+                <a href="{% url 'motivo-morte-create' %}" class="btn btn-primary">Novo Motivo</a>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for motivo in motivos %}
+                    <tr>
+                        <td>{{ motivo.nome }}</td>
+                        <td>
+                            <a href="{% url 'motivo-morte-update' motivo.pk %}" class="btn btn-sm btn-primary">Editar</a>
+                            <a href="{% url 'motivo-morte-delete' motivo.pk %}" class="btn btn-sm btn-danger">Excluir</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

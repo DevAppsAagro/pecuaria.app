@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-6">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="bi bi-exclamation-triangle text-warning" style="font-size: 3rem;"></i>
+                    <h3 class="mt-4">Confirmar Exclusão</h3>
+                    <p class="lead">
+                        Tem certeza que deseja excluir a fazenda "{{ fazenda.nome }}"?
+                    </p>
+                    <p class="text-muted">Esta ação não pode ser desfeita.</p>
+                    
+                    <form method="post" class="mt-4">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                            <a href="{% url 'fazenda_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> Confirmar Exclusão
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

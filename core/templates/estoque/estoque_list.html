@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Estoque</h2>
+        <a href="{% url 'insumo_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Novo Insumo
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nome do Insumo</th>
+                            <th>Categoria</th>
+                            <th>Subcategoria</th>
+                            <th>Unidade</th>
+                            <th>Saldo</th>
+                            <th>Preço Médio</th>
+                            <th>Total Imobilizado</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for insumo in insumos %}
+                        <tr>
+                            <td>{{ insumo.nome }}</td>
+                            <td>{{ insumo.categoria.nome }}</td>
+                            <td>{{ insumo.subcategoria.nome }}</td>
+                            <td>{{ insumo.unidade_medida.sigla }}</td>
+                            <td>{{ insumo.saldo_estoque|floatformat:2 }}</td>
+                            <td>R$ {{ insumo.preco_medio|floatformat:2 }}</td>
+                            <td>R$ {{ insumo.valor_total|floatformat:2 }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'insumo_edit' insumo.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'insumo_delete' insumo.id %}" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center">Nenhum insumo cadastrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

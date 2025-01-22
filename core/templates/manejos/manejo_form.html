@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Registro de Manejo</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="manejoForm" action="{% url 'manejo_create' %}">
+                        {% csrf_token %}
+                        
+                        <!-- Data do Manejo -->
+                        <div class="mb-4">
+                            <label for="data" class="form-label h5">Data do Manejo</label>
+                            <input type="date" class="form-control form-control-lg" id="data" name="data" required 
+                                   value="{% now 'Y-m-d' %}">
+                        </div>
+
+                        <!-- Animal -->
+                        <div class="mb-4">
+                            <label for="brinco" class="form-label h5">Brinco do Animal</label>
+                            <input type="text" class="form-control form-control-lg" id="brinco" name="brinco" 
+                                   placeholder="Digite o brinco visual ou eletrônico" required>
+                        </div>
+
+                        <!-- Informações do Animal -->
+                        <div id="animalInfo" class="card mb-4" style="display: none;">
+                            <div class="card-body">
+                                <h5 class="card-title">Informações do Animal</h5>
+                                <div id="animalDetails" class="h6"></div>
+                                <div id="ultimaPesagem" class="mt-3" style="display: none;">
+                                    <hr>
+                                    <h5 class="card-title">Última Pesagem</h5>
+                                    <div id="pesagemDetails" class="h6"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pesagem -->
+                        <div class="mb-4">
+                            <label for="peso" class="form-label h5">Peso (kg)</label>
+                            <input type="number" class="form-control form-control-lg" id="peso" name="peso" step="0.01">
+                            <div id="gmdInfo" class="alert alert-info mt-2" style="display: none;">
+                                <i class="fas fa-chart-line me-2"></i>
+                                <span id="gmdText"></span>
+                            </div>
+                        </div>
+
+                        <!-- Checkbox para Manejo Sanitário -->
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="fazer_manejo" name="fazer_manejo">
+                            <label class="form-check-label h5 ms-2" for="fazer_manejo">
+                                Fazer também Manejo Sanitário?
+                            </label>
+                        </div>
+
+                        <!-- Campos do Manejo Sanitário -->
+                        <div id="manejo_sanitario_campos" style="display: none;">
+                            <div class="mb-4">
+                                <label for="insumo" class="form-label h5">Insumo</label>
+                                <input type="text" class="form-control form-control-lg" id="insumo" name="insumo">
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="tipo_manejo" class="form-label h5">Tipo de Manejo</label>
+                                <input type="text" class="form-control form-control-lg" id="tipo_manejo" name="tipo_manejo">
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="dias_proximo" class="form-label h5">Dias para Próximo Manejo</label>
+                                <input type="number" class="form-control form-control-lg" id="dias_proximo" name="dias_proximo">
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="observacao" class="form-label h5">Observação</label>
+                                <textarea class="form-control form-control-lg" id="observacao" name="observacao" rows="4"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">Salvar Manejo</button>
+                            <button type="reset" class="btn btn-secondary btn-lg">Limpar Formulário</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('manejoForm');
+    const brincoInput = document.getElementById('brinco');
+    const pesoInput = document.getElementById('peso');
+    const dataInput = document.getElementById('data');
+    const animalInfo = document.getElementById('animalInfo');
+    const animalDetails = document.getElementById('animalDetails');
+    const ultimaPesagem = document.getElementById('ultimaPesagem');
+    const pesagemDetails = document.getElementById('pesagemDetails');
+    const gmdInfo = document.getElementById('gmdInfo');
+    const gmdText = document.getElementById('gmdText');
+    const fazerManejo = document.getElementById('fazer_manejo');
+    const manejoSanitarioCampos = document.getElementById('manejo_sanitario_campos');
+    let ultimaPesagemData = null;
+    let dataOriginal = dataInput.value; // Guardar a data original
+
+    // Formatar data para exibição
+    function formatarData(data) {
+        return new Date(data).toLocaleDateString('pt-BR');
+    }
+
+    // Formatar número com 3 casas decimais
+    function formatarNumero(numero) {
+        return Number(numero).toFixed(3);
+    }
+
+    // Calcular GMD
+    function calcularGMD() {
+        console.log('Calculando GMD...');
+        console.log('Última pesagem:', ultimaPesagemData);
+        console.log('Peso atual:', pesoInput.value);
+        console.log('Data atual:', dataInput.value);
+
+        if (!ultimaPesagemData || !pesoInput.value || !dataInput.value) {
+            console.log('Faltam dados para calcular GMD');
+            return;
+        }
+
+        const pesoAtual = parseFloat(pesoInput.value);
+        const pesoAnterior = ultimaPesagemData.peso;
+        const dataAnterior = new Date(ultimaPesagemData.data);
+        const dataAtual = new Date(dataInput.value);
+        
+        console.log('Peso atual:', pesoAtual);
+        console.log('Peso anterior:', pesoAnterior);
+        console.log('Data anterior:', dataAnterior);
+        console.log('Data atual:', dataAtual);
+
+        if (!isNaN(pesoAtual) && dataAtual > dataAnterior) {
+            const diffDias = Math.round((dataAtual - dataAnterior) / (1000 * 60 * 60 * 24));
+            const gmd = (pesoAtual - pesoAnterior) / diffDias;
+            
+            console.log('Diferença em dias:', diffDias);
+            console.log('GMD calculado:', gmd);
+
+            if (diffDias > 0) {
+                const ganhoTotal = pesoAtual - pesoAnterior;
+                gmdInfo.style.display = 'block';
+                gmdText.innerHTML = `
+                    <div class="mb-2">Peso anterior: <strong>${formatarNumero(pesoAnterior)} kg</strong> (${formatarData(dataAnterior)})</div>
+                    <div class="mb-2">Peso atual: <strong>${formatarNumero(pesoAtual)} kg</strong> (${formatarData(dataAtual)})</div>
+                    <div class="mb-2">Período: <strong>${diffDias} dias</strong></div>
+                    <div class="mb-2">Ganho total: <strong>${formatarNumero(ganhoTotal)} kg</strong></div>
+                    <div>GMD: <strong>${formatarNumero(gmd)} kg/dia</strong></div>
+                `;
+            } else {
+                console.log('Diferença de dias <= 0');
+                gmdInfo.style.display = 'none';
+            }
+        } else {
+            console.log('Peso inválido ou data atual menor que anterior');
+            gmdInfo.style.display = 'none';
+        }
+    }
+
+    // Controlar visibilidade dos campos de manejo sanitário
+    fazerManejo.addEventListener('change', function() {
+        manejoSanitarioCampos.style.display = this.checked ? 'block' : 'none';
+    });
+
+    // Recalcular GMD quando o peso ou data mudar
+    pesoInput.addEventListener('input', calcularGMD);
+    dataInput.addEventListener('change', calcularGMD);
+
+    // Buscar animal
+    brincoInput.addEventListener('blur', async function() {
+        const brinco = this.value.trim();
+        if (!brinco) return;
+
+        try {
+            console.log('Buscando animal:', brinco);
+            const response = await fetch(`/api/buscar_animal/${brinco}/`);
+            const data = await response.json();
+            console.log('Resposta da API:', data);
+
+            if (data.success) {
+                animalInfo.style.display = 'block';
+                animalDetails.innerHTML = `
+                    <p class="mb-2">Brinco Visual: <strong>${data.animal.brinco_visual}</strong></p>
+                    <p class="mb-2">Categoria: <strong>${data.animal.categoria}</strong></p>
+                    <p class="mb-0">Lote: <strong>${data.animal.lote}</strong></p>
+                `;
+
+                if (data.ultima_pesagem) {
+                    console.log('Última pesagem encontrada:', data.ultima_pesagem);
+                    ultimaPesagemData = data.ultima_pesagem;
+                    ultimaPesagem.style.display = 'block';
+                    const origem = data.ultima_pesagem.data === data.animal.data_entrada ? 'Peso de Entrada' : 'Última Pesagem';
+                    pesagemDetails.innerHTML = `
+                        <p class="mb-2">${origem}: <strong>${formatarNumero(data.ultima_pesagem.peso)} kg</strong></p>
+                        <p class="mb-0">Data: <strong>${formatarData(data.ultima_pesagem.data)}</strong></p>
+                    `;
+                    
+                    // Recalcular GMD se já houver peso atual
+                    calcularGMD();
+                } else {
+                    console.log('Animal não tem pesagem anterior');
+                    ultimaPesagem.style.display = 'none';
+                    ultimaPesagemData = null;
+                    gmdInfo.style.display = 'none';
+                }
+            } else {
+                console.log('Animal não encontrado');
+                animalInfo.style.display = 'none';
+                ultimaPesagem.style.display = 'none';
+                ultimaPesagemData = null;
+                gmdInfo.style.display = 'none';
+                alert('Animal não encontrado!');
+            }
+        } catch (error) {
+            console.error('Erro ao buscar animal:', error);
+            alert('Erro ao buscar animal');
+        }
+    });
+
+    // Envio do formulário
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        if (!document.getElementById('animalInfo').style.display === 'block') {
+            alert('Por favor, selecione um animal válido primeiro.');
+            return;
+        }
+
+        try {
+            const formData = new FormData(this);
+            const response = await fetch(this.action, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: formData
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                // Limpar campos mantendo a data
+                brincoInput.value = '';
+                pesoInput.value = '';
+                animalInfo.style.display = 'none';
+                ultimaPesagem.style.display = 'none';
+                gmdInfo.style.display = 'none';
+
+                if (!fazerManejo.checked) {
+                    document.getElementById('insumo').value = '';
+                    document.getElementById('tipo_manejo').value = '';
+                    document.getElementById('dias_proximo').value = '';
+                    document.getElementById('observacao').value = '';
+                }
+
+                alert('Manejo registrado com sucesso!');
+            } else {
+                alert(result.message || 'Erro ao registrar manejo');
+            }
+        } catch (error) {
+            console.error('Erro ao registrar manejo:', error);
+            alert('Erro ao registrar manejo: ' + error.message);
+        }
+    });
+
+    // Botão limpar
+    document.querySelector('button[type="reset"]').addEventListener('click', function() {
+        dataInput.value = dataOriginal; // Restaurar data original
+    });
+});
+</script>
+{% endblock %}

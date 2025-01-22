@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ animal.pk|yesno:"Editar,Novo" }} Animal</h2>
+        <a href="{% url 'animal_list' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <div class="row">
+                    <!-- Brinco Visual -->
+                    <div class="col-md-3 mb-3">
+                        <label for="brinco_visual" class="form-label">Brinco Visual *</label>
+                        <input type="text" class="form-control" id="brinco_visual" name="brinco_visual" 
+                               value="{{ animal.brinco_visual|default:'' }}" required>
+                        <div class="invalid-feedback">
+                            Por favor, informe o brinco visual.
+                        </div>
+                    </div>
+
+                    <!-- Brinco Eletrônico -->
+                    <div class="col-md-3 mb-3">
+                        <label for="brinco_eletronico" class="form-label">Brinco Eletrônico</label>
+                        <input type="text" class="form-control" id="brinco_eletronico" name="brinco_eletronico"
+                               value="{{ animal.brinco_eletronico|default:'' }}">
+                    </div>
+
+                    <!-- Raça -->
+                    <div class="col-md-3 mb-3">
+                        <label for="raca" class="form-label">Raça *</label>
+                        <select class="form-select" id="raca" name="raca" required>
+                            <option value="">Selecione...</option>
+                            {% for raca in racas %}
+                            <option value="{{ raca.id }}" {% if animal.raca_id == raca.id %}selected{% endif %}>
+                                {{ raca.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback">
+                            Por favor, selecione a raça.
+                        </div>
+                    </div>
+
+                    <!-- Categoria Animal -->
+                    <div class="col-md-3 mb-3">
+                        <label for="categoria_animal" class="form-label">Categoria Animal *</label>
+                        <select class="form-select" id="categoria_animal" name="categoria_animal" required>
+                            <option value="">Selecione...</option>
+                            {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}" {% if animal.categoria_animal_id == categoria.id %}selected{% endif %}>
+                                {{ categoria.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback">
+                            Por favor, selecione a categoria.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Data de Nascimento -->
+                    <div class="col-md-3 mb-3">
+                        <label for="data_nascimento" class="form-label">Data de Nascimento *</label>
+                        <input type="date" class="form-control" id="data_nascimento" name="data_nascimento"
+                               value="{{ animal.data_nascimento|date:'Y-m-d'|default:'' }}" required>
+                        <div class="invalid-feedback">
+                            Por favor, informe a data de nascimento.
+                        </div>
+                    </div>
+
+                    <!-- Data de Entrada -->
+                    <div class="col-md-3 mb-3">
+                        <label for="data_entrada" class="form-label">Data de Entrada *</label>
+                        <input type="date" class="form-control" id="data_entrada" name="data_entrada"
+                               value="{{ animal.data_entrada|date:'Y-m-d'|default:'' }}" required>
+                        <div class="invalid-feedback">
+                            Por favor, informe a data de entrada.
+                        </div>
+                    </div>
+
+                    <!-- Peso de Entrada -->
+                    <div class="col-md-3 mb-3">
+                        <label for="peso_entrada" class="form-label">Peso de Entrada (kg)</label>
+                        <input type="number" step="0.01" class="form-control" id="peso_entrada" name="peso_entrada"
+                               value="{{ animal.peso_entrada|default:'' }}">
+                    </div>
+
+                    <!-- Valor de Compra -->
+                    <div class="col-md-3 mb-3">
+                        <label for="valor_compra" class="form-label">Valor de Compra (R$)</label>
+                        <input type="number" step="0.01" class="form-control" id="valor_compra" name="valor_compra"
+                               value="{{ animal.valor_compra|default:'' }}">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Lote -->
+                    <div class="col-md-4 mb-3">
+                        <label for="lote" class="form-label">Lote *</label>
+                        <select class="form-select" id="lote" name="lote" required onchange="atualizarPastos()">
+                            <option value="">Selecione o lote</option>
+                            {% for lote in lotes %}
+                            <option value="{{ lote.id }}" {% if animal.lote_id == lote.id %}selected{% endif %}>
+                                {{ lote.id_lote }} - {{ lote.fazenda.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback">
+                            Por favor, selecione o lote.
+                        </div>
+                    </div>
+
+                    <!-- Pasto Atual -->
+                    <div class="col-md-4 mb-3">
+                        <label for="pasto_atual" class="form-label">Pasto Atual *</label>
+                        <select class="form-select" id="pasto_atual" name="pasto_atual" required>
+                            <option value="">{% if not animal %}Primeiro selecione um lote{% else %}Selecione o pasto{% endif %}</option>
+                            {% for pasto in pastos %}
+                            <option value="{{ pasto.id }}" {% if animal.pasto_atual_id == pasto.id %}selected{% endif %}>
+                                {{ pasto.id_pasto }} - {{ pasto.fazenda.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback">
+                            Por favor, selecione o pasto.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Salvar
+                    </button>
+                    <a href="{% url 'animal_list' %}" class="btn btn-secondary">
+                        <i class="bi bi-x-lg"></i> Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function atualizarPastos() {
+    const loteSelect = document.getElementById('lote');
+    const pastoSelect = document.getElementById('pasto_atual');
+    const loteId = loteSelect.value;
+    const pastoAtualId = pastoSelect.value; // Guarda o ID do pasto atual
+
+    // Limpa o select de pastos mantendo apenas a opção padrão
+    pastoSelect.innerHTML = '<option value="">Selecione o pasto</option>';
+
+    if (loteId) {
+        // Faz uma requisição AJAX para buscar os pastos do lote
+        fetch(`/pastos-por-lote/${loteId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    data.pastos.forEach(pasto => {
+                        const option = document.createElement('option');
+                        option.value = pasto.id;
+                        option.textContent = `${pasto.id_pasto} - ${pasto.fazenda.nome}`;
+                        // Se este é o pasto atual, marca como selecionado
+                        if (pasto.id == pastoAtualId) {
+                            option.selected = true;
+                        }
+                        pastoSelect.appendChild(option);
+                    });
+                } else {
+                    console.error('Erro ao carregar pastos:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Erro na requisição:', error);
+            });
+    }
+}
+
+// Executa ao carregar a página se já houver um lote selecionado
+document.addEventListener('DOMContentLoaded', function() {
+    const loteSelect = document.getElementById('lote');
+    if (loteSelect.value) {
+        atualizarPastos();
+    }
+});
+
+// Validação do formulário
+(function () {
+    'use strict'
+    var forms = document.querySelectorAll('.needs-validation')
+    Array.prototype.slice.call(forms)
+        .forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                }
+                form.classList.add('was-validated')
+            }, false)
+        })
+})()
+</script>
+
+{% endblock %}

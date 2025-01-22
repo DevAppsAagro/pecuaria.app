@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Lotes</h2>
+        <a href="{% url 'lote_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Novo Lote
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            {% if lotes %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID do Lote</th>
+                                <th>Data de Criação</th>
+                                <th>Finalidade</th>
+                                <th>Fazenda</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lote in lotes %}
+                            <tr>
+                                <td>{{ lote.id_lote }}</td>
+                                <td>{{ lote.data_criacao|date:"d/m/Y" }}</td>
+                                <td>{{ lote.finalidade }}</td>
+                                <td>{{ lote.fazenda }}</td>
+                                <td class="text-end">
+                                    <div class="btn-group" role="group">
+                                        <a href="{% url 'lote_detail' lote.id %}" class="btn btn-primary btn-sm" title="Visualizar">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{% url 'lote_edit' lote.pk %}" class="btn btn-warning btn-sm" title="Editar">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="{% url 'lote_delete' lote.pk %}" class="btn btn-danger btn-sm" title="Excluir">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-collection" style="font-size: 3rem; color: #6c757d;"></i>
+                    <p class="mt-3">Nenhum lote cadastrado.</p>
+                    <a href="{% url 'lote_create' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-lg"></i> Cadastrar Primeiro Lote
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

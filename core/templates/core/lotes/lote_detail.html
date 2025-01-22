@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+{% load core_extras %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col">
+            <h2 class="mb-4">Detalhes do Lote {{ lote.id_lote }}</h2>
+        </div>
+    </div>
+
+    <!-- Informações Básicas -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Informações Básicas</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">ID do Lote</dt>
+                        <dd class="col-sm-8">{{ lote.id_lote }}</dd>
+
+                        <dt class="col-sm-4">Data de Criação</dt>
+                        <dd class="col-sm-8">{{ lote.data_criacao|date:"d/m/Y" }}</dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Finalidade</dt>
+                        <dd class="col-sm-8">{{ lote.finalidade.nome }}</dd>
+
+                        <dt class="col-sm-4">Fazenda</dt>
+                        <dd class="col-sm-8">{{ lote.fazenda.nome }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas do Lote -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Estatísticas do Lote</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-6">Total de Animais</dt>
+                        <dd class="col-sm-6">{{ total_animais }}</dd>
+
+                        <dt class="col-sm-6">Peso Médio</dt>
+                        <dd class="col-sm-6">{{ peso_medio|floatformat:2 }} kg</dd>
+
+                        <dt class="col-sm-6">GMD Médio</dt>
+                        <dd class="col-sm-6">{{ gmd_medio|floatformat:3 }} kg/dia</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Distribuição por Categoria</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Categoria</th>
+                                    <th class="text-end">Quantidade</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for categoria in categorias %}
+                                <tr>
+                                    <td>{{ categoria.categoria_animal__nome }}</td>
+                                    <td class="text-end">{{ categoria.total }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações Financeiras -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Informações Financeiras</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-6">Custo Fixo Total</dt>
+                        <dd class="col-sm-6">R$ {{ custo_fixo|floatformat:2 }}</dd>
+
+                        <dt class="col-sm-6">Custo Variável Total</dt>
+                        <dd class="col-sm-6">R$ {{ custo_variavel|floatformat:2 }}</dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-6">Custo Total</dt>
+                        <dd class="col-sm-6">R$ {{ custo_total|floatformat:2 }}</dd>
+
+                        <dt class="col-sm-6">Custo Médio por Animal</dt>
+                        <dd class="col-sm-6">R$ {{ custo_medio_animal|floatformat:2 }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Movimentações -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Movimentações</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Tipo</th>
+                            <th>Animal</th>
+                            <th>Origem</th>
+                            <th>Destino</th>
+                            <th>Motivo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mov in movimentacoes %}
+                        <tr>
+                            <td>{{ mov.data_movimentacao|date:"d/m/Y" }}</td>
+                            <td>{{ mov.get_tipo_display }}</td>
+                            <td>{{ mov.animal.brinco_visual }}</td>
+                            <td>
+                                {% if mov.tipo == 'LOTE' %}
+                                    {{ mov.lote_origem.id_lote|default:"-" }}
+                                {% else %}
+                                    {{ mov.pasto_origem.id_pasto|default:"-" }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if mov.tipo == 'LOTE' %}
+                                    {{ mov.lote_destino.id_lote|default:"-" }}
+                                {% else %}
+                                    {{ mov.pasto_destino.id_pasto|default:"-" }}
+                                {% endif %}
+                            </td>
+                            <td>{{ mov.motivo|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center">Nenhuma movimentação registrada</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manejos Sanitários -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Manejos Sanitários</h5>
+        </div>
+        <div class="card-body">
+            {% if manejos_por_tipo %}
+                {% for tipo, manejos in manejos_por_tipo.items %}
+                <h6 class="mb-3">{{ tipo }}</h6>
+                <div class="table-responsive mb-4">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Animal</th>
+                                <th>Insumo</th>
+                                <th>Próximo Manejo</th>
+                                <th>Observação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for manejo in manejos %}
+                            <tr>
+                                <td>{{ manejo.data|date:"d/m/Y" }}</td>
+                                <td>{{ manejo.animal.brinco_visual }}</td>
+                                <td>{{ manejo.insumo }}</td>
+                                <td>{{ manejo.data|add_days:manejo.dias_proximo_manejo|date:"d/m/Y" }}</td>
+                                <td>{{ manejo.observacao|default:"-" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted mb-0">Nenhum manejo sanitário registrado</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

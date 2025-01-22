@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card mt-5">
+            <div class="card-body text-center">
+                <h2 class="card-title mb-4">Aguardando Confirmação</h2>
+                <div class="alert alert-info">
+                    <p>Seu pagamento está sendo processado.</p>
+                    <p>Assim que confirmado, você receberá um email com as instruções de acesso.</p>
+                </div>
+                <p>Se você já recebeu a confirmação, <a href="{% url 'login' %}">tente fazer login</a>.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

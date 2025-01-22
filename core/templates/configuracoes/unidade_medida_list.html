@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Unidades de Medida</h2>
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-end mb-3">
+                <a href="{% url 'unidade-medida-create' %}" class="btn btn-primary">Nova Unidade</a>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Sigla</th>
+                        <th>Tipo</th>
+                        <th>Descrição</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for unidade in unidades %}
+                    <tr>
+                        <td>{{ unidade.nome }}</td>
+                        <td>{{ unidade.sigla }}</td>
+                        <td>{{ unidade.get_tipo_display }}</td>
+                        <td>{{ unidade.descricao|default:"-" }}</td>
+                        <td>
+                            <a href="{% url 'unidade-medida-update' unidade.pk %}" class="btn btn-sm btn-primary">Editar</a>
+                            <a href="{% url 'unidade-medida-delete' unidade.pk %}" class="btn btn-sm btn-danger">Excluir</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

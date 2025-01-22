@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Compras</h2>
+        <a href="{% url 'criar_compra' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nova Compra
+        </a>
+    </div>
+
+    {% if compras %}
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Fornecedor</th>
+                    <th>Valor Total</th>
+                    <th>Status</th>
+                    <th>Data Vencimento</th>
+                    <th>Data Pagamento</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for compra in compras %}
+                <tr>
+                    <td>{{ compra.data|date:"d/m/Y" }}</td>
+                    <td>{{ compra.vendedor }}</td>
+                    <td>R$ {{ compra.valor_total|floatformat:2 }}</td>
+                    <td>
+                        {% if compra.status == 'PAGO' %}
+                            <span class="badge bg-success">Pago</span>
+                        {% elif compra.status == 'VENCIDO' %}
+                            <span class="badge bg-danger">Vencido</span>
+                        {% elif compra.status == 'VENCE_HOJE' %}
+                            <span class="badge bg-warning">Vence Hoje</span>
+                        {% else %}
+                            <span class="badge bg-primary">Pendente</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ compra.data_vencimento|date:"d/m/Y" }}</td>
+                    <td>{{ compra.data_pagamento|default:"-"|date:"d/m/Y" }}</td>
+                    <td>
+                        <div class="btn-group">
+                            <a href="{% url 'compras_detalhe' compra.id %}" class="btn btn-sm btn-info" title="Detalhes">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="{% url 'editar_compra' compra.id %}" class="btn btn-sm btn-warning" title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'excluir_compra' compra.id %}" class="btn btn-sm btn-danger" title="Excluir"
+                               onclick="return confirm('Tem certeza que deseja excluir esta compra?')">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        Nenhuma compra registrada.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

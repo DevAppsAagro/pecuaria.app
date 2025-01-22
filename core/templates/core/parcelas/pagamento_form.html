@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Registrar Pagamento</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5 class="mb-3">Informações da Parcela</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th width="40%">Número:</th>
+                                    <td>{{ parcela.numero }}/{{ parcela.compra.numero_parcelas }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Vencimento:</th>
+                                    <td>{{ parcela.data_vencimento|date:"d/m/Y" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Valor Total:</th>
+                                    <td>R$ {{ parcela.valor }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Valor Pago:</th>
+                                    <td>R$ {{ parcela.valor_pago }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Valor Restante:</th>
+                                    <td>R$ {{ parcela.valor_restante }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    {% if parcela.valor_restante > 0 %}
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.data_pagamento.id_for_label }}" class="form-label">Data do Pagamento</label>
+                                {{ form.data_pagamento }}
+                                {% if form.data_pagamento.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.data_pagamento.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.valor.id_for_label }}" class="form-label">Valor</label>
+                                {{ form.valor }}
+                                {% if form.valor.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.valor.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="{{ form.conta_bancaria.id_for_label }}" class="form-label">Conta Bancária</label>
+                                {{ form.conta_bancaria }}
+                                {% if form.conta_bancaria.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.conta_bancaria.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="{{ form.observacao.id_for_label }}" class="form-label">Observação</label>
+                                {{ form.observacao }}
+                                {% if form.observacao.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.observacao.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'compras_detalhe' parcela.compra.pk %}" class="btn btn-secondary me-md-2">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">Registrar Pagamento</button>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="alert alert-success">
+                        Esta parcela já está totalmente paga.
+                    </div>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'compras_detalhe' parcela.compra.pk %}" class="btn btn-secondary">Voltar</a>
+                    </div>
+                    {% endif %}
+
+                    {% if pagamentos %}
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <h5 class="mb-3">Histórico de Pagamentos</h5>
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Valor</th>
+                                            <th>Conta</th>
+                                            <th>Observação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for pagamento in pagamentos %}
+                                        <tr>
+                                            <td>{{ pagamento.data_pagamento|date:"d/m/Y" }}</td>
+                                            <td>R$ {{ pagamento.valor }}</td>
+                                            <td>{{ pagamento.conta_bancaria }}</td>
+                                            <td>{{ pagamento.observacao|default:"-" }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

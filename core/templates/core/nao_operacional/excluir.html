@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">{{ titulo }}</h1>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <p>Tem certeza que deseja excluir a movimentação não operacional abaixo?</p>
+            
+            <ul class="list-unstyled">
+                <li><strong>Data:</strong> {{ object.data|date:"d/m/Y" }}</li>
+                <li><strong>Tipo:</strong> {{ object.get_tipo_display }}</li>
+                <li><strong>Valor:</strong> R$ {{ object.valor }}</li>
+                <li><strong>Conta:</strong> {{ object.conta_bancaria }}</li>
+                <li><strong>Fazenda:</strong> {{ object.fazenda }}</li>
+            </ul>
+            
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Confirmar Exclusão</button>
+                <a href="{% url 'lista_nao_operacional' %}" class="btn btn-secondary">Cancelar</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

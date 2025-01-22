@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4>Detalhes da Saída - Nutrição</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="card-title">Informações Gerais</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Insumo:</th>
+                                    <td>{{ saida.insumo.nome }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Data:</th>
+                                    <td>{{ saida.data|date:"d/m/Y" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Quantidade:</th>
+                                    <td>{{ saida.quantidade }} {{ saida.insumo.unidade_medida.sigla }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Valor Unitário:</th>
+                                    <td>R$ {{ saida.valor_unitario|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Valor Total:</th>
+                                    <td>R$ {{ saida.valor_total|floatformat:2 }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5 class="card-title">Informações do Lote</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Lote:</th>
+                                    <td>{{ saida.destino_lote.id_lote }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Fazenda:</th>
+                                    <td>{{ saida.destino_lote.fazenda.nome }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Quantidade de Animais:</th>
+                                    <td>{{ saida.destino_lote.quantidade_atual }} animais</td>
+                                </tr>
+                                <tr>
+                                    <th>Peso Médio:</th>
+                                    <td>{{ peso_medio|floatformat:2 }} kg</td>
+                                </tr>
+                                <tr>
+                                    <th>Consumo % PV:</th>
+                                    <td>{{ saida.consumo_pv|floatformat:2 }}%</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <h5 class="card-title">Cálculos do Trato</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Consumo por Cabeça:</th>
+                                    <td>{{ peso_medio|multiply:saida.consumo_pv|divide:100|floatformat:2 }} kg/cab/dia</td>
+                                </tr>
+                                <tr>
+                                    <th>Consumo Diário do Lote:</th>
+                                    <td>{{ peso_medio|multiply:saida.consumo_pv|divide:100|multiply:saida.destino_lote.quantidade_atual|floatformat:2 }} kg/dia</td>
+                                </tr>
+                                <tr>
+                                    <th>Duração do Trato:</th>
+                                    <td>{{ dias_duracao|floatformat:1 }} dias</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5 class="card-title">Informações Adicionais</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Observação:</th>
+                                    <td>{{ saida.observacao|default:"-" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Registrado por:</th>
+                                    <td>{{ saida.usuario.get_full_name|default:saida.usuario.username }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Data do Registro:</th>
+                                    <td>{{ saida.data|date:"d/m/Y" }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5 class="card-title">Rateio por Animal</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Brinco Visual</th>
+                                            <th>Brinco Eletrônico</th>
+                                            <th>Categoria</th>
+                                            <th>Raça</th>
+                                            <th>Valor Rateado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for rateio in rateios %}
+                                        <tr>
+                                            <td>{{ rateio.animal.brinco_visual }}</td>
+                                            <td>{{ rateio.animal.brinco_eletronico }}</td>
+                                            <td>{{ rateio.animal.categoria_animal.nome }}</td>
+                                            <td>{{ rateio.animal.raca.nome }}</td>
+                                            <td>R$ {{ rateio.valor|floatformat:2 }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <th colspan="4">Total</th>
+                                            <th>R$ {{ saida.valor_total|floatformat:2 }}</th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer text-end">
+                    <a href="{% url 'saida_nutricao_list' %}" class="btn btn-secondary">Voltar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

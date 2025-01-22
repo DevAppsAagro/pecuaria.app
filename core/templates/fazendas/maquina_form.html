@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">{{ titulo }}</h5>
+            <div>
+                <a href="{% url 'maquinas_list' %}" class="btn btn-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="id_maquina" class="form-label">ID da Máquina</label>
+                        <input type="text" class="form-control" id="id_maquina" name="id_maquina" required
+                               value="{{ maquina.id_maquina|default:'' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="nome" class="form-label">Nome</label>
+                        <input type="text" class="form-control" id="nome" name="nome" required
+                               value="{{ maquina.nome|default:'' }}">
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="fazenda" class="form-label">Fazenda</label>
+                        <select class="form-select" id="fazenda" name="fazenda" required>
+                            <option value="">Selecione uma fazenda</option>
+                            {% for fazenda in fazendas %}
+                            <option value="{{ fazenda.id }}" {% if maquina.fazenda_id == fazenda.id %}selected{% endif %}>
+                                {{ fazenda.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="data_aquisicao" class="form-label">Data de Aquisição</label>
+                        <input type="date" class="form-control" id="data_aquisicao" name="data_aquisicao" required
+                               value="{{ maquina.data_aquisicao|date:'Y-m-d'|default:'' }}">
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="valor_mercado" class="form-label">Valor de Mercado (R$)</label>
+                        <input type="text" class="form-control" id="valor_mercado" name="valor_mercado" required
+                               value="{{ maquina.valor_mercado|default:'' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="valor_compra" class="form-label">Valor de Compra (R$)</label>
+                        <input type="text" class="form-control" id="valor_compra" name="valor_compra" required
+                               value="{{ maquina.valor_compra|default:'' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="valor_residual" class="form-label">Valor Residual (R$)</label>
+                        <input type="text" class="form-control" id="valor_residual" name="valor_residual" required
+                               value="{{ maquina.valor_residual|default:'' }}">
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="vida_util" class="form-label">Vida Útil (anos)</label>
+                        <input type="number" class="form-control" id="vida_util" name="vida_util" required
+                               value="{{ maquina.vida_util|default:'' }}">
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Função para formatar valor no padrão brasileiro
+        function formatarMoeda(valor) {
+            if (!valor) return '';
+            
+            // Remove tudo que não é número
+            valor = valor.replace(/\D/g, '');
+            
+            // Converte para número e divide por 100 para considerar os centavos
+            valor = (Number(valor) / 100).toFixed(2);
+            
+            // Formata no padrão brasileiro
+            valor = valor.replace('.', ',');
+            valor = valor.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+            
+            return `R$ ${valor}`;
+        }
+
+        // Função para remover formatação
+        function removerFormatacao(valor) {
+            return valor.replace(/\D/g, '');
+        }
+
+        // Função para atualizar o valor do input
+        function atualizarInput(input) {
+            let valor = removerFormatacao(input.value);
+            input.value = formatarMoeda(valor);
+        }
+
+        // Adiciona os eventos nos campos de valor
+        ['valor_mercado', 'valor_compra', 'valor_residual'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                // Formata o valor inicial se existir
+                if (input.value) {
+                    atualizarInput(input);
+                }
+
+                // Eventos para formatar durante a digitação
+                input.addEventListener('input', function() {
+                    let valor = removerFormatacao(this.value);
+                    if (valor.length > 2) {
+                        this.value = formatarMoeda(valor);
+                    }
+                });
+
+                // Formata quando o campo perde o foco
+                input.addEventListener('blur', function() {
+                    atualizarInput(this);
+                });
+
+                // Remove formatação quando o campo recebe foco
+                input.addEventListener('focus', function() {
+                    let valor = removerFormatacao(this.value);
+                    if (valor.length > 0) {
+                        this.value = formatarMoeda(valor);
+                    }
+                });
+            }
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}

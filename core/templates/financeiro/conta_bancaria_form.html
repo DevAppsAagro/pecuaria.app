@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">{% if form.instance.pk %}Editar{% else %}Nova{% endif %} Conta Bancária</h2>
+    <div class="card">
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="id_banco" class="form-label">Banco</label>
+                        {{ form.banco }}
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_agencia" class="form-label">Agência</label>
+                        {{ form.agencia }}
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_conta" class="form-label">Número da Conta</label>
+                        {{ form.conta }}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="id_tipo" class="form-label">Tipo de Conta</label>
+                        {{ form.tipo }}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="id_saldo" class="form-label">Saldo Atual</label>
+                        {{ form.saldo }}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="id_data_saldo" class="form-label">Data do Saldo</label>
+                        {{ form.data_saldo }}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-8">
+                        <label for="id_fazenda" class="form-label">Fazenda</label>
+                        {{ form.fazenda }}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="id_ativa" class="form-label">Conta Ativa</label>
+                        {{ form.ativa }}
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Salvar
+                    </button>
+                    <a href="{% url 'contas_bancarias_list' %}" class="btn btn-secondary">
+                        Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Adiciona classes Bootstrap aos campos do formulário
+        var formControls = document.querySelectorAll('input, select');
+        formControls.forEach(function(element) {
+            element.classList.add('form-control');
+        });
+
+        // Ajusta o campo checkbox
+        var checkboxAtiva = document.getElementById('id_ativa');
+        if (checkboxAtiva) {
+            checkboxAtiva.classList.remove('form-control');
+            checkboxAtiva.classList.add('form-check-input');
+            checkboxAtiva.parentElement.classList.add('form-check', 'mt-2');
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,318 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div id="pdf-content" class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Relatório de Pesagens</h2>
+        <button onclick="exportarPDF()" class="btn btn-primary">
+            <i class="bi bi-file-pdf"></i> Exportar PDF
+        </button>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label for="data_inicio" class="form-label">Data Início</label>
+                    <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
+                           value="{{ filtros.data_inicio|default:'' }}" 
+                           onchange="this.setAttribute('value', this.value);">
+                </div>
+                <div class="col-md-3">
+                    <label for="data_fim" class="form-label">Data Fim</label>
+                    <input type="date" class="form-control" id="data_fim" name="data_fim" 
+                           value="{{ filtros.data_fim|default:'' }}"
+                           onchange="this.setAttribute('value', this.value);">
+                </div>
+                <div class="col-md-3">
+                    <label for="lote" class="form-label">Lote</label>
+                    <select class="form-select" id="lote" name="lote_id">
+                        <option value="">Todos os Lotes</option>
+                        {% for lote in lotes %}
+                            <option value="{{ lote.id }}" {% if filtros.lote_id == lote.id|stringformat:"s" %}selected{% endif %}>
+                                {{ lote.id_lote }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="animal" class="form-label">Animal</label>
+                    <select class="form-select" id="animal" name="animal_id">
+                        <option value="">Todos os Animais</option>
+                        {% for animal in animais %}
+                            <option value="{{ animal.id }}" {% if filtros.animal_id == animal.id|stringformat:"s" %}selected{% endif %}>
+                                {{ animal.brinco_visual }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body" style="height: 400px;">
+                    <h5 class="card-title">Evolução de Peso</h5>
+                    <canvas id="grafico-pesos"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body" style="height: 400px;">
+                    <h5 class="card-title">Ganho Médio Diário</h5>
+                    <canvas id="grafico-gmd"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body" style="height: 400px;">
+                    <h5 class="card-title">Custo por Arroba</h5>
+                    <canvas id="grafico-custos"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Dados -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <div class="alert alert-info">
+                <strong>GMD Médio Ponderado do Período:</strong> {{ media_gmd|floatformat:2 }} kg/dia
+                <br>
+                <small class="text-muted">* Média ponderada pelo número de dias entre pesagens</small>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Animal</th>
+                            <th>Peso (kg)</th>
+                            <th>@ Atual</th>
+                            <th>GMD (kg/dia)</th>
+                            <th>Dias</th>
+                            <th>Ganho (kg)</th>
+                            <th>Ganho (@)</th>
+                            <th>Custo/@</th>
+                            <th>Variação (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dados in dados_pesagens reversed %}
+                            <tr {% if dados.variacao_positiva %}class="table-success"{% elif dados.variacao_negativa %}class="table-danger"{% endif %}>
+                                <td>{{ dados.data|date:"d/m/Y" }}</td>
+                                <td>{{ dados.animal }}</td>
+                                <td>{{ dados.peso|floatformat:2 }}</td>
+                                <td>{{ dados.arroba_atual|floatformat:2 }}</td>
+                                <td>{{ dados.gmd|floatformat:2 }}</td>
+                                <td>{{ dados.dias_periodo }}</td>
+                                <td>{{ dados.ganho_kg|floatformat:2 }}</td>
+                                <td>{{ dados.ganho_arroba|floatformat:2 }}</td>
+                                <td>
+                                    {% if dados.gmd > 0 and dados.dias_periodo > 0 %}
+                                        R$ {{ dados.custo_arroba|floatformat:2 }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if dados.gmd > 0 %}
+                                        {% if dados.percentual_variacao %}
+                                            {% if dados.percentual_variacao > 0 %}
+                                                +{{ dados.percentual_variacao }}%
+                                            {% else %}
+                                                {{ dados.percentual_variacao }}%
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts necessários -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<script>
+    // Dados do backend
+    // @ts-ignore
+    const dados = {{ dados_graficos|safe }};
+
+    // Configuração base para todos os gráficos
+    const configBase = {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+            padding: {
+                left: 10,
+                right: 10,
+                top: 20,
+                bottom: 30  // Aumenta margem inferior para as datas
+            }
+        },
+        scales: {
+            x: {
+                ticks: {
+                    maxRotation: 45,
+                    minRotation: 45,
+                    padding: 10
+                }
+            }
+        }
+    };
+
+    // Gráfico de Pesos
+    new Chart(document.getElementById('grafico-pesos'), {
+        type: 'line',
+        data: {
+            labels: dados.datas,
+            datasets: [{
+                label: 'Peso (kg)',
+                data: dados.pesos,
+                borderColor: '#198754',
+                backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                tension: 0.1,
+                fill: true
+            }]
+        },
+        options: {
+            ...configBase,
+            scales: {
+                ...configBase.scales,
+                y: {
+                    beginAtZero: false,
+                    title: {
+                        display: true,
+                        text: 'Peso (kg)'
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Evolução do Peso'
+                }
+            }
+        }
+    });
+
+    // Gráfico de GMD
+    new Chart(document.getElementById('grafico-gmd'), {
+        type: 'line',
+        data: {
+            labels: dados.datas,
+            datasets: [{
+                label: 'GMD (kg/dia)',
+                data: dados.gmd,
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                tension: 0.1,
+                fill: true
+            }]
+        },
+        options: {
+            ...configBase,
+            scales: {
+                ...configBase.scales,
+                y: {
+                    beginAtZero: false,
+                    title: {
+                        display: true,
+                        text: 'GMD (kg/dia)'
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Evolução do GMD'
+                }
+            }
+        }
+    });
+
+    // Gráfico de Custos
+    new Chart(document.getElementById('grafico-custos'), {
+        type: 'line',
+        data: {
+            labels: dados.datas,
+            datasets: [{
+                label: 'Custo por @',
+                data: dados.custos,
+                borderColor: '#dc3545',
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                tension: 0.1,
+                fill: true
+            }]
+        },
+        options: {
+            ...configBase,
+            scales: {
+                ...configBase.scales,
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'R$/@'
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Evolução do Custo por @'
+                }
+            }
+        }
+    });
+
+    // Atualiza a lista de animais quando o lote é alterado
+    document.getElementById('lote').addEventListener('change', function() {
+        const loteId = this.value;
+        const animalSelect = document.getElementById('animal');
+        animalSelect.innerHTML = '<option value="">Todos os Animais</option>';
+        
+        if (loteId) {
+            fetch(`/relatorios/animais-por-lote/${loteId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(animal => {
+                        const option = document.createElement('option');
+                        option.value = animal.id;
+                        option.textContent = animal.brinco_visual;
+                        animalSelect.appendChild(option);
+                    });
+                });
+        }
+    });
+
+    // Função para exportar PDF
+    function exportarPDF() {
+        const element = document.getElementById('pdf-content');
+        const opt = {
+            margin: 1,
+            filename: 'relatorio-pesagens.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(element).save();
+    }
+</script>
+{% endblock %}

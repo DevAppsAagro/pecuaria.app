@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Histórico de Pagamentos - Parcela {{ parcela.numero }}/{{ parcela.compra.numero_parcelas }}</h5>
+            <a href="{% url 'compras_detalhe' parcela.compra.pk %}" class="btn btn-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+        </div>
+        <div class="card-body">
+            <!-- Detalhes da Parcela -->
+            <div class="mb-4">
+                <h6 class="text-muted mb-3">Detalhes da Parcela</h6>
+                <div class="row">
+                    <div class="col-md-3">
+                        <p><strong>Valor Total:</strong> R$ {{ parcela.valor|floatformat:2 }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>Valor Pago:</strong> R$ {{ parcela.valor_pago|floatformat:2 }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>Valor Restante:</strong> R$ {{ parcela.valor_restante|floatformat:2 }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>Status:</strong> {{ parcela.get_status_display }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lista de Pagamentos -->
+            <h6 class="text-muted mb-3">Pagamentos Realizados</h6>
+            {% if pagamentos %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Valor</th>
+                            <th>Conta Bancária</th>
+                            <th>Observação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pagamento in pagamentos %}
+                        <tr>
+                            <td>{{ pagamento.data_pagamento|date:"d/m/Y" }}</td>
+                            <td>R$ {{ pagamento.valor|floatformat:2 }}</td>
+                            <td>{{ pagamento.conta_bancaria }}</td>
+                            <td>{{ pagamento.observacao|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">Nenhum pagamento registrado.</p>
+            {% endif %}
+
+            <!-- Botão para Registrar Novo Pagamento -->
+            {% if parcela.valor_restante > 0 %}
+            <div class="mt-3">
+                <a href="{% url 'registrar_pagamento' parcela.id %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Registrar Pagamento
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

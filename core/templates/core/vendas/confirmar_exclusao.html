@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Confirmar Cancelamento</h4>
+                </div>
+                <div class="card-body">
+                    <p>Tem certeza que deseja cancelar a venda do dia {{ venda.data|date:"d/m/Y" }}?</p>
+                    <p><strong>Comprador:</strong> {{ venda.comprador.nome }}</p>
+                    <p><strong>Animais:</strong></p>
+                    <ul>
+                        {% for animal_venda in venda.animais.all %}
+                            <li>{{ animal_venda.animal.brinco_visual }}</li>
+                        {% endfor %}
+                    </ul>
+                    <p class="text-danger">Esta ação irá:</p>
+                    <ul class="text-danger">
+                        <li>Cancelar a venda</li>
+                        <li>Restaurar os animais para o status ATIVO</li>
+                        <li>Remover a data de saída e valor de venda dos animais</li>
+                    </ul>
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'vendas_detalhe' venda.pk %}" class="btn btn-secondary me-md-2">Voltar</a>
+                            <button type="submit" class="btn btn-danger">Confirmar Cancelamento</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

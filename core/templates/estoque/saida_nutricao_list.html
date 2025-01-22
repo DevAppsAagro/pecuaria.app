@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4>Saídas de Estoque - Nutrição</h4>
+                    <a href="{% url 'saida_nutricao_estoque' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Nova Saída Nutrição
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Insumo</th>
+                                    <th>Quantidade</th>
+                                    <th>Valor Unitário</th>
+                                    <th>Valor Total</th>
+                                    <th>Destino</th>
+                                    <th>Consumo %PV</th>
+                                    <th>Observação</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for saida in saidas %}
+                                <tr>
+                                    <td>{{ saida.data|date:"d/m/Y" }}</td>
+                                    <td>{{ saida.insumo.nome }}</td>
+                                    <td>{{ saida.quantidade|floatformat:2 }} {{ saida.insumo.unidade_medida.sigla }}</td>
+                                    <td>R$ {{ saida.valor_unitario|floatformat:2 }}</td>
+                                    <td>R$ {{ saida.valor_total|floatformat:2 }}</td>
+                                    <td>{{ saida.destino_lote.id_lote }} - {{ saida.destino_lote.fazenda.nome }}</td>
+                                    <td>{{ saida.consumo_pv|floatformat:2 }}%</td>
+                                    <td>{{ saida.observacao|default:"-" }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="{% url 'saida_nutricao_detail' saida.id %}" class="btn btn-sm btn-info" title="Ver Detalhes">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="{% url 'saida_nutricao_edit' saida.id %}" class="btn btn-sm btn-warning" title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="{% url 'saida_nutricao_delete' saida.id %}" class="btn btn-sm btn-danger" title="Excluir">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="9" class="text-center">Nenhuma saída de nutrição registrada.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

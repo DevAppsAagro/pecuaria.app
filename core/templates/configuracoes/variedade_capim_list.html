@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Variedades de Capim</h2>
+        <a href="{% url 'variedade-capim-create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Nova Variedade
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Nome Científico</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for variedade in variedades %}
+                            <tr>
+                                <td>{{ variedade.nome }}</td>
+                                <td>{{ variedade.nome_cientifico|default:'-' }}</td>
+                                <td>
+                                    <a href="{% url 'variedade-capim-edit' variedade.pk %}" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'variedade-capim-delete' variedade.pk %}" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir esta variedade de capim?')">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center">Nenhuma variedade de capim cadastrada.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

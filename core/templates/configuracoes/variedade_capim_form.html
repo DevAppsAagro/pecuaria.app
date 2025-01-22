@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% if variedade %}Editar{% else %}Nova{% endif %} Variedade de Capim</h2>
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="nome" class="form-label">Nome</label>
+                    <input type="text" class="form-control" id="nome" name="nome" value="{{ variedade.nome|default:'' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="nome_cientifico" class="form-label">Nome Científico (opcional)</label>
+                    <input type="text" class="form-control" id="nome_cientifico" name="nome_cientifico" value="{{ variedade.nome_cientifico|default:'' }}">
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <a href="{% url 'variedade-capim-list' %}" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

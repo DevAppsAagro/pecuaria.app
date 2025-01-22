@@ -1,0 +1,40 @@
+<!-- Modal -->
+<div class="modal fade" id="modalPagarParcela{{ parcela.id }}" tabindex="-1" aria-labelledby="modalPagarParcelaLabel{{ parcela.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalPagarParcelaLabel{{ parcela.id }}">Pagar Parcela {{ parcela.numero }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'pagar_parcela' parcela.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="valor" class="form-label">Valor Original</label>
+                        <input type="text" class="form-control" value="{{ parcela.valor }}" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="data_pagamento" class="form-label">Data do Pagamento</label>
+                        <input type="date" class="form-control" id="data_pagamento" name="data_pagamento" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="multa_juros" class="form-label">Multa/Juros</label>
+                        <input type="number" class="form-control" id="multa_juros" name="multa_juros" step="0.01" value="0.00">
+                    </div>
+                    <div class="mb-3">
+                        <label for="desconto" class="form-label">Desconto</label>
+                        <input type="number" class="form-control" id="desconto" name="desconto" step="0.01" value="0.00">
+                    </div>
+                    <div class="mb-3">
+                        <label for="observacao" class="form-label">Observação</label>
+                        <textarea class="form-control" id="observacao" name="observacao" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Confirmar Pagamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

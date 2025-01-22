@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">{{ titulo }}</h1>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="{{ form.data.id_for_label }}" class="form-label">{{ form.data.label }}</label>
+                        {{ form.data }}
+                        {% if form.data.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.data.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <label for="{{ form.data_vencimento.id_for_label }}" class="form-label">{{ form.data_vencimento.label }}</label>
+                        {{ form.data_vencimento }}
+                        {% if form.data_vencimento.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.data_vencimento.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <label for="{{ form.data_pagamento.id_for_label }}" class="form-label">{{ form.data_pagamento.label }}</label>
+                        {{ form.data_pagamento }}
+                        {% if form.data_pagamento.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.data_pagamento.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="{{ form.tipo.id_for_label }}" class="form-label">{{ form.tipo.label }}</label>
+                        {{ form.tipo }}
+                        {% if form.tipo.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.tipo.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="{{ form.valor.id_for_label }}" class="form-label">{{ form.valor.label }}</label>
+                        {{ form.valor }}
+                        {% if form.valor.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.valor.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="{{ form.conta_bancaria.id_for_label }}" class="form-label">{{ form.conta_bancaria.label }}</label>
+                        {{ form.conta_bancaria }}
+                        {% if form.conta_bancaria.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.conta_bancaria.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="{{ form.fazenda.id_for_label }}" class="form-label">{{ form.fazenda.label }}</label>
+                        {{ form.fazenda }}
+                        {% if form.fazenda.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.fazenda.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <label for="{{ form.observacoes.id_for_label }}" class="form-label">{{ form.observacoes.label }}</label>
+                        {{ form.observacoes }}
+                        {% if form.observacoes.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.observacoes.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">Salvar</button>
+                        <a href="{% url 'lista_nao_operacional' %}" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

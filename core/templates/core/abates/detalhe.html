@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>Detalhes do Abate</h2>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'abates_editar' abate.pk %}" class="btn btn-primary">
+                <i class="bi bi-pencil"></i> Editar
+            </a>
+            <a href="{% url 'abates_excluir' abate.pk %}" class="btn btn-danger">
+                <i class="bi bi-trash"></i> Excluir
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Informações do Abate</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Data do Abate:</strong> {{ abate.data|date:"d/m/Y" }}</p>
+                            <p><strong>Data de Vencimento:</strong> {{ abate.data_vencimento|date:"d/m/Y" }}</p>
+                            <p><strong>Data de Pagamento:</strong> 
+                                {% if abate.status == 'PAGO' %}
+                                    {{ abate.data_pagamento|date:"d/m/Y" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </p>
+                            <p><strong>Valor por @:</strong> R$ {{ abate.valor_arroba|floatformat:2 }}</p>
+                            <p><strong>Comprador:</strong> {{ abate.comprador.nome }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Conta Bancária:</strong> {{ abate.conta_bancaria }}</p>
+                            <p><strong>Número de Parcelas:</strong> {{ abate.numero_parcelas }}</p>
+                            <p><strong>Status:</strong>
+                                {% if abate.status == 'PAGO' %}
+                                    <span class="badge bg-success">Pago</span>
+                                {% elif abate.status == 'VENCIDO' %}
+                                    <span class="badge bg-danger">Vencido</span>
+                                {% elif abate.status == 'CANCELADO' %}
+                                    <span class="badge bg-secondary">Cancelado</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Pendente</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Animais Abatidos</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Brinco</th>
+                                    <th>Peso Vivo</th>
+                                    <th>Rendimento</th>
+                                    <th>Peso em @</th>
+                                    <th>Valor/@</th>
+                                    <th>Valor Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for animal_abate in animais %}
+                                <tr>
+                                    <td>{{ animal_abate.animal.brinco_visual }}</td>
+                                    <td>{{ animal_abate.peso_vivo|floatformat:2 }} kg</td>
+                                    <td>{{ animal_abate.rendimento|floatformat:2 }}%</td>
+                                    <td>{{ animal_abate.peso_arroba|floatformat:2 }} @</td>
+                                    <td>R$ {{ animal_abate.valor_arroba|floatformat:2 }}</td>
+                                    <td>R$ {{ animal_abate.valor_total|floatformat:2 }}</td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="table-info">
+                                    <td colspan="5">
+                                        <strong>Total:</strong>
+                                    </td>
+                                    <td><strong>R$ {{ abate.valor_total|floatformat:2 }}</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Parcelas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Nº</th>
+                                    <th>Vencimento</th>
+                                    <th>Valor</th>
+                                    <th>Valor Pago</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for parcela in parcelas %}
+                                <tr>
+                                    <td>{{ parcela.numero }}</td>
+                                    <td>{{ parcela.data_vencimento|date:"d/m/Y" }}</td>
+                                    <td>R$ {{ parcela.valor|floatformat:2 }}</td>
+                                    <td>R$ {{ parcela.valor_pago|floatformat:2 }}</td>
+                                    <td>
+                                        {% if parcela.status == 'PAGO' %}
+                                            <span class="badge bg-success">Pago</span>
+                                        {% elif parcela.status == 'VENCIDO' %}
+                                            <span class="badge bg-danger">Vencido</span>
+                                        {% elif parcela.status == 'CANCELADO' %}
+                                            <span class="badge bg-secondary">Cancelado</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">Pendente</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            {% if parcela.status != 'PAGO' %}
+                                            <a href="{% url 'registrar_pagamento_abate' parcela.id %}" 
+                                               class="btn btn-sm btn-success" title="Registrar Pagamento">
+                                                <i class="bi bi-cash"></i>
+                                            </a>
+                                            {% endif %}
+                                            <a href="{% url 'historico_pagamentos_abate' parcela.id %}" 
+                                               class="btn btn-sm btn-info" title="Histórico de Pagamentos">
+                                                <i class="bi bi-clock-history"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Resumo</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Total de Animais:</strong> {{ animais|length }}</p>
+                    <p><strong>Valor Total:</strong> R$ {{ abate.valor_total|floatformat:2 }}</p>
+                    <p><strong>Total Pago:</strong> R$ {{ abate.valor_pago|default:"0.00"|floatformat:2 }}</p>
+                    <p><strong>Saldo Restante:</strong> R$ {{ abate.valor_restante|default:"0.00"|floatformat:2 }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

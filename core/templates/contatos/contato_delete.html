@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Excluir Contato</h2>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title mb-4">Confirmar Exclusão</h5>
+            <p>Você tem certeza que deseja excluir o contato abaixo?</p>
+            
+            <div class="mb-4">
+                <dl class="row">
+                    <dt class="col-sm-3">Nome</dt>
+                    <dd class="col-sm-9">{{ object.nome }}</dd>
+
+                    <dt class="col-sm-3">Tipo</dt>
+                    <dd class="col-sm-9">{{ object.get_tipo_display }}</dd>
+
+                    <dt class="col-sm-3">Telefone</dt>
+                    <dd class="col-sm-9">{{ object.telefone|default:"-" }}</dd>
+
+                    <dt class="col-sm-3">E-mail</dt>
+                    <dd class="col-sm-9">{{ object.email|default:"-" }}</dd>
+
+                    <dt class="col-sm-3">Cidade/UF</dt>
+                    <dd class="col-sm-9">{{ object.cidade }}/{{ object.uf }}</dd>
+                </dl>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Confirmar Exclusão
+                </button>
+                <a href="{% url 'contatos_list' %}" class="btn btn-secondary">
+                    Cancelar
+                </a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

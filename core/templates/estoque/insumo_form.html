@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4>{{ insumo|yesno:"Editar,Novo" }} Insumo</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="nome" class="form-label">Nome do Insumo</label>
+                            <input type="text" class="form-control" id="nome" name="nome" value="{{ insumo.nome|default:'' }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="categoria" class="form-label">Categoria</label>
+                            <select class="form-select" id="categoria" name="categoria" required>
+                                <option value="">Selecione uma categoria</option>
+                                {% for categoria in categorias %}
+                                <option value="{{ categoria.id }}" {% if insumo.categoria_id == categoria.id %}selected{% endif %}>
+                                    {{ categoria.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="subcategoria" class="form-label">Subcategoria</label>
+                            <select class="form-select" id="subcategoria" name="subcategoria" required>
+                                <option value="">Selecione primeiro uma categoria</option>
+                                {% if insumo %}
+                                <option value="{{ insumo.subcategoria.id }}" selected>
+                                    {{ insumo.subcategoria.nome }}
+                                </option>
+                                {% endif %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="unidade_medida" class="form-label">Unidade de Medida</label>
+                            <div class="input-group">
+                                <select class="form-select" id="unidade_medida" name="unidade_medida" required>
+                                    <option value="">Selecione...</option>
+                                    {% for unidade in unidades %}
+                                    <option value="{{ unidade.id }}" {% if insumo.unidade_medida_id == unidade.id %}selected{% endif %}>
+                                        {{ unidade.nome }} ({{ unidade.sigla }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <a href="{% url 'unidade-medida-create' %}" class="btn btn-outline-secondary" target="_blank">
+                                    <i class="fas fa-plus"></i> Nova Unidade
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="text-end">
+                            <a href="{% url 'estoque_list' %}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const categoriaSelect = document.getElementById('categoria');
+    const subcategoriaSelect = document.getElementById('subcategoria');
+
+    categoriaSelect.addEventListener('change', function() {
+        const categoriaId = this.value;
+        if (categoriaId) {
+            fetch(`/get-subcategorias/?categoria_id=${categoriaId}`)
+                .then(response => response.json())
+                .then(data => {
+                    subcategoriaSelect.innerHTML = '<option value="">Selecione uma subcategoria</option>';
+                    data.forEach(subcategoria => {
+                        subcategoriaSelect.innerHTML += `
+                            <option value="${subcategoria.id}">${subcategoria.nome}</option>
+                        `;
+                    });
+                    subcategoriaSelect.disabled = false;
+                });
+        } else {
+            subcategoriaSelect.innerHTML = '<option value="">Selecione primeiro uma categoria</option>';
+            subcategoriaSelect.disabled = true;
+        }
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}

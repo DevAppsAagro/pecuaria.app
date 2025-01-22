@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Despesas</h2>
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between mb-3">
+                <h5 class="card-title">Lista de Despesas</h5>
+                <a href="{% url 'despesa_create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Nova Despesa
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Data Emissão</th>
+                            <th>Data Vencimento</th>
+                            <th>Nota Fiscal</th>
+                            <th>Fornecedor</th>
+                            <th>Valor Total</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for despesa in despesas %}
+                        <tr>
+                            <td class="align-middle">{{ despesa.data_emissao|date:"d/m/Y" }}</td>
+                            <td class="align-middle">
+                                {% if despesa.forma_pagamento == 'PR' %}
+                                    {% with info=despesa.info_parcelas %}
+                                        {% if info.proxima_data %}
+                                            {{ info.proxima_data|date:"d/m/Y" }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    {% endwith %}
+                                {% else %}
+                                    {{ despesa.data_vencimento|date:"d/m/Y" }}
+                                {% endif %}
+                            </td>
+                            <td class="align-middle">{{ despesa.numero_nf }}</td>
+                            <td class="align-middle">{{ despesa.contato.nome }}</td>
+                            <td class="align-middle">
+                                <div>R$ {{ despesa.valor_total|floatformat:2 }}</div>
+                                {% if despesa.forma_pagamento == 'PR' %}
+                                    {% with info=despesa.info_parcelas %}
+                                        <div><small class="text-muted">({{ info.pagas }}/{{ info.total }} parcelas)</small></div>
+                                    {% endwith %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if despesa.status == 'PENDENTE' %}
+                                    <span class="badge bg-warning">Pendente</span>
+                                {% elif despesa.status == 'PAGO' %}
+                                    <span class="badge bg-success">Pago</span>
+                                {% elif despesa.status == 'VENCIDO' %}
+                                    <span class="badge bg-danger">Vencido</span>
+                                {% elif despesa.status == 'VENCE_HOJE' %}
+                                    <span class="badge bg-info">Vence Hoje</span>
+                                {% elif despesa.status == 'CANCELADO' %}
+                                    <span class="badge bg-secondary">Cancelado</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{% url 'despesa_detail' despesa.id %}" class="btn btn-sm btn-info" title="Ver Detalhes">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{% url 'despesa_update' despesa.id %}" class="btn btn-sm btn-warning" title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'despesa_delete' despesa.id %}" class="btn btn-sm btn-danger" title="Excluir">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">Nenhuma despesa cadastrada.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

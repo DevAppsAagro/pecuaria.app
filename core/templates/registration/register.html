@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block auth_content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">Registro</h3>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="id_username" class="form-label">Usuário</label>
+                        <input type="text" name="username" class="form-control" id="id_username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_email" class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" id="id_email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_password1" class="form-label">Senha</label>
+                        <input type="password" name="password1" class="form-control" id="id_password1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_password2" class="form-label">Confirme a Senha</label>
+                        <input type="password" name="password2" class="form-control" id="id_password2" required>
+                    </div>
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            {{ form.errors }}
+                        </div>
+                    {% endif %}
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Registrar</button>
+                    </div>
+                </form>
+                <div class="text-center mt-3">
+                    <p>Já tem uma conta? <a href="{% url 'login' %}">Faça login</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

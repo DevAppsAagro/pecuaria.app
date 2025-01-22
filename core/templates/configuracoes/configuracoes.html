@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Configurações</h2>
+    
+    <div class="row row-cols-1 row-cols-md-3 g-4">
+        <!-- Raças -->
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-tags"></i> Raças</h5>
+                    <p class="card-text">Gerencie as raças de animais do seu rebanho.</p>
+                    <a href="{% url 'raca_list' %}" class="btn btn-primary">Acessar</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Finalidades de Lote -->
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-collection"></i> Finalidades de Lote</h5>
+                    <p class="card-text">Configure as finalidades para seus lotes de animais.</p>
+                    <a href="{% url 'finalidade_lote_list' %}" class="btn btn-primary">Acessar</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Categorias de Animais -->
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-diagram-3"></i> Categorias de Animais</h5>
+                    <p class="card-text">Gerencie as diferentes categorias de animais.</p>
+                    <a href="{% url 'categoria_animal_list' %}" class="btn btn-primary">Acessar</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Unidades de Medida -->
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-rulers"></i> Unidades de Medida</h5>
+                    <p class="card-text">Configure as unidades de medida utilizadas no sistema.</p>
+                    <a href="{% url 'unidade-medida-list' %}" class="btn btn-primary">Acessar</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Motivos de Morte -->
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-clipboard-x"></i> Motivos de Morte</h5>
+                    <p class="card-text">Gerencie os motivos de morte para seu rebanho.</p>
+                    <a href="{% url 'motivo-morte-list' %}" class="btn btn-primary">Acessar</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Categorias de Custos -->
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-cash-stack"></i> Categorias de Custos</h5>
+                    <p class="card-text">Gerencie as categorias e subcategorias de custos.</p>
+                    <a href="{% url 'categoria-custo-list' %}" class="btn btn-primary">Acessar</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Variedades de Capim -->
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-flower1"></i> Variedades de Capim</h5>
+                    <p class="card-text">Gerencie as variedades de capim para seus pastos.</p>
+                    <a href="{% url 'variedade-capim-list' %}" class="btn btn-primary">Acessar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

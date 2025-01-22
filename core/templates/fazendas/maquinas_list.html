@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Máquinas</h5>
+            <div>
+                <a href="{% url 'maquina_create' %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus"></i> Nova Máquina
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if maquinas %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>Fazenda</th>
+                            <th>Valor de Mercado</th>
+                            <th>Depreciação Anual</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for maquina in maquinas %}
+                        <tr>
+                            <td>{{ maquina.id_maquina }}</td>
+                            <td>{{ maquina.nome }}</td>
+                            <td>{{ maquina.fazenda.nome }}</td>
+                            <td class="valor-monetario">{{ maquina.valor_mercado }}</td>
+                            <td class="valor-monetario">{{ maquina.depreciacao_anual }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'maquina_detail' maquina.pk %}" class="btn btn-info btn-sm" title="Detalhes">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{% url 'maquina_edit' maquina.pk %}" class="btn btn-primary btn-sm" title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-danger btn-sm" title="Excluir" 
+                                            onclick="if(confirm('Tem certeza que deseja excluir esta máquina?')) { window.location.href='{% url 'maquina_delete' maquina.pk %}'; }">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                Nenhuma máquina cadastrada. Clique em "Nova Máquina" para começar!
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Função para formatar valor no padrão brasileiro
+        function formatarMoeda(valor) {
+            valor = parseFloat(valor);
+            return valor.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        // Formata todos os valores monetários
+        document.querySelectorAll('.valor-monetario').forEach(element => {
+            const valor = element.textContent;
+            if (valor) {
+                element.textContent = formatarMoeda(valor);
+            }
+        });
+    });
+</script>
+{% endblock %}

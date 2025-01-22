@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #map-container {
+        margin-bottom: 2rem;
+    }
+    #map {
+        height: 500px;
+        width: 100%;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .map-controls {
+        background: white;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+    .legenda {
+        padding: 1rem;
+        background: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .legenda-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    .legenda-cor {
+        width: 20px;
+        height: 20px;
+        margin-right: 0.5rem;
+        border-radius: 3px;
+    }
+    .info-totais {
+        margin-top: 1rem;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 0.25rem;
+    }
+    .pasto-label {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        font-weight: bold;
+        color: #333;
+        font-size: 14px;
+        text-shadow: 
+            -1px -1px 0 #fff,
+            1px -1px 0 #fff,
+            -1px 1px 0 #fff,
+            1px 1px 0 #fff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Pastos</h2>
+        <a href="{% url 'pasto_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Novo Pasto
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Mapa e Controles -->
+    <div id="map-container">
+        <div class="row">
+            <div class="col-md-9">
+                <div id="map"></div>
+            </div>
+            <div class="col-md-3">
+                <div class="map-controls">
+                    <div class="mb-3">
+                        <label for="filtro-fazenda" class="form-label">Filtrar por Fazenda</label>
+                        <select class="form-select" id="filtro-fazenda">
+                            <option value="">Todas as Fazendas</option>
+                            {% for fazenda in fazendas %}
+                            <option value="{{ fazenda.id }}" 
+                                    {% if fazenda_selecionada == fazenda.id|stringformat:"s" %}selected{% endif %}>
+                                {{ fazenda.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="legenda">
+                        <h6 class="mb-3">Legenda</h6>
+                        <div id="legenda-fazendas">
+                            <!-- Preenchido via JavaScript -->
+                        </div>
+                        <div class="info-totais">
+                            <div id="total-pastos">Pastos: {{ pastos|length }}</div>
+                            <div id="total-area">Área Total: <span id="soma-area">0</span> ha</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Pastos -->
+    <div class="card">
+        <div class="card-body">
+            {% if pastos %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID do Pasto</th>
+                                <th>Fazenda</th>
+                                <th>Capacidade (UA/ha)</th>
+                                <th>Área (ha)</th>
+                                <th>Variedade de Capim</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pasto in pastos %}
+                            <tr>
+                                <td>{{ pasto.id_pasto }}</td>
+                                <td>{{ pasto.fazenda.nome }}</td>
+                                <td>{{ pasto.capacidade_ua|floatformat:2 }}</td>
+                                <td>{{ pasto.area|floatformat:2 }}</td>
+                                <td>{{ pasto.variedade_capim|default:"-" }}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{% url 'pasto_detail' pasto.id %}" class="btn btn-sm btn-outline-info me-1">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{% url 'pasto_edit' pasto.id %}" class="btn btn-sm btn-outline-primary me-1">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="{% url 'pasto_delete' pasto.id %}" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-grid" style="font-size: 3rem; color: #6c757d;"></i>
+                    <p class="mt-3">Nenhum pasto cadastrado.</p>
+                    <a href="{% url 'pasto_create' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-lg"></i> Cadastrar Primeiro Pasto
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Dados dos pastos
+    var pastosData = {{ pastos_json|safe }};
+    var coresFazendas = {{ cores_fazendas|safe }};
+    
+    // Inicializar o mapa
+    var map = L.map('map').setView([-15.7801, -47.9292], 5);
+    
+    // Adicionar camada de satélite do Google
+    var googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+        attribution: 'Google Maps'
+    }).addTo(map);
+
+    // Criar camada para os polígonos
+    var pastosLayer = L.featureGroup().addTo(map);
+
+    // Função para criar popup
+    function criarPopup(pasto) {
+        return `
+            <strong>${pasto.fazenda_nome}</strong><br>
+            Nome: ${pasto.nome || 'Sem nome'}<br>
+            ID do Pasto: ${pasto.id_pasto}<br>
+            Área: ${pasto.area.toFixed(2)} ha<br>
+            Capacidade: ${pasto.capacidade_ua.toFixed(2)} UA/ha
+        `;
+    }
+
+    // Função para desenhar os polígonos
+    function desenharPastos(pastos) {
+        pastosLayer.clearLayers();
+        var bounds = L.latLngBounds();
+        var areaTotal = 0;
+
+        pastos.forEach(function(pasto) {
+            var polygon = L.polygon(pasto.coordenadas, {
+                color: pasto.cor,
+                fillOpacity: 0.4,
+                weight: 2
+            }).addTo(pastosLayer);
+
+            polygon.bindPopup(criarPopup(pasto));
+            
+            // Adicionar hover effect
+            polygon.on('mouseover', function() {
+                this.setStyle({
+                    fillOpacity: 0.7,
+                    weight: 3
+                });
+            });
+            polygon.on('mouseout', function() {
+                this.setStyle({
+                    fillOpacity: 0.4,
+                    weight: 2
+                });
+            });
+
+            // Criar rótulo para o pasto
+            var center = polygon.getBounds().getCenter();
+            var label = L.divIcon({
+                className: 'pasto-label',
+                html: pasto.nome || pasto.id_pasto,
+                iconSize: [100, 20],
+                iconAnchor: [50, 10]
+            });
+            L.marker(center, { icon: label }).addTo(pastosLayer);
+
+            // Expandir os bounds
+            bounds.extend(polygon.getBounds());
+            areaTotal += pasto.area;
+        });
+
+        // Atualizar área total
+        document.getElementById('soma-area').textContent = areaTotal.toFixed(2);
+
+        // Ajustar zoom se houver polígonos
+        if (pastos.length > 0) {
+            map.fitBounds(bounds);
+        }
+    }
+
+    // Criar legenda
+    function criarLegenda() {
+        var legendaHtml = '';
+        var fazendas = {};
+        
+        pastosData.forEach(function(pasto) {
+            if (!fazendas[pasto.fazenda_id]) {
+                fazendas[pasto.fazenda_id] = {
+                    nome: pasto.fazenda_nome,
+                    cor: pasto.cor
+                };
+            }
+        });
+
+        for (var id in fazendas) {
+            legendaHtml += `
+                <div class="legenda-item">
+                    <div class="legenda-cor" style="background-color: ${fazendas[id].cor}"></div>
+                    <div>${fazendas[id].nome}</div>
+                </div>
+            `;
+        }
+
+        document.getElementById('legenda-fazendas').innerHTML = legendaHtml;
+    }
+
+    // Filtrar pastos
+    document.getElementById('filtro-fazenda').addEventListener('change', function() {
+        var fazendaId = this.value;
+        var pastosFiltrados = fazendaId ? 
+            pastosData.filter(p => p.fazenda_id.toString() === fazendaId) : 
+            pastosData;
+        
+        desenharPastos(pastosFiltrados);
+        
+        // Atualizar URL sem recarregar a página
+        var url = new URL(window.location);
+        if (fazendaId) {
+            url.searchParams.set('fazenda', fazendaId);
+        } else {
+            url.searchParams.delete('fazenda');
+        }
+        window.history.pushState({}, '', url);
+    });
+
+    // Inicializar mapa
+    desenharPastos(pastosData);
+    criarLegenda();
+});
+</script>
+{% endblock %}

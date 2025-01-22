@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mt-4">{{ titulo }}</h1>
+            
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="id_lote" class="form-label">ID do Lote</label>
+                            <input type="text" class="form-control" id="id_lote" name="id_lote" value="{{ lote.id_lote|default:'' }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="data_criacao" class="form-label">Data de Criação</label>
+                            <input type="date" class="form-control" id="data_criacao" name="data_criacao" value="{{ lote.data_criacao|date:'Y-m-d'|default:'' }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="finalidade" class="form-label">Finalidade do Lote</label>
+                            <select class="form-select" id="finalidade" name="finalidade" required>
+                                <option value="">Selecione uma finalidade</option>
+                                {% for finalidade in finalidades %}
+                                <option value="{{ finalidade.id }}" {% if lote.finalidade_id == finalidade.id %}selected{% endif %}>
+                                    {{ finalidade.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="fazenda" class="form-label">Fazenda</label>
+                            <select class="form-select" id="fazenda" name="fazenda" required>
+                                <option value="">Selecione uma fazenda</option>
+                                {% for fazenda in fazendas %}
+                                <option value="{{ fazenda.id }}" {% if lote.fazenda_id == fazenda.id %}selected{% endif %}>
+                                    {{ fazenda.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary">Salvar</button>
+                            <a href="{% url 'lote_list' %}" class="btn btn-secondary">Cancelar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

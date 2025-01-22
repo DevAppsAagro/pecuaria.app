@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Finalidades de Lote</h2>
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-end mb-3">
+                <a href="#" class="btn btn-primary">Nova Finalidade</a>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Descrição</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for finalidade in finalidades %}
+                    <tr>
+                        <td>{{ finalidade.nome }}</td>
+                        <td>{{ finalidade.descricao }}</td>
+                        <td>
+                            <a href="#" class="btn btn-sm btn-primary">Editar</a>
+                            <a href="#" class="btn btn-sm btn-danger">Excluir</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

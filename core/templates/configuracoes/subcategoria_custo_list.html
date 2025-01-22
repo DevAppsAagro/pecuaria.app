@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Subcategorias de Custos</h2>
+        <div>
+            <a href="{% url 'categoria-custo-list' %}" class="btn btn-info me-2">
+                <i class="bi bi-list"></i> Categorias
+            </a>
+            <a href="{% url 'subcategoria-custo-create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Nova Subcategoria
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Categoria</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for subcategoria in subcategorias %}
+                            <tr>
+                                <td>{{ subcategoria.nome }}</td>
+                                <td>{{ subcategoria.categoria.nome }}</td>
+                                <td>
+                                    <a href="{% url 'subcategoria-custo-edit' subcategoria.pk %}" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'subcategoria-custo-delete' subcategoria.pk %}" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir esta subcategoria?')">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center">Nenhuma subcategoria cadastrada.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

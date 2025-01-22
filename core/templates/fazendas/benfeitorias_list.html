@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Benfeitorias</h5>
+            <a href="{% url 'benfeitoria_create' %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-lg"></i> Nova Benfeitoria
+            </a>
+        </div>
+        <div class="card-body">
+            {% if benfeitorias %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>Fazenda</th>
+                            <th>Valor de Compra</th>
+                            <th>Valor Residual</th>
+                            <th>Vida Útil</th>
+                            <th>Depreciação Anual</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for benfeitoria in benfeitorias %}
+                        <tr>
+                            <td>{{ benfeitoria.id_benfeitoria }}</td>
+                            <td>{{ benfeitoria.nome }}</td>
+                            <td>{{ benfeitoria.fazenda.nome }}</td>
+                            <td class="valor-monetario">{{ benfeitoria.valor_compra }}</td>
+                            <td class="valor-monetario">{{ benfeitoria.valor_residual }}</td>
+                            <td>{{ benfeitoria.vida_util }} anos</td>
+                            <td class="valor-monetario">{{ benfeitoria.depreciacao_anual }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'benfeitoria_detail' benfeitoria.pk %}" class="btn btn-info btn-sm" title="Detalhes">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{% url 'benfeitoria_edit' benfeitoria.pk %}" class="btn btn-primary btn-sm" title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'benfeitoria_delete' benfeitoria.pk %}" class="btn btn-danger btn-sm" title="Excluir">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info" role="alert">
+                Nenhuma benfeitoria cadastrada.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Função para formatar valor no padrão brasileiro
+        function formatarMoeda(valor) {
+            valor = parseFloat(valor);
+            return valor.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        // Formata todos os valores monetários
+        document.querySelectorAll('.valor-monetario').forEach(element => {
+            const valor = element.textContent;
+            if (valor) {
+                element.textContent = formatarMoeda(valor);
+            }
+        });
+    });
+</script>
+{% endblock %}

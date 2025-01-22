@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Histórico de Movimentações - Animal {{ animal.brinco_visual }}</h5>
+            <div>
+                <a href="{% url 'movimentacao_create' animal.pk %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg"></i> Nova Movimentação
+                </a>
+                <a href="{% url 'animal_detail' animal.pk %}" class="btn btn-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Tipo</th>
+                            <th>Origem</th>
+                            <th>Destino</th>
+                            <th>Observação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mov in movimentacoes %}
+                        <tr>
+                            <td>{{ mov.data_movimentacao|date:"d/m/Y" }}</td>
+                            <td>{{ mov.get_tipo_display }}</td>
+                            <td>
+                                {% if mov.tipo == 'LOTE' %}
+                                    {{ mov.lote_origem.id_lote|default:"-" }}
+                                {% else %}
+                                    {{ mov.pasto_origem.id_pasto|default:"-" }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if mov.tipo == 'LOTE' %}
+                                    {{ mov.lote_destino.id_lote }}
+                                {% else %}
+                                    {{ mov.pasto_destino.id_pasto }}
+                                {% endif %}
+                            </td>
+                            <td>{{ mov.observacao|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center">Nenhuma movimentação registrada.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

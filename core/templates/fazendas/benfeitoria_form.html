@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">{{ titulo }}</h5>
+            <a href="{% url 'benfeitorias_list' %}" class="btn btn-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="id_benfeitoria" class="form-label">ID da Benfeitoria</label>
+                            <input type="text" class="form-control" id="id_benfeitoria" name="id_benfeitoria" value="{{ benfeitoria.id_benfeitoria|default:'' }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="nome" class="form-label">Nome</label>
+                            <input type="text" class="form-control" id="nome" name="nome" value="{{ benfeitoria.nome|default:'' }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="fazenda" class="form-label">Fazenda</label>
+                            <select class="form-select" id="fazenda" name="fazenda" required>
+                                <option value="">Selecione uma fazenda</option>
+                                {% for fazenda in fazendas %}
+                                <option value="{{ fazenda.id }}" {% if benfeitoria.fazenda.id == fazenda.id %}selected{% endif %}>
+                                    {{ fazenda.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="data_aquisicao" class="form-label">Data de Aquisição</label>
+                            <input type="date" class="form-control" id="data_aquisicao" name="data_aquisicao" value="{{ benfeitoria.data_aquisicao|date:'Y-m-d'|default:'' }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="valor_compra" class="form-label">Valor de Compra</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" class="form-control valor-monetario" id="valor_compra" name="valor_compra" value="{{ benfeitoria.valor_compra|default:'' }}" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="valor_residual" class="form-label">Valor Residual</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" class="form-control valor-monetario" id="valor_residual" name="valor_residual" value="{{ benfeitoria.valor_residual|default:'' }}" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="vida_util" class="form-label">Vida Útil (anos)</label>
+                            <input type="number" class="form-control" id="vida_util" name="vida_util" value="{{ benfeitoria.vida_util|default:'' }}" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Função para formatar valor no padrão brasileiro
+        function formatarMoeda(valor) {
+            if (!valor) return '';
+            
+            // Se o valor já estiver formatado, converte para número
+            if (typeof valor === 'string') {
+                valor = valor.replace('R$', '')
+                           .replace(/\./g, '')
+                           .replace(',', '.')
+                           .trim();
+            }
+            
+            valor = parseFloat(valor);
+            return valor.toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        // Formata os campos de valor monetário ao carregar
+        document.querySelectorAll('input.valor-monetario').forEach(input => {
+            input.value = formatarMoeda(input.value);
+
+            // Adiciona evento para formatar enquanto digita
+            input.addEventListener('input', function(e) {
+                let valor = e.target.value.replace(/\D/g, '');
+                valor = (parseFloat(valor) / 100).toString();
+                e.target.value = formatarMoeda(valor);
+            });
+        });
+    });
+</script>
+{% endblock %}

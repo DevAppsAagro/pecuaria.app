@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Nova Movimentação - Animal {{ animal.brinco_visual }}</h5>
+            <a href="{% url 'animal_detail' animal.pk %}" class="btn btn-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label for="tipo" class="form-label">Tipo de Movimentação *</label>
+                    <select class="form-select" id="tipo" name="tipo" required onchange="toggleDestino()">
+                        <option value="">Selecione o tipo</option>
+                        <option value="LOTE">Mudança de Lote</option>
+                        <option value="PASTO">Mudança de Pasto</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="data_movimentacao" class="form-label">Data da Movimentação *</label>
+                    <input type="date" class="form-control" id="data_movimentacao" name="data_movimentacao" required>
+                </div>
+
+                <div class="mb-3" id="lote_destino_div" style="display: none;">
+                    <label for="lote_destino" class="form-label">Lote de Destino *</label>
+                    <select class="form-select" id="lote_destino" name="destino" required>
+                        <option value="">Selecione o lote</option>
+                        {% for lote in lotes %}
+                        <option value="{{ lote.pk }}">{{ lote.id_lote }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Selecione o lote para onde o animal será movido</div>
+                </div>
+
+                <div class="mb-3" id="pasto_destino_div" style="display: none;">
+                    <label for="pasto_destino" class="form-label">Pasto de Destino *</label>
+                    <select class="form-select" id="pasto_destino" name="destino" required>
+                        <option value="">Selecione o pasto</option>
+                        {% for pasto in pastos %}
+                        <option value="{{ pasto.pk }}">{{ pasto.id_pasto }} - {{ pasto.nome|default:"" }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Selecione o pasto para onde o animal será movido</div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="observacao" class="form-label">Observação</label>
+                    <textarea class="form-control" id="observacao" name="observacao" rows="3"></textarea>
+                </div>
+
+                <div class="text-muted mb-3">
+                    * Campos obrigatórios
+                </div>
+
+                <button type="submit" class="btn btn-primary">Registrar Movimentação</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleDestino() {
+        const tipo = document.getElementById('tipo').value;
+        const loteDiv = document.getElementById('lote_destino_div');
+        const pastoDiv = document.getElementById('pasto_destino_div');
+        const loteSelect = document.getElementById('lote_destino');
+        const pastoSelect = document.getElementById('pasto_destino');
+        
+        // Primeiro, esconde e desabilita todos
+        loteDiv.style.display = 'none';
+        pastoDiv.style.display = 'none';
+        loteSelect.disabled = true;
+        pastoSelect.disabled = true;
+        loteSelect.removeAttribute('required');
+        pastoSelect.removeAttribute('required');
+        
+        // Depois, mostra e habilita apenas o selecionado
+        if (tipo === 'LOTE') {
+            loteDiv.style.display = 'block';
+            loteSelect.disabled = false;
+            loteSelect.setAttribute('required', 'required');
+            pastoSelect.value = '';
+        } else if (tipo === 'PASTO') {
+            pastoDiv.style.display = 'block';
+            pastoSelect.disabled = false;
+            pastoSelect.setAttribute('required', 'required');
+            loteSelect.value = '';
+        }
+    }
+
+    // Executa ao carregar a página para garantir o estado inicial correto
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleDestino();
+    });
+
+    // Adiciona validação antes do envio do formulário
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const tipo = document.getElementById('tipo').value;
+        const loteSelect = document.getElementById('lote_destino');
+        const pastoSelect = document.getElementById('pasto_destino');
+        
+        if (tipo === 'LOTE' && !loteSelect.value) {
+            e.preventDefault();
+            alert('Por favor, selecione o lote de destino');
+        } else if (tipo === 'PASTO' && !pastoSelect.value) {
+            e.preventDefault();
+            alert('Por favor, selecione o pasto de destino');
+        }
+    });
+</script>
+{% endblock %}

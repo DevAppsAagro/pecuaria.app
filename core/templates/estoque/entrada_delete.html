@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4>Excluir Entrada</h4>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">
+                        Tem certeza que deseja excluir esta entrada?
+                    </p>
+                    <dl class="row">
+                        <dt class="col-sm-4">Data:</dt>
+                        <dd class="col-sm-8">{{ entrada.data|date:"d/m/Y" }}</dd>
+                        
+                        <dt class="col-sm-4">Insumo:</dt>
+                        <dd class="col-sm-8">{{ entrada.insumo.nome }}</dd>
+                        
+                        <dt class="col-sm-4">Quantidade:</dt>
+                        <dd class="col-sm-8">{{ entrada.quantidade|floatformat:2 }} {{ entrada.insumo.unidade_medida.sigla }}</dd>
+                        
+                        <dt class="col-sm-4">Valor Unitário:</dt>
+                        <dd class="col-sm-8">R$ {{ entrada.valor_unitario|floatformat:2 }}</dd>
+                        
+                        <dt class="col-sm-4">Valor Total:</dt>
+                        <dd class="col-sm-8">R$ {{ entrada.valor_total|floatformat:2 }}</dd>
+                        
+                        <dt class="col-sm-4">Fazenda:</dt>
+                        <dd class="col-sm-8">{{ entrada.destino.nome }}</dd>
+                        
+                        {% if entrada.observacao %}
+                        <dt class="col-sm-4">Observação:</dt>
+                        <dd class="col-sm-8">{{ entrada.observacao }}</dd>
+                        {% endif %}
+                    </dl>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Esta ação não poderá ser desfeita e irá atualizar o saldo do estoque.
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="text-end">
+                            <a href="{% url 'entrada_list' %}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-danger">Confirmar Exclusão</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4>Detalhes da Entrada</h4>
+                    <div>
+                        <a href="{% url 'entrada_edit' entrada.id %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-edit"></i> Editar
+                        </a>
+                        <a href="{% url 'entrada_delete' entrada.id %}" class="btn btn-danger btn-sm">
+                            <i class="fas fa-trash"></i> Excluir
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="card-title">Informações Gerais</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Insumo:</th>
+                                    <td>{{ entrada.insumo.nome }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Categoria:</th>
+                                    <td>{{ entrada.insumo.categoria.nome }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Subcategoria:</th>
+                                    <td>{{ entrada.insumo.subcategoria.nome }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Data:</th>
+                                    <td>{{ entrada.data|date:"d/m/Y" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Quantidade:</th>
+                                    <td>{{ entrada.quantidade }} {{ entrada.insumo.unidade_medida.sigla }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Valor Unitário:</th>
+                                    <td>R$ {{ entrada.valor_unitario|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Valor Total:</th>
+                                    <td>R$ {{ entrada.valor_total|floatformat:2 }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5 class="card-title">Informações Adicionais</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Nota Fiscal:</th>
+                                    <td>{{ entrada.nota_fiscal|default:"-" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Fornecedor:</th>
+                                    <td>{{ entrada.fornecedor|default:"-" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Observação:</th>
+                                    <td>{{ entrada.observacao|default:"-" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Registrado por:</th>
+                                    <td>{{ entrada.usuario.get_full_name|default:entrada.usuario.username }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Data de Cadastro:</th>
+                                    <td>{{ entrada.data_cadastro|date:"d/m/Y H:i" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Última Atualização:</th>
+                                    <td>{{ entrada.data_atualizacao|date:"d/m/Y H:i" }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    {% if entrada.despesa %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5 class="card-title">Despesa Vinculada</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Despesa:</th>
+                                    <td>
+                                        <a href="{% url 'despesa_detail' entrada.despesa.id %}">
+                                            {{ entrada.despesa.descricao }}
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Data:</th>
+                                    <td>{{ entrada.despesa.data|date:"d/m/Y" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Valor:</th>
+                                    <td>R$ {{ entrada.despesa.valor|floatformat:2 }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer text-end">
+                    <a href="{% url 'entrada_list' %}" class="btn btn-secondary">Voltar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

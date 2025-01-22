@@ -1,0 +1,573 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório do Animal teste - {{ animal.brinco_visual }}</title>
+    <style>
+        /* Reset básico */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Configurações básicas */
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            background: white;
+            padding: 20mm;
+        }
+
+        /* Cabeçalho */
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+        }
+
+        header h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        header p {
+            font-size: 12px;
+            margin: 2px 0;
+        }
+
+        /* Título do relatório */
+        .relatorio-titulo {
+            text-align: center;
+            font-size: 16px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        /* Seções */
+        .secao {
+            margin: 15px 0;
+            page-break-inside: avoid;
+        }
+
+        .secao h2 {
+            font-size: 14px;
+            background: #f5f5f5;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+
+        /* Grid de informações */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .info-item {
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .info-label {
+            font-weight: bold;
+            display: inline-block;
+            min-width: 140px;
+        }
+
+        /* Tabelas */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: left;
+        }
+
+        th {
+            background: #f5f5f5;
+            font-weight: bold;
+        }
+
+        /* Rodapé */
+        footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            font-size: 10px;
+            text-align: center;
+        }
+
+        footer p {
+            margin: 2px 0;
+        }
+
+        /* Configurações de impressão */
+        @media print {
+            @page {
+                size: A4;
+                margin: 15mm;
+            }
+
+            body {
+                padding: 0;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            .page-break {
+                page-break-before: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Cabeçalho -->
+    <header>
+        <h1>{{ cabecalho.empresa }}</h1>
+        <p>CNPJ: {{ cabecalho.cnpj }}</p>
+        <p>{{ cabecalho.endereco }} - {{ cabecalho.cidade_uf }}</p>
+        <p>Tel: {{ cabecalho.telefone }} - Email: {{ cabecalho.email }}</p>
+    </header>
+
+    <!-- Título do Relatório -->
+    <div class="relatorio-titulo">
+        RELATÓRIO DETALHADO DO ANIMAL
+    </div>
+
+    <!-- Identificação do Animal -->
+    <div class="secao">
+        <h2>1. Identificação</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Brinco Visual:</span>
+                {{ animal.brinco_visual }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Brinco Eletrônico:</span>
+                {{ animal.brinco_eletronico|default:"-" }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Raça:</span>
+                {{ animal.raca }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Categoria:</span>
+                {{ animal.categoria_animal }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Data de Nascimento:</span>
+                {{ animal.data_nascimento|date:"d/m/Y" }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Data de Entrada:</span>
+                {{ animal.data_entrada|date:"d/m/Y" }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Dias Ativos:</span>
+                {{ dias_ativos }} dias
+            </div>
+            <div class="info-item">
+                <span class="info-label">Situação:</span>
+                {% if abate %}
+                    Abatido
+                {% elif venda %}
+                    Vendido
+                {% else %}
+                    Ativo
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Localização -->
+    <div class="secao">
+        <h2>2. Localização</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Fazenda:</span>
+                {{ animal.fazenda_atual.nome }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Lote:</span>
+                {% if animal.lote %}
+                    {{ animal.lote.id_lote }}{% if animal.lote.nome %} - {{ animal.lote.nome }}{% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Pasto:</span>
+                {% if animal.pasto_atual %}
+                    {{ animal.pasto_atual.id_pasto }}{% if animal.pasto_atual.nome %} - {{ animal.pasto_atual.nome }}{% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Pesos e Ganhos -->
+    <div class="secao">
+        <h2>3. Pesos e Ganhos</h2>
+        <div class="info-grid">
+            <!-- Pesos -->
+            <div class="info-item">
+                <span class="info-label">Peso Atual:</span>
+                {% if peso_atual %}{{ peso_atual|format_decimal_br }} kg{% else %}- kg{% endif %}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Peso Entrada:</span>
+                {{ animal.peso_entrada|format_decimal_br }} kg
+            </div>
+            
+            <!-- Ganhos em Kg -->
+            <div class="info-item">
+                <span class="info-label">Kg Produzido:</span>
+                {% if peso_atual and animal.peso_entrada %}{{ peso_atual|sub:animal.peso_entrada|format_decimal_br }} kg{% else %}- kg{% endif %}
+            </div>
+            <div class="info-item">
+                <span class="info-label">GMD:</span>
+                {% if peso_atual and animal.peso_entrada and dias_ativos %}{{ peso_atual|sub:animal.peso_entrada|div:dias_ativos|floatformat:2 }} kg/dia{% else %}- kg/dia{% endif %}
+            </div>
+            
+            <!-- Ganhos em @ -->
+            <div class="info-item">
+                <span class="info-label">@ Atual:</span>
+                {% if arroba_atual %}{{ arroba_atual|format_decimal_br }} @{% else %}-{% endif %}
+            </div>
+            <div class="info-item">
+                <span class="info-label">@ Entrada:</span>
+                {% if arroba_entrada %}{{ arroba_entrada|format_decimal_br }} @{% else %}-{% endif %}
+            </div>
+            <div class="info-item">
+                <span class="info-label">@ Produzida:</span>
+                {% if ganho_arroba %}{{ ganho_arroba|format_decimal_br }} @{% else %}-{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações Financeiras -->
+    <div class="secao">
+        <h2>4. Informações Financeiras</h2>
+        <div class="info-grid">
+            <!-- Custos Totais -->
+            <div class="info-item">
+                <span class="info-label">Valor de Aquisição:</span>
+                {% if animal.valor_compra %}{{ animal.valor_compra|format_currency_br }}{% else %}-{% endif %}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Custos Fixos Totais:</span>
+                {{ custos_fixos_totais|format_currency_br }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Custos Variáveis Totais:</span>
+                {{ custos_variaveis_totais|format_currency_br }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Custo Total:</span>
+                {{ custo_total|format_currency_br }}
+            </div>
+
+            <!-- Custos por Produção -->
+            <div class="info-item">
+                <span class="info-label">Por Kg Produzido:</span>
+                {{ custo_por_kg|format_currency_br }}/kg
+            </div>
+            <div class="info-item">
+                <span class="info-label">Por @ Produzida:</span>
+                {{ custo_por_arroba|format_currency_br }}/@
+            </div>
+
+            <!-- Custos Diários -->
+            <div class="info-item">
+                <span class="info-label">Total por Dia:</span>
+                {{ custo_diario|format_currency_br }}/dia
+            </div>
+            <div class="info-item">
+                <span class="info-label">Variável por Dia:</span>
+                {{ custo_variavel_diario|format_currency_br }}/dia
+            </div>
+            <div class="info-item">
+                <span class="info-label">Fixo por Dia:</span>
+                {{ custo_fixo_diario|format_currency_br }}/dia
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações de Compra -->
+    {% if compra %}
+    <div class="secao">
+        <h2>5. Informações de Compra</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Data da Compra:</span>
+                {{ compra.compra.data|date:"d/m/Y" }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Tipo de Compra:</span>
+                {{ compra.compra.get_tipo_compra_display }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">
+                    {% if compra.compra.tipo_compra == 'KG' %}
+                        Valor por Kg:
+                    {% else %}
+                        Valor por Unidade:
+                    {% endif %}
+                </span>
+                {{ compra.compra.valor_unitario|format_currency_br }}
+            </div>
+            {% if compra.compra.tipo_compra == 'KG' %}
+            <div class="info-item">
+                <span class="info-label">Peso na Compra:</span>
+                {{ animal.peso_entrada|format_decimal_br }} kg
+            </div>
+            {% endif %}
+            <div class="info-item">
+                <span class="info-label">Valor Total:</span>
+                {{ compra.valor_total|format_currency_br }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Status:</span>
+                {{ compra.compra.status }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Informações de Venda -->
+    {% if venda %}
+    <div class="secao">
+        <h2>{% if not abate %}5{% else %}6{% endif %}. Informações de Venda</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Data da Venda:</span>
+                {{ venda.venda.data|date:"d/m/Y" }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Valor por @:</span>
+                {{ venda.venda.valor_arroba|format_currency_br }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Valor Total:</span>
+                {{ venda.valor_total|format_currency_br }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">@ Total:</span>
+                {{ venda.arroba_total|format_decimal_br }} @
+            </div>
+            <div class="info-item">
+                <span class="info-label">Cliente:</span>
+                {{ venda.venda.contato.nome }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Status:</span>
+                {{ venda.venda.status }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Lucro:</span>
+                {{ lucro|format_currency_br }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Informações de Abate -->
+    {% if abate %}
+    <div class="secao">
+        <h2>{% if not venda %}5{% else %}6{% endif %}. Informações de Abate</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Data do Abate:</span>
+                {{ abate.abate.data|date:"d/m/Y" }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Valor por @:</span>
+                {{ abate.valor_arroba|format_currency_br }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Valor Total:</span>
+                {{ abate.valor_total|format_currency_br }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">@ Total:</span>
+                {{ arrobas_final|format_decimal_br }} @
+            </div>
+            <div class="info-item">
+                <span class="info-label">Cliente:</span>
+                {{ abate.abate.comprador.nome }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Status:</span>
+                {{ abate.abate.status }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Lucro:</span>
+                {{ lucro|format_currency_br }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if pesagens %}
+    <div class="secao">
+        <h2>6. Histórico de Pesagens</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Peso (kg)</th>
+                    <th>GMD (kg/dia)</th>
+                    <th>Dias no Período</th>
+                    <th>Usuário</th>
+                    <th>Observação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pesagem in pesagens|dictsortreversed:"data" %}
+                <tr {% if pesagem.peso == animal.peso_entrada %}class="entrada"{% elif abate and pesagem.peso == abate.peso_vivo %}class="abate"{% endif %}>
+                    <td>
+                        {{ pesagem.data|date:"d/m/Y" }}
+                        {% if pesagem.peso == animal.peso_entrada %}
+                            (Peso de Entrada)
+                        {% elif abate and pesagem.peso == abate.peso_vivo %}
+                            (Peso de Abate)
+                        {% endif %}
+                    </td>
+                    <td>{{ pesagem.peso|format_decimal_br }}</td>
+                    <td>
+                        {% if not forloop.last %}
+                            {% with proxima=pesagens|next:forloop.counter0 %}
+                            {% with dias=pesagem.data|dias_entre:proxima.data %}
+                            {% with ganho=pesagem.peso|sub:proxima.peso %}
+                            {% if dias > 0 %}
+                                {{ ganho|div:dias|floatformat:3 }}
+                            {% else %}
+                                -
+                            {% endif %}
+                            {% endwith %}
+                            {% endwith %}
+                            {% endwith %}
+                        {% else %}
+                            {% with dias=pesagem.data|dias_entre:animal.data_entrada %}
+                            {% with ganho=pesagem.peso|sub:animal.peso_entrada %}
+                            {% if dias > 0 %}
+                                {{ ganho|div:dias|floatformat:3 }}
+                            {% else %}
+                                -
+                            {% endif %}
+                            {% endwith %}
+                            {% endwith %}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not forloop.last %}
+                            {% with proxima=pesagens|next:forloop.counter0 %}
+                            {{ pesagem.data|dias_entre:proxima.data }}
+                            {% endwith %}
+                        {% else %}
+                            {{ pesagem.data|dias_entre:animal.data_entrada }}
+                        {% endif %}
+                    </td>
+                    <td>{{ pesagem.usuario.username }}</td>
+                    <td>{{ pesagem.observacao|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+                <!-- Peso de Entrada (sempre por último) -->
+                <tr class="entrada">
+                    <td>
+                        {{ animal.data_entrada|date:"d/m/Y" }}
+                        (Peso de Entrada)
+                    </td>
+                    <td>{{ animal.peso_entrada|format_decimal_br }}</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>{{ animal.usuario.username }}</td>
+                    <td>Peso registrado na entrada do animal</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if manejos %}
+    <div class="secao">
+        <h2>7. Histórico de Manejos Sanitários</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Tipo</th>
+                    <th>Insumo</th>
+                    <th>Próximo Manejo</th>
+                    <th>Observação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for manejo in manejos %}
+                <tr>
+                    <td>{{ manejo.data|date:"d/m/Y" }}</td>
+                    <td>{{ manejo.tipo_manejo }}</td>
+                    <td>{{ manejo.insumo }}</td>
+                    <td>{{ manejo.data|add_days:manejo.dias_proximo_manejo|date:"d/m/Y" }}</td>
+                    <td>{{ manejo.observacao|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if movimentacoes %}
+    <div class="secao">
+        <h2>8. Histórico de Movimentações</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Origem</th>
+                    <th>Destino</th>
+                    <th>Motivo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mov in movimentacoes %}
+                <tr>
+                    <td>{{ mov.data_movimentacao|date:"d/m/Y" }}</td>
+                    <td>{{ mov.pasto_origem }}</td>
+                    <td>{{ mov.pasto_destino }}</td>
+                    <td>{{ mov.motivo }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Rodapé -->
+    <footer>
+        <p>Responsável Técnico: {{ rodape.responsavel_tecnico }} - {{ rodape.crmv }}</p>
+        <p>{{ rodape.sistema }}</p>
+        <p>Emitido em: {% now "d/m/Y H:i" %}</p>
+    </footer>
+
+    <!-- Botão de Impressão -->
+    <div class="no-print" style="text-align: center; margin: 20px;">
+        <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px;">
+            Imprimir Relatório
+        </button>
+    </div>
+</body>
+</html>

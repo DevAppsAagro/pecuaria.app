@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>Abates</h2>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'abates_criar' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Novo Abate
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Comprador</th>
+                            <th>Valor/@</th>
+                            <th>Rendimento</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for abate in abates %}
+                        <tr>
+                            <td>{{ abate.data|date:"d/m/Y" }}</td>
+                            <td>{{ abate.comprador.nome }}</td>
+                            <td>R$ {{ abate.valor_arroba|floatformat:2 }}</td>
+                            <td>{{ abate.rendimento_padrao|floatformat:2 }}%</td>
+                            <td>
+                                {% if abate.status == 'PAGO' %}
+                                    <span class="badge bg-success">Pago</span>
+                                {% elif abate.status == 'VENCIDO' %}
+                                    <span class="badge bg-danger">Vencido</span>
+                                {% elif abate.status == 'CANCELADO' %}
+                                    <span class="badge bg-secondary">Cancelado</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Pendente</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'abates_detalhe' abate.pk %}" class="btn btn-sm btn-info" title="Detalhes">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{% url 'abates_editar' abate.pk %}" class="btn btn-sm btn-primary" title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'abates_excluir' abate.pk %}" class="btn btn-sm btn-danger" title="Excluir">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center">Nenhum abate registrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

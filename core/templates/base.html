@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestão Pecuária</title>
+    <!-- jQuery primeiro -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- Depois Bootstrap CSS e JS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Outros CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    <style>
+        .sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            background-color: #f8f9fa;
+            width: 250px;
+        }
+        
+        .sidebar-sticky {
+            position: relative;
+            top: 0;
+            height: calc(100vh - 48px);
+            padding-top: .5rem;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        
+        .sidebar .nav-link {
+            font-weight: 500;
+            color: #333;
+            padding: 10px 20px;
+        }
+        
+        .sidebar .nav-link:hover {
+            background-color: #e9ecef;
+        }
+        
+        .sidebar .nav-link.active {
+            color: #007bff;
+        }
+        
+        .sidebar .nav-link i {
+            margin-right: 10px;
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            padding-top: 68px; /* 48px da barra superior + 20px de padding */
+        }
+        
+        .top-navbar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            left: 250px;
+            z-index: 1030;
+            background-color: white;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            height: 48px;
+            padding: 0 1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                padding-top: 0;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .top-navbar {
+                left: 0;
+            }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% if user.is_authenticated %}
+    <nav class="sidebar">
+        <div class="sidebar-sticky">
+            <div class="px-3 py-2">
+                <h5>Gestão Pecuária</h5>
+            </div>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{% url 'dashboard' %}">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'financeiro' in request.path %}active{% endif %}" data-bs-toggle="collapse" href="#submenuFinanceiro" role="button" aria-expanded="false">
+                        <i class="bi bi-currency-dollar"></i> Financeiro <i class="bi bi-chevron-down float-end"></i>
+                    </a>
+                    <div class="collapse {% if 'financeiro' in request.path %}show{% endif %}" id="submenuFinanceiro">
+                        <ul class="nav flex-column ms-3">
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'despesas_list' %}active{% endif %}" href="{% url 'despesas_list' %}">
+                                    <i class="bi bi-cash-stack"></i> Despesas
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'compras_list' %}active{% endif %}" href="{% url 'compras_list' %}">
+                                    <i class="bi bi-cart"></i> Compras
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'vendas_list' %}active{% endif %}" href="{% url 'vendas_list' %}">
+                                    <i class="bi bi-tags"></i> Vendas
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'abates_list' %}active{% endif %}" href="{% url 'abates_list' %}">
+                                    <i class="bi bi-scissors"></i> Abates
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'nao_operacional_list' %}active{% endif %}" href="{% url 'nao_operacional_list' %}">
+                                    <i class="bi bi-wallet2"></i> Não Operacional
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'contatos_list' %}active{% endif %}" href="{% url 'contatos_list' %}">
+                                    <i class="bi bi-person-rolodex"></i> Contatos
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'contas_bancarias_list' %}active{% endif %}" href="{% url 'contas_bancarias_list' %}">
+                                    <i class="bi bi-bank"></i> Contas Bancárias
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'manejos' in request.path %}active{% endif %}" href="{% url 'manejos' %}">
+                        <i class="bi bi-clipboard-check"></i> Manejos
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'reproducao' in request.path %}active{% endif %}" href="{% url 'reproducao' %}">
+                        <i class="bi bi-heart"></i> Reprodução
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'animais' in request.path %}active{% endif %}" href="{% url 'animal_list' %}">
+                        <i class="bi bi-clipboard2-pulse"></i> Animais
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'estoque' in request.path %}active{% endif %}" data-bs-toggle="collapse" href="#submenuEstoque" role="button" aria-expanded="false">
+                        <i class="bi bi-box-seam"></i> Estoque <i class="bi bi-chevron-down float-end"></i>
+                    </a>
+                    <div class="collapse {% if 'estoque' in request.path %}show{% endif %}" id="submenuEstoque">
+                        <ul class="nav flex-column ms-3">
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'estoque_list' %}active{% endif %}" href="{% url 'estoque_list' %}">
+                                    <i class="bi bi-box2"></i> Insumos
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'entrada_list' %}active{% endif %}" href="{% url 'entrada_list' %}">
+                                    <i class="bi bi-box-arrow-in-down"></i> Entradas
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'saida_list' %}active{% endif %}" href="{% url 'saida_list' %}">
+                                    <i class="bi bi-box-arrow-up"></i> Saída
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'saida_nutricao_list' %}active{% endif %}" href="{% url 'saida_nutricao_list' %}">
+                                    <i class="bi bi-box-arrow-up"></i> Saída Nutrição
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'pastos' in request.path %}active{% endif %}" href="{% url 'pasto_list' %}">
+                        <i class="bi bi-tree"></i> Pastos
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'fazendas' in request.path %}active{% endif %}" data-bs-toggle="collapse" href="#submenuFazendas" role="button" aria-expanded="false">
+                        <i class="bi bi-house"></i> Fazendas <i class="bi bi-chevron-down float-end"></i>
+                    </a>
+                    <div class="collapse {% if 'fazendas' in request.path or 'maquinas' in request.path or 'benfeitorias' in request.path %}show{% endif %}" id="submenuFazendas">
+                        <ul class="nav flex-column ms-3">
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'fazenda_list' %}active{% endif %}" href="{% url 'fazenda_list' %}">
+                                    <i class="bi bi-list-ul"></i> Listar Fazendas
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'maquinas_list' %}active{% endif %}" href="{% url 'maquinas_list' %}">
+                                    <i class="bi bi-truck"></i> Máquinas
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'benfeitorias_list' %}active{% endif %}" href="{% url 'benfeitorias_list' %}">
+                                    <i class="bi bi-building"></i> Benfeitorias
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'lotes' in request.path %}active{% endif %}" href="{% url 'lote_list' %}">
+                        <i class="bi bi-collection"></i> Lotes
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'relatorios' in request.path %}active{% endif %}" href="{% url 'relatorios_list' %}">
+                        <i class="bi bi-file-earmark-text"></i> Relatórios
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'configuracoes' in request.path %}active{% endif %}" href="{% url 'configuracoes' %}">
+                        <i class="bi bi-gear"></i> Configurações
+                    </a>
+                </li>
+            </ul>
+            <div class="position-absolute bottom-0 w-100 p-3">
+                <a href="{% url 'logout' %}" class="btn btn-outline-danger w-100">
+                    <i class="bi bi-box-arrow-right"></i> Sair
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="top-navbar d-flex align-items-center justify-content-end">
+        <div class="dropdown">
+            <button class="btn btn-link dropdown-toggle text-dark text-decoration-none" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-person-circle"></i> {{ user.username }}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                <li><a class="dropdown-item" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        {% block content %}
+        {% endblock %}
+    </main>
+    {% else %}
+    <div class="container mt-5">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        {% block auth_content %}
+        {% endblock %}
+    </div>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

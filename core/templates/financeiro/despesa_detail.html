@@ -1,0 +1,337 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Detalhes da Despesa</h5>
+                    <div>
+                        {% if despesa.forma_pagamento == 'AV' and despesa.status != 'PAGO' %}
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalPagamentoDespesa">
+                                <i class="bi bi-cash"></i> Pagar
+                            </button>
+                        {% elif not despesa.forma_pagamento == 'PR' and despesa.status == 'PENDENTE' %}
+                            <button type="button" class="btn btn-success" onclick="registrarPagamentoDespesa()">
+                                <i class="fas fa-check"></i> Pagar
+                            </button>
+                        {% endif %}
+                        <a href="{% url 'despesas_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <p><strong>Número NF:</strong> {{ despesa.numero_nf|default:"-" }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Data Emissão:</strong> {{ despesa.data_emissao|date:"d/m/Y" }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Data Vencimento:</strong> {{ despesa.data_vencimento|date:"d/m/Y" }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <strong>Status:</strong>
+                                {% if despesa.status == 'PENDENTE' %}
+                                    <span class="badge bg-warning">Pendente</span>
+                                {% elif despesa.status == 'PAGO' %}
+                                    <span class="badge bg-success">Pago</span>
+                                {% elif despesa.status == 'VENCIDO' %}
+                                    <span class="badge bg-danger">Vencido</span>
+                                {% elif despesa.status == 'VENCE_HOJE' %}
+                                    <span class="badge bg-info">Vence Hoje</span>
+                                {% elif despesa.status == 'CANCELADO' %}
+                                    <span class="badge bg-secondary">Cancelado</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p><strong>Contato:</strong> {{ despesa.contato }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Forma de Pagamento:</strong> 
+                                {% if despesa.forma_pagamento == 'AV' %}
+                                    À Vista
+                                {% else %}
+                                    Parcelado
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Valor Total:</strong> R$ {{ despesa.valor_total|floatformat:2 }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Itens da Despesa</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Categoria</th>
+                                    <th>Subcategoria</th>
+                                    <th>Tipo Alocação</th>
+                                    <th>Destino</th>
+                                    <th>Quantidade</th>
+                                    <th>Valor Unitário</th>
+                                    <th>Valor Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in itens %}
+                                <tr>
+                                    <td>{{ item.categoria }}</td>
+                                    <td>{{ item.subcategoria|default:"-" }}</td>
+                                    <td>{{ item.categoria.get_tipo_alocacao_display }}</td>
+                                    <td>
+                                        {% if item.categoria.alocacao == 'fazenda' %}
+                                            {{ item.fazenda_destino|default:"-" }}
+                                        {% elif item.categoria.alocacao == 'lote' %}
+                                            {{ item.lote_destino|default:"-" }}
+                                        {% elif item.categoria.alocacao == 'maquina' %}
+                                            {{ item.maquina_destino|default:"-" }}
+                                        {% elif item.categoria.alocacao == 'benfeitoria' %}
+                                            {{ item.benfeitoria_destino.id_benfeitoria }} - {{ item.benfeitoria_destino.nome }}
+                                        {% elif item.categoria.alocacao == 'pastagem' %}
+                                            {{ item.pastagem_destino|default:"-" }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.quantidade }}</td>
+                                    <td>R$ {{ item.valor_unitario|floatformat:2 }}</td>
+                                    <td>R$ {{ item.valor_total|floatformat:2 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {% if despesa.forma_pagamento == 'PR' %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Parcelas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Parcela</th>
+                                    <th>Valor Original</th>
+                                    <th>Multa/Juros</th>
+                                    <th>Desconto</th>
+                                    <th>Valor Final</th>
+                                    <th>Vencimento</th>
+                                    <th>Data Pagamento</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for parcela in despesa.parcelas.all %}
+                                <tr>
+                                    <td>{{ parcela.numero }}/{{ despesa.parcelas.count }}</td>
+                                    <td>R$ {{ parcela.valor|floatformat:2 }}</td>
+                                    <td>R$ {{ parcela.multa_juros|floatformat:2 }}</td>
+                                    <td>R$ {{ parcela.desconto|floatformat:2 }}</td>
+                                    <td>R$ {{ parcela.valor_final|floatformat:2 }}</td>
+                                    <td>{{ parcela.data_vencimento|date:"d/m/Y" }}</td>
+                                    <td>
+                                        {% if parcela.data_pagamento %}
+                                            {{ parcela.data_pagamento|date:"d/m/Y" }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if parcela.status == 'PENDENTE' %}
+                                            <span class="badge bg-warning">Pendente</span>
+                                        {% elif parcela.status == 'PAGO' %}
+                                            <span class="badge bg-success">Pago</span>
+                                        {% elif parcela.status == 'VENCIDO' %}
+                                            <span class="badge bg-danger">Vencido</span>
+                                        {% elif parcela.status == 'VENCE_HOJE' %}
+                                            <span class="badge bg-info">Vence Hoje</span>
+                                        {% elif parcela.status == 'CANCELADO' %}
+                                            <span class="badge bg-secondary">Cancelado</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if parcela.status != 'PAGO' %}
+                                            <button type="button" class="btn btn-primary btn-sm" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#modalPagarParcela{{ parcela.id }}">
+                                                Pagar
+                                            </button>
+                                            {% include 'financeiro/modal_pagar_parcela.html' with parcela=parcela %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Modal Pagamento Despesa -->
+            <div class="modal fade" id="modalPagamentoDespesa" tabindex="-1" role="dialog" aria-labelledby="modalPagamentoDespesaLabel" aria-hidden="true">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="modalPagamentoDespesaLabel">Registrar Pagamento</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form id="formPagamentoDespesa" method="POST" action="{% url 'pagar_despesa' despesa.pk %}">
+                            {% csrf_token %}
+                            <div class="modal-body">
+                                <div class="form-group mb-3">
+                                    <label for="data_pagamento">Data do Pagamento</label>
+                                    <input type="date" class="form-control" id="data_pagamento" name="data_pagamento" required>
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="valor_total">Valor Total</label>
+                                    <input type="text" class="form-control" id="valor_total" value="{{ despesa.valor_total }}" readonly>
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="multa_juros">Multa/Juros</label>
+                                    <input type="number" class="form-control" id="multa_juros" name="multa_juros" step="0.01" value="0" min="0">
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="desconto">Desconto</label>
+                                    <input type="number" class="form-control" id="desconto" name="desconto" step="0.01" value="0" min="0">
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="valor_final">Valor Final</label>
+                                    <input type="text" class="form-control" id="valor_final" readonly>
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="observacao">Observação</label>
+                                    <textarea class="form-control" id="observacao" name="observacao" rows="3"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Registrar Pagamento</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Pagamento Parcela -->
+            <div class="modal fade" id="modalPagamentoParcela" tabindex="-1" role="dialog" aria-labelledby="modalPagamentoParcelaLabel" aria-hidden="true">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="modalPagamentoParcelaLabel">Registrar Pagamento da Parcela <span id="numero_parcela"></span></h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form id="formPagamentoParcela" method="POST">
+                            {% csrf_token %}
+                            <div class="modal-body">
+                                <div class="form-group mb-3">
+                                    <label for="parcela_data_pagamento">Data do Pagamento</label>
+                                    <input type="date" class="form-control" id="parcela_data_pagamento" name="data_pagamento" required>
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="parcela_valor">Valor Original</label>
+                                    <input type="text" class="form-control" id="parcela_valor" readonly>
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="parcela_multa_juros">Multa/Juros</label>
+                                    <input type="number" class="form-control" id="parcela_multa_juros" name="multa_juros" step="0.01" value="0" min="0">
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="parcela_desconto">Desconto</label>
+                                    <input type="number" class="form-control" id="parcela_desconto" name="desconto" step="0.01" value="0" min="0">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-success">Confirmar Pagamento</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    function atualizarValorFinal() {
+        const valorTotal = parseFloat(document.getElementById('valor_total').value) || 0;
+        const multaJuros = parseFloat(document.getElementById('multa_juros').value) || 0;
+        const desconto = parseFloat(document.getElementById('desconto').value) || 0;
+        
+        const valorFinal = valorTotal + multaJuros - desconto;
+        document.getElementById('valor_final').value = valorFinal.toFixed(2);
+    }
+
+    // Adiciona listeners para os campos
+    document.getElementById('multa_juros').addEventListener('input', atualizarValorFinal);
+    document.getElementById('desconto').addEventListener('input', atualizarValorFinal);
+    atualizarValorFinal();
+
+    function registrarPagamentoDespesa() {
+        document.getElementById('data_pagamento').value = new Date().toISOString().split('T')[0];
+        atualizarValorFinal();
+        var myModal = new bootstrap.Modal(document.getElementById('modalPagamentoDespesa'));
+        myModal.show();
+    }
+
+    function submitPagamentoDespesa(event) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Erro ao registrar pagamento: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Erro ao registrar pagamento: ' + error);
+        });
+
+        return false;
+    }
+
+    function registrarPagamentoParcela(parcelaId, numero, valor) {
+        document.getElementById('parcela_data_pagamento').value = new Date().toISOString().split('T')[0];
+        document.getElementById('parcela_valor').value = valor;
+        document.getElementById('formPagamentoParcela').action = `/financeiro/parcela/${parcelaId}/pagar/`;
+        document.getElementById('numero_parcela').textContent = numero;
+        var myModal = new bootstrap.Modal(document.getElementById('modalPagamentoParcela'));
+        myModal.show();
+    }
+</script>
+{% endblock extra_js %}

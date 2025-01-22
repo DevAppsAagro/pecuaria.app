@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Importar Animais</h2>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Instruções</h5>
+            <p>Para importar animais, siga os passos abaixo:</p>
+            <ol>
+                <li>Baixe a planilha modelo clicando no botão abaixo</li>
+                <li>Preencha os dados dos animais seguindo as instruções na aba "Instruções"</li>
+                <li>Salve a planilha e faça o upload usando o formulário abaixo</li>
+            </ol>
+            <a href="{% url 'download_planilha_modelo' %}" class="btn btn-primary">
+                <i class="fas fa-download"></i> Baixar Planilha Modelo
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Upload da Planilha</h5>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="arquivo" class="form-label">Selecione a planilha preenchida:</label>
+                    <input type="file" class="form-control" id="arquivo" name="arquivo" accept=".xlsx" required>
+                    <div class="form-text">Apenas arquivos .xlsx são aceitos</div>
+                </div>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-upload"></i> Importar Animais
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="mt-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

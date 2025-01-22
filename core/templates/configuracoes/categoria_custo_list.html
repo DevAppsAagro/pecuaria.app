@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Categorias de Custos</h2>
+        <div>
+            <a href="{% url 'subcategoria-custo-list' %}" class="btn btn-info me-2">
+                <i class="bi bi-list-nested"></i> Subcategorias
+            </a>
+            <a href="{% url 'categoria-custo-create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Nova Categoria
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Tipo</th>
+                            <th>Alocação</th>
+                            <th>Subcategorias</th>
+                            <th class="text-center" style="width: 120px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for categoria in categorias %}
+                            <tr>
+                                <td class="fw-medium">{{ categoria.nome }}</td>
+                                <td>{{ categoria.get_tipo_display }}</td>
+                                <td>{{ categoria.get_alocacao_display }}</td>
+                                <td>{{ categoria.subcategorias.count }}</td>
+                                <td>
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <a href="{% url 'categoria-custo-edit' categoria.pk %}" 
+                                           class="btn btn-light btn-sm border-0 rounded-circle shadow-sm"
+                                           style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;"
+                                           data-bs-toggle="tooltip"
+                                           data-bs-placement="top"
+                                           title="Editar">
+                                            <i class="bi bi-pencil text-primary"></i>
+                                        </a>
+                                        <a href="{% url 'categoria-custo-delete' categoria.pk %}" 
+                                           class="btn btn-light btn-sm border-0 rounded-circle shadow-sm"
+                                           style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;"
+                                           onclick="return confirm('Tem certeza que deseja excluir esta categoria?')"
+                                           data-bs-toggle="tooltip"
+                                           data-bs-placement="top"
+                                           title="Excluir">
+                                            <i class="bi bi-trash text-danger"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">
+                                    <i class="bi bi-inbox fs-4 d-block mb-2"></i>
+                                    Nenhuma categoria cadastrada.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+            new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+    })
+</script>
+{% endblock %}

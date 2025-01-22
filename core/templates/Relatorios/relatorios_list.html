@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Relatórios</h2>
+    
+    <div class="row g-4">
+        <!-- DRE Fazenda -->
+        <div class="col-md-6 col-lg-4">
+            <a href="{% url 'em_desenvolvimento' %}" class="text-decoration-none">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-building text-primary" style="font-size: 2rem;"></i>
+                            <h5 class="card-title mb-0 ms-3">DRE Fazenda</h5>
+                        </div>
+                        <p class="card-text text-muted">Demonstração do Resultado do Exercício por Fazenda</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- DRE Lote -->
+        <div class="col-md-6 col-lg-4">
+            <a href="{% url 'em_desenvolvimento' %}" class="text-decoration-none">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-collection text-success" style="font-size: 2rem;"></i>
+                            <h5 class="card-title mb-0 ms-3">DRE Lote</h5>
+                        </div>
+                        <p class="card-text text-muted">Demonstração do Resultado do Exercício por Lote</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Fluxo de Caixa -->
+        <div class="col-md-6 col-lg-4">
+            <a href="{% url 'em_desenvolvimento' %}" class="text-decoration-none">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-cash-stack text-info" style="font-size: 2rem;"></i>
+                            <h5 class="card-title mb-0 ms-3">Fluxo de Caixa</h5>
+                        </div>
+                        <p class="card-text text-muted">Análise detalhada do fluxo de caixa</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Confinamento -->
+        <div class="col-md-6 col-lg-4">
+            <a href="{% url 'em_desenvolvimento' %}" class="text-decoration-none">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-house-door text-warning" style="font-size: 2rem;"></i>
+                            <h5 class="card-title mb-0 ms-3">Confinamento</h5>
+                        </div>
+                        <p class="card-text text-muted">Relatório de animais em confinamento</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Estoque Pecuário -->
+        <div class="col-md-6 col-lg-4">
+            <a href="{% url 'em_desenvolvimento' %}" class="text-decoration-none">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-box-seam text-secondary" style="font-size: 2rem;"></i>
+                            <h5 class="card-title mb-0 ms-3">Estoque Pecuário</h5>
+                        </div>
+                        <p class="card-text text-muted">Controle de estoque do rebanho</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Relatório Reprodutivo -->
+        <div class="col-md-6 col-lg-4">
+            <a href="{% url 'em_desenvolvimento' %}" class="text-decoration-none">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-heart text-danger" style="font-size: 2rem;"></i>
+                            <h5 class="card-title mb-0 ms-3">Reprodutivo</h5>
+                        </div>
+                        <p class="card-text text-muted">Acompanhamento reprodutivo do rebanho</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Relatório de Pesagens -->
+        <div class="col-md-6 col-lg-4">
+            <a href="{% url 'relatorio_pesagens' %}" class="text-decoration-none">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-graph-up text-primary" style="font-size: 2rem;"></i>
+                            <h5 class="card-title mb-0 ms-3">Pesagens</h5>
+                        </div>
+                        <p class="card-text text-muted">Relatório detalhado de pesagens com GMD e custos</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
+    }
+    .text-purple {
+        color: #6f42c1;
+    }
+</style>
+{% endblock %}

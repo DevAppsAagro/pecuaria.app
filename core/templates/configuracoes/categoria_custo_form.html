@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% if categoria %}Editar{% else %}Nova{% endif %} Categoria de Custo</h2>
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="nome" class="form-label">Nome</label>
+                    <input type="text" class="form-control" id="nome" name="nome" value="{{ categoria.nome|default:'' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="tipo" class="form-label">Tipo da Categoria</label>
+                    <select class="form-select" id="tipo" name="tipo" required>
+                        <option value="">Selecione o tipo</option>
+                        <option value="fixo" {% if categoria.tipo == 'fixo' %}selected{% endif %}>Custo Fixo</option>
+                        <option value="variavel" {% if categoria.tipo == 'variavel' %}selected{% endif %}>Custo Variável</option>
+                        <option value="investimento" {% if categoria.tipo == 'investimento' %}selected{% endif %}>Investimento</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="alocacao" class="form-label">Alocação de Custo</label>
+                    <select class="form-select" id="alocacao" name="alocacao" required>
+                        <option value="">Selecione a alocação</option>
+                        <option value="fazenda" {% if categoria.alocacao == 'fazenda' %}selected{% endif %}>Fazenda</option>
+                        <option value="lote" {% if categoria.alocacao == 'lote' %}selected{% endif %}>Lote</option>
+                        <option value="estoque" {% if categoria.alocacao == 'estoque' %}selected{% endif %}>Estoque</option>
+                        <option value="maquina" {% if categoria.alocacao == 'maquina' %}selected{% endif %}>Máquina</option>
+                        <option value="benfeitoria" {% if categoria.alocacao == 'benfeitoria' %}selected{% endif %}>Benfeitoria</option>
+                        <option value="pastagem" {% if categoria.alocacao == 'pastagem' %}selected{% endif %}>Pastagem</option>
+                    </select>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <a href="{% url 'categoria-custo-list' %}" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

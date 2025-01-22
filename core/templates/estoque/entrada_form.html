@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4>{% if entrada %}Editar{% else %}Nova{% endif %} Entrada de Estoque</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="insumo" class="form-label">Insumo</label>
+                            <select class="form-select" id="insumo" name="insumo" required>
+                                <option value="">Selecione um insumo</option>
+                                {% for insumo in insumos %}
+                                <option value="{{ insumo.id }}" {% if entrada and entrada.insumo_id == insumo.id %}selected{% endif %}>
+                                    {{ insumo.nome }} ({{ insumo.unidade_medida.sigla }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="fazenda" class="form-label">Fazenda</label>
+                            <select class="form-select" id="fazenda" name="fazenda" required>
+                                <option value="">Selecione uma fazenda</option>
+                                {% for fazenda in fazendas %}
+                                <option value="{{ fazenda.id }}" {% if entrada and entrada.destino_id == fazenda.id %}selected{% endif %}>
+                                    {{ fazenda.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="data" class="form-label">Data</label>
+                                <input type="date" class="form-control" id="data" name="data" value="{{ entrada.data|date:'Y-m-d' }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="quantidade" class="form-label">Quantidade</label>
+                                <input type="number" class="form-control" id="quantidade" name="quantidade" step="0.01" value="{{ entrada.quantidade|default:'' }}" required>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="valor_unitario" class="form-label">Valor Unitário (R$)</label>
+                                <input type="number" class="form-control" id="valor_unitario" name="valor_unitario" step="0.01" value="{{ entrada.valor_unitario|default:'' }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="valor_total" class="form-label">Valor Total (R$)</label>
+                                <input type="number" class="form-control" id="valor_total" name="valor_total" value="{{ entrada.valor_total|default:'' }}" readonly>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="observacao" class="form-label">Observação</label>
+                            <textarea class="form-control" id="observacao" name="observacao" rows="3">{{ entrada.observacao|default:'' }}</textarea>
+                        </div>
+
+                        <div class="text-end">
+                            <a href="{% url 'entrada_list' %}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const quantidadeInput = document.getElementById('quantidade');
+    const valorUnitarioInput = document.getElementById('valor_unitario');
+    const valorTotalInput = document.getElementById('valor_total');
+    const insumoSelect = document.getElementById('insumo');
+
+    function calcularValorTotal() {
+        const quantidade = parseFloat(quantidadeInput.value) || 0;
+        const valorUnitario = parseFloat(valorUnitarioInput.value) || 0;
+        valorTotalInput.value = (quantidade * valorUnitario).toFixed(2);
+    }
+
+    quantidadeInput.addEventListener('input', calcularValorTotal);
+    valorUnitarioInput.addEventListener('input', calcularValorTotal);
+
+    insumoSelect.addEventListener('change', function() {
+        const insumoId = this.value;
+        if (insumoId) {
+            fetch(`/get-insumo-info/?insumo_id=${insumoId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Pode usar essas informações para mostrar o saldo atual
+                    // e o preço médio como referência
+                });
+        }
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}
