@@ -312,7 +312,7 @@
                     <td class="text-right">{{ dados.ganho_kg|default:"-"|floatformat:2 }}</td>
                     <td class="text-right">{{ dados.ganho_arroba|default:"-"|floatformat:2 }}</td>
                     <td class="text-right">
-                        {% if dados.custo_arroba %}
+                        {% if dados.gmd > 0 and dados.dias_periodo > 0 %}
                             R$ {{ dados.custo_arroba|floatformat:2 }}
                         {% else %}
                             -
@@ -369,7 +369,7 @@
         Chart.defaults.maintainAspectRatio = false;
 
         // Dados para os gráficos
-        const dados = {{ graficos_json|safe }};
+        const dados = {{ dados_graficos|safe }};
         
         // Configurações comuns para todos os gráficos
         const commonOptions = {

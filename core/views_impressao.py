@@ -170,14 +170,9 @@ def imprimir_pesagens(request):
     lote_id = request.GET.get('lote_id')
     animal_id = request.GET.get('animal_id')
     
-    # Query base otimizada com prefetch_related
+    # Query base otimizada - reduzido número de joins
     pesagens = Pesagem.objects.select_related(
-        'animal', 
-        'animal__lote'
-    ).prefetch_related(
-        'animal__rateiocusto_set',
-        'animal__rateiocusto_set__item_despesa',
-        'animal__rateiocusto_set__item_despesa__categoria'
+        'animal'
     ).filter(
         usuario=request.user
     ).order_by('-data')
@@ -192,41 +187,54 @@ def imprimir_pesagens(request):
     if animal_id:
         pesagens = pesagens.filter(animal_id=animal_id)
     
-    # Converte para lista e ordena por data decrescente
+    # Otimização: Buscar apenas os animais necessários
+    animal_ids = pesagens.values_list('animal_id', flat=True).distinct()
+    animais = {
+        animal.id: animal for animal in Animal.objects.filter(
+            id__in=animal_ids
+        ).select_related('lote')
+    }
+    
+    # Buscar rateios de uma vez só
+    rateios = RateioCusto.objects.filter(
+        animal_id__in=animal_ids
+    ).select_related(
+        'item_despesa',
+        'item_despesa__categoria'
+    )
+    
+    # Organizar rateios por animal
+    rateios_por_animal = {}
+    for rateio in rateios:
+        if rateio.animal_id not in rateios_por_animal:
+            rateios_por_animal[rateio.animal_id] = []
+        rateios_por_animal[rateio.animal_id].append(rateio)
+    
+    # Converte para lista e ordena por data
     pesagens = list(pesagens)
     
-    # Cache de pesos de entrada para evitar repetição
-    animais_com_peso_entrada = set()
-    pesos_entrada = []
-    
-    for pesagem in pesagens:
-        animal = pesagem.animal
-        if animal.id not in animais_com_peso_entrada and animal.peso_entrada and animal.data_entrada:
-            peso_entrada = Pesagem(
+    # Adiciona peso de entrada apenas se necessário
+    for animal_id, animal in animais.items():
+        if animal.peso_entrada and animal.data_entrada:
+            pesagens.append(Pesagem(
                 animal=animal,
                 peso=animal.peso_entrada,
                 data=animal.data_entrada,
                 usuario=request.user
-            )
-            pesos_entrada.append(peso_entrada)
-            animais_com_peso_entrada.add(animal.id)
+            ))
     
-    # Adiciona os pesos de entrada e ordena
-    pesagens.extend(pesos_entrada)
+    # Ordena todas as pesagens por data
     pesagens.sort(key=lambda x: x.data, reverse=True)
     
     dados_pesagens = []
     soma_ponderada_gmd = 0
     soma_dias = 0
     
-    # Cache de custos por animal para evitar recálculo
-    custos_por_animal = {}
-    
+    # Processa as pesagens
     for i, pesagem in enumerate(pesagens):
-        animal = pesagem.animal
+        animal = animais[pesagem.animal_id]
         peso_atual = Decimal(str(pesagem.peso))
         
-        # Dados básicos
         dados = {
             'data': pesagem.data,
             'animal': animal.brinco_visual,
@@ -242,8 +250,8 @@ def imprimir_pesagens(request):
             'variacao_percentual': 0
         }
         
-        # Procura próxima pesagem do mesmo animal na lista
-        proximas_pesagens = [p for p in pesagens[i+1:] if p.animal_id == animal.id]
+        # Otimização: Busca próxima pesagem mais eficientemente
+        proximas_pesagens = [p for p in pesagens[i+1:i+2] if p.animal_id == animal.id]
         
         if proximas_pesagens:
             pesagem_anterior = proximas_pesagens[0]
@@ -269,8 +277,8 @@ def imprimir_pesagens(request):
                 soma_ponderada_gmd += (gmd * dias)
                 soma_dias += dias
         
-        # Calcula custo por arroba usando cache
-        if animal.peso_entrada is not None and animal.id not in custos_por_animal:
+        # Calcula custo por arroba
+        if animal.peso_entrada is not None:
             peso_entrada = Decimal(str(animal.peso_entrada)) if animal.peso_entrada else 0
             ganho_total = peso_atual - peso_entrada
             
@@ -278,16 +286,16 @@ def imprimir_pesagens(request):
                 kg_produzido = Decimal(str(peso_atual - peso_entrada))
                 ganho_arroba = (kg_produzido / Decimal('15')) * Decimal('0.5')
                 
-                # Usa os dados já carregados pelo prefetch_related
-                rateios = animal.rateiocusto_set.all()
+                # Usa os rateios já carregados
+                rateios_animal = rateios_por_animal.get(animal.id, [])
                 custo_fixo = sum(
                     Decimal(str(rateio.valor)) 
-                    for rateio in rateios 
+                    for rateio in rateios_animal 
                     if rateio.item_despesa.categoria.tipo == 'fixo'
                 )
                 custo_variavel = sum(
                     Decimal(str(rateio.valor)) 
-                    for rateio in rateios 
+                    for rateio in rateios_animal 
                     if rateio.item_despesa.categoria.tipo == 'variavel'
                 )
                 
@@ -297,11 +305,7 @@ def imprimir_pesagens(request):
                 custo_total = custo_fixo + custo_variavel
                 
                 if custo_total > 0 and ganho_arroba > 0:
-                    custos_por_animal[animal.id] = round(float(custo_total / ganho_arroba), 2)
-        
-        # Usa o custo calculado do cache
-        if animal.id in custos_por_animal:
-            dados['custo_arroba'] = custos_por_animal[animal.id]
+                    dados['custo_arroba'] = round(float(custo_total / ganho_arroba), 2)
         
         dados_pesagens.append(dados)
     
@@ -310,17 +314,27 @@ def imprimir_pesagens(request):
     
     # Calcula a variação percentual para cada pesagem
     for i, dados in enumerate(dados_pesagens):
-        if dados['gmd'] and dados['gmd'] > 0:  
-            proximos_dados = [d for d in dados_pesagens[i+1:] if d['animal'] == dados['animal'] and d['gmd'] and d['gmd'] > 0]
+        if dados['gmd'] and dados['gmd'] > 0:
+            # Otimização: Limita a busca aos próximos 5 registros
+            proximos_dados = [d for d in dados_pesagens[i+1:i+6] if d['animal'] == dados['animal'] and d['gmd'] and d['gmd'] > 0]
             if proximos_dados:
                 gmd_anterior = proximos_dados[0]['gmd']
                 if gmd_anterior > 0:
                     variacao = ((dados['gmd'] - gmd_anterior) / gmd_anterior) * 100
                     dados['percentual_variacao'] = round(variacao, 1)
+                    dados['variacao_significativa'] = abs(variacao) > 15
                     dados['variacao_positiva'] = variacao > 15
                     dados['variacao_negativa'] = variacao < -15
     
-    # Agrupa dados por data para os gráficos
+    # Marca animais abaixo da média
+    if media_gmd:
+        for dados in dados_pesagens:
+            if dados['gmd'] and dados['gmd'] > 0 and dados['gmd'] < media_gmd:
+                dados['abaixo_media'] = True
+                dados['percentual_abaixo'] = round(((media_gmd - dados['gmd']) / media_gmd) * 100, 1)
+                dados['variacao_percentual'] = round(((dados['gmd'] - media_gmd) / media_gmd) * 100, 1)
+    
+    # Prepara dados para os gráficos
     dados_por_data = {}
     for dados in dados_pesagens:
         data = dados['data'].strftime('%d/%m/%Y')
@@ -345,55 +359,38 @@ def imprimir_pesagens(request):
     
     for data in datas:
         dados_data = dados_por_data[data]
-        
-        # Média dos pesos
-        if dados_data['pesos']:
-            medias_peso.append(round(sum(dados_data['pesos']) / len(dados_data['pesos']), 2))
-        else:
-            medias_peso.append(0)
-        
-        # Média do GMD
-        if dados_data['gmd']:
-            medias_gmd.append(round(sum(dados_data['gmd']) / len(dados_data['gmd']), 2))
-        else:
-            medias_gmd.append(0)
-        
-        # Média dos custos
-        if dados_data['custos']:
-            medias_custo.append(round(sum(dados_data['custos']) / len(dados_data['custos']), 2))
-        else:
-            medias_custo.append(0)
+        medias_peso.append(round(sum(dados_data['pesos']) / len(dados_data['pesos']), 2) if dados_data['pesos'] else 0)
+        medias_gmd.append(round(sum(dados_data['gmd']) / len(dados_data['gmd']), 2) if dados_data['gmd'] else 0)
+        medias_custo.append(round(sum(dados_data['custos']) / len(dados_data['custos']), 2) if dados_data['custos'] else 0)
     
-    # Buscar informações do lote e animal selecionados
-    lote_selecionado = None
-    animal_selecionado = None
-    
-    if lote_id:
-        lote_selecionado = Lote.objects.filter(id=lote_id, usuario=request.user).first()
-    if animal_id:
-        animal_selecionado = Animal.objects.filter(id=animal_id, usuario=request.user).first()
-
-    # Preparar cabeçalho
-    cabecalho = {
-        'empresa': 'Nome da Empresa',
-        'cnpj': '00.000.000/0000-00',
-        'endereco': 'Endereço da Empresa'
-    }
-
-    # Serializar dados para os gráficos
-    import json
-    from django.core.serializers.json import DjangoJSONEncoder
-    
-    graficos_data = {
+    # Dados para os gráficos
+    dados_graficos = {
         'datas': datas,
         'pesos': medias_peso,
         'gmd': medias_gmd,
         'custos': medias_custo
     }
-
+    
+    # Informações do cabeçalho
+    cabecalho = {
+        'empresa': 'FAZENDA MODELO LTDA',
+        'cnpj': '12.345.678/0001-90',
+        'endereco': 'Rodovia BR 101, Km 123'
+    }
+    
+    # Obtém o lote selecionado se houver
+    lote_selecionado = None
+    if lote_id:
+        lote_selecionado = Lote.objects.filter(id=lote_id).first()
+    
+    # Obtém o animal selecionado se houver
+    animal_selecionado = None
+    if animal_id:
+        animal_selecionado = Animal.objects.filter(id=animal_id).first()
+    
     context = {
         'dados_pesagens': dados_pesagens,
-        'graficos_json': json.dumps(graficos_data, cls=DjangoJSONEncoder),
+        'dados_graficos': dados_graficos,
         'media_gmd': media_gmd,
         'filtros': {
             'data_inicio': data_inicio,
