@@ -7,7 +7,7 @@ from decimal import Decimal
 
 @login_required
 def relatorios_view(request):
-    return render(request, 'relatorios/relatorios_list.html')
+    return render(request, 'Relatorios/relatorios_list.html')
 
 @login_required
 def animais_por_lote(request, lote_id):
@@ -262,4 +262,4 @@ def relatorio_pesagens(request):
         'dias_para_meta': dias_para_meta
     }
     
-    return render(request, 'relatorios/pesagens.html', context)
+    return render(request, 'Relatorios/pesagens.html', context)
