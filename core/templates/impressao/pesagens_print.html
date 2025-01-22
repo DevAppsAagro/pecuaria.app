@@ -1,0 +1,477 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Pesagens</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        /* Reset básico */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Configurações básicas */
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            background: white;
+            padding: 0;
+        }
+
+        /* Cabeçalho */
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+        }
+
+        header h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        header p {
+            font-size: 12px;
+            margin: 2px 0;
+        }
+
+        /* Título do relatório */
+        .relatorio-titulo {
+            text-align: center;
+            font-size: 16px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        /* Filtros aplicados */
+        .filtros {
+            margin: 20px 0;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+
+        .filtros p {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+
+        /* Métricas principais */
+        .metricas {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .metricas p {
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        /* Gráficos */
+        .graficos {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .grafico {
+            flex: 1 1 300px;
+            min-width: 300px;
+            margin: 0;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: auto;
+            min-height: 250px;
+            margin-bottom: 20px;
+            background: white;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        /* Tabela */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 12px;
+        }
+
+        .table th,
+        .table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+
+        .table tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        .table tr.positivo {
+            background-color: #d4edda;
+        }
+
+        .table tr.negativo {
+            background-color: #f8d7da;
+        }
+
+        /* Rodapé */
+        footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            font-size: 10px;
+            text-align: center;
+            color: #666;
+        }
+
+        /* Utilitários */
+        .text-center {
+            text-align: center;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .mt-4 {
+            margin-top: 20px;
+        }
+
+        /* Botão de Impressão */
+        .print-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 1000;
+            display: block;
+        }
+
+        .print-button:hover {
+            background-color: #0056b3;
+        }
+
+        .print-button.hidden {
+            display: none !important;
+        }
+
+        @media print {
+            body {
+                width: 100%;
+                padding: 0;
+                margin: 0;
+            }
+
+            .chart-container {
+                min-height: 180px;
+                margin-bottom: 15px;
+                border: 1px solid #ddd;
+                background: white;
+                padding: 15px;
+            }
+
+            .graficos {
+                gap: 15px;
+                margin-bottom: 20px;
+            }
+
+            .grafico {
+                flex: 1 1 30%;
+                min-width: 30%;
+            }
+
+            /* Esconder elementos desnecessários na impressão */
+            .no-print, .print-button {
+                display: none !important;
+            }
+
+            /* Ajustes para layout */
+            .container {
+                width: 100%;
+                max-width: none;
+                margin: 0 auto;
+                padding: 0 1.5cm;
+            }
+
+            canvas {
+                max-width: 100% !important;
+            }
+        }
+
+        @media screen {
+            body {
+                padding: 20px;
+            }
+
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 0 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Cabeçalho -->
+    <header>
+        <h1>{{ cabecalho.empresa }}</h1>
+        <p>CNPJ: {{ cabecalho.cnpj }}</p>
+        <p>{{ cabecalho.endereco }}</p>
+        <p>Data de Emissão: {% now "d/m/Y H:i" %}</p>
+    </header>
+
+    <!-- Título -->
+    <div class="relatorio-titulo">
+        Relatório de Pesagens
+    </div>
+
+    <!-- Filtros Aplicados -->
+    <div class="filtros">
+        <h3 style="font-size: 14px; margin-bottom: 8px;">Filtros Aplicados:</h3>
+        <p>Período: {% if filtros.data_inicio %}{{ filtros.data_inicio }}{% else %}Início{% endif %} até {% if filtros.data_fim %}{{ filtros.data_fim }}{% else %}Hoje{% endif %}</p>
+        {% if filtros.lote_id %}<p>Lote: {{ lote_selecionado.id_lote }}</p>{% endif %}
+        {% if filtros.animal_id %}<p>Animal: {{ animal_selecionado.brinco_visual }}</p>{% endif %}
+    </div>
+
+    <!-- Métricas Principais -->
+    <div class="metricas">
+        <h3 style="font-size: 14px; margin-bottom: 8px;">Métricas do Período:</h3>
+        <p><strong>GMD Médio Ponderado:</strong> {{ media_gmd|floatformat:2 }} kg/dia</p>
+        <small class="text-muted">* Média ponderada pelo número de dias entre pesagens</small>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="graficos">
+        <div class="grafico">
+            <div class="chart-container">
+                <canvas id="pesoChart"></canvas>
+            </div>
+        </div>
+        <div class="grafico">
+            <div class="chart-container">
+                <canvas id="gmdChart"></canvas>
+            </div>
+        </div>
+        <div class="grafico">
+            <div class="chart-container">
+                <canvas id="custoChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Pesagens -->
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Animal</th>
+                <th>Peso (kg)</th>
+                <th>@ Atual</th>
+                <th>GMD (kg/dia)</th>
+                <th>Dias</th>
+                <th>Ganho (kg)</th>
+                <th>Ganho (@)</th>
+                <th>Custo/@</th>
+                <th>Variação (%)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for dados in dados_pesagens %}
+                <tr {% if dados.variacao_positiva %}class="positivo"{% elif dados.variacao_negativa %}class="negativo"{% endif %}>
+                    <td>{{ dados.data|date:"d/m/Y" }}</td>
+                    <td>{{ dados.animal }}</td>
+                    <td class="text-right">{{ dados.peso|floatformat:2 }}</td>
+                    <td class="text-right">{{ dados.arroba_atual|floatformat:2 }}</td>
+                    <td class="text-right">{{ dados.gmd|default:"-"|floatformat:2 }}</td>
+                    <td class="text-right">{{ dados.dias_periodo|default:"-" }}</td>
+                    <td class="text-right">{{ dados.ganho_kg|default:"-"|floatformat:2 }}</td>
+                    <td class="text-right">{{ dados.ganho_arroba|default:"-"|floatformat:2 }}</td>
+                    <td class="text-right">
+                        {% if dados.custo_arroba %}
+                            R$ {{ dados.custo_arroba|floatformat:2 }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-right">
+                        {% if dados.percentual_variacao %}
+                            {% if dados.percentual_variacao > 0 %}
+                                +{{ dados.percentual_variacao|floatformat:1 }}%
+                            {% else %}
+                                {{ dados.percentual_variacao|floatformat:1 }}%
+                            {% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Rodapé -->
+    <footer>
+        <p>Relatório gerado em {% now "d/m/Y H:i:s" %}</p>
+        <p>Sistema de Gestão Pecuária</p>
+    </footer>
+
+    <!-- Botão de Impressão -->
+    <button onclick="handlePrint()" class="print-button">
+        <i class="bi bi-printer"></i> Imprimir
+    </button>
+
+    <!-- Scripts para os gráficos -->
+    <script>
+        // Função para lidar com a impressão
+        function handlePrint() {
+            // Esconde o botão
+            document.querySelector('.print-button').classList.add('hidden');
+            
+            // Chama a impressão após um pequeno delay para garantir que o botão sumiu
+            setTimeout(function() {
+                window.print();
+                
+                // Restaura o botão após a impressão
+                window.onafterprint = function() {
+                    document.querySelector('.print-button').classList.remove('hidden');
+                };
+            }, 100);
+        }
+
+        // Configurações comuns para os gráficos
+        Chart.defaults.font.size = 11;
+        Chart.defaults.responsive = true;
+        Chart.defaults.maintainAspectRatio = false;
+
+        // Dados para os gráficos
+        const dados = {{ graficos_json|safe }};
+        
+        // Configurações comuns para todos os gráficos
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: false
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    align: 'start'
+                }
+            }
+        };
+        
+        // Gráfico de Peso
+        new Chart(document.getElementById('pesoChart'), {
+            type: 'line',
+            data: {
+                labels: dados.datas,
+                datasets: [{
+                    label: 'Peso (kg)',
+                    data: dados.pesos,
+                    borderColor: '#007bff',
+                    backgroundColor: '#007bff20',
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    title: {
+                        display: true,
+                        text: 'Evolução do Peso'
+                    }
+                }
+            }
+        });
+
+        // Gráfico de GMD
+        new Chart(document.getElementById('gmdChart'), {
+            type: 'line',
+            data: {
+                labels: dados.datas,
+                datasets: [{
+                    label: 'GMD (kg/dia)',
+                    data: dados.gmd,
+                    borderColor: '#28a745',
+                    backgroundColor: '#28a74520',
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    title: {
+                        display: true,
+                        text: 'Evolução do GMD'
+                    }
+                }
+            }
+        });
+
+        // Gráfico de Custo
+        new Chart(document.getElementById('custoChart'), {
+            type: 'line',
+            data: {
+                labels: dados.datas,
+                datasets: [{
+                    label: 'Custo/@ (R$)',
+                    data: dados.custos,
+                    borderColor: '#dc3545',
+                    backgroundColor: '#dc354520',
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    title: {
+                        display: true,
+                        text: 'Evolução do Custo/@'
+                    }
+                }
+            }
+        });
+
+        // Ajustar gráficos quando a janela for redimensionada
+        window.addEventListener('resize', function() {
+            Chart.instances.forEach(chart => {
+                chart.resize();
+            });
+        });
+    </script>
+</body>
+</html>

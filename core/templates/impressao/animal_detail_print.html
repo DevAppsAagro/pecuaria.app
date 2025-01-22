@@ -3,7 +3,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Relatório do Animal teste - {{ animal.brinco_visual }}</title>
+    <title>Relatório do Animal - {{ animal.brinco_visual }}</title>
     <style>
         /* Reset básico */
         * {
@@ -111,23 +111,33 @@
             margin: 2px 0;
         }
 
-        /* Configurações de impressão */
+        /* Botão de Impressão */
+        .print-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 1000;
+            display: block;
+        }
+
+        .print-button:hover {
+            background-color: #0056b3;
+        }
+
+        .print-button.hidden {
+            display: none !important;
+        }
+
         @media print {
-            @page {
-                size: A4;
-                margin: 15mm;
-            }
-
-            body {
-                padding: 0;
-            }
-
-            .no-print {
-                display: none;
-            }
-
-            .page-break {
-                page-break-before: always;
+            .print-button {
+                display: none !important;
             }
         }
     </style>
@@ -564,10 +574,26 @@
     </footer>
 
     <!-- Botão de Impressão -->
-    <div class="no-print" style="text-align: center; margin: 20px;">
-        <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px;">
-            Imprimir Relatório
-        </button>
-    </div>
+    <button onclick="handlePrint()" class="print-button">
+        <i class="bi bi-printer"></i> Imprimir
+    </button>
+
+    <script>
+        // Função para lidar com a impressão
+        function handlePrint() {
+            // Esconde o botão
+            document.querySelector('.print-button').classList.add('hidden');
+            
+            // Chama a impressão após um pequeno delay para garantir que o botão sumiu
+            setTimeout(function() {
+                window.print();
+                
+                // Restaura o botão após a impressão
+                window.onafterprint = function() {
+                    document.querySelector('.print-button').classList.remove('hidden');
+                };
+            }, 100);
+        }
+    </script>
 </body>
 </html>
