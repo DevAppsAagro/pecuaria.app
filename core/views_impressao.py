@@ -170,8 +170,15 @@ def imprimir_pesagens(request):
     lote_id = request.GET.get('lote_id')
     animal_id = request.GET.get('animal_id')
     
-    # Query base
-    pesagens = Pesagem.objects.select_related('animal', 'animal__lote').filter(
+    # Query base otimizada com prefetch_related
+    pesagens = Pesagem.objects.select_related(
+        'animal', 
+        'animal__lote'
+    ).prefetch_related(
+        'animal__rateiocusto_set',
+        'animal__rateiocusto_set__item_despesa',
+        'animal__rateiocusto_set__item_despesa__categoria'
+    ).filter(
         usuario=request.user
     ).order_by('-data')
     
@@ -185,11 +192,13 @@ def imprimir_pesagens(request):
     if animal_id:
         pesagens = pesagens.filter(animal_id=animal_id)
     
-    # Converte para lista e ordena por data decrescente (mais recente primeiro)
+    # Converte para lista e ordena por data decrescente
     pesagens = list(pesagens)
     
-    # Adiciona o peso de entrada como primeira pesagem para cada animal
+    # Cache de pesos de entrada para evitar repetição
     animais_com_peso_entrada = set()
+    pesos_entrada = []
+    
     for pesagem in pesagens:
         animal = pesagem.animal
         if animal.id not in animais_com_peso_entrada and animal.peso_entrada and animal.data_entrada:
@@ -199,15 +208,19 @@ def imprimir_pesagens(request):
                 data=animal.data_entrada,
                 usuario=request.user
             )
-            pesagens.append(peso_entrada)
+            pesos_entrada.append(peso_entrada)
             animais_com_peso_entrada.add(animal.id)
     
-    # Ordena todas as pesagens por data decrescente
+    # Adiciona os pesos de entrada e ordena
+    pesagens.extend(pesos_entrada)
     pesagens.sort(key=lambda x: x.data, reverse=True)
     
     dados_pesagens = []
     soma_ponderada_gmd = 0
     soma_dias = 0
+    
+    # Cache de custos por animal para evitar recálculo
+    custos_por_animal = {}
     
     for i, pesagem in enumerate(pesagens):
         animal = pesagem.animal
@@ -233,12 +246,10 @@ def imprimir_pesagens(request):
         proximas_pesagens = [p for p in pesagens[i+1:] if p.animal_id == animal.id]
         
         if proximas_pesagens:
-            # Se tem pesagem anterior na lista (como está ordenado decrescente, a próxima é a anterior cronologicamente)
             pesagem_anterior = proximas_pesagens[0]
             dias = (pesagem.data - pesagem_anterior.data).days
             peso_anterior = Decimal(str(pesagem_anterior.peso))
         elif animal.peso_entrada and animal.data_entrada:
-            # Se não tem pesagem anterior mas tem peso de entrada
             dias = (pesagem.data - animal.data_entrada).days
             peso_anterior = Decimal(str(animal.peso_entrada))
         else:
@@ -258,8 +269,8 @@ def imprimir_pesagens(request):
                 soma_ponderada_gmd += (gmd * dias)
                 soma_dias += dias
         
-        # Calcula custo por arroba
-        if animal.peso_entrada is not None:
+        # Calcula custo por arroba usando cache
+        if animal.peso_entrada is not None and animal.id not in custos_por_animal:
             peso_entrada = Decimal(str(animal.peso_entrada)) if animal.peso_entrada else 0
             ganho_total = peso_atual - peso_entrada
             
@@ -267,10 +278,18 @@ def imprimir_pesagens(request):
                 kg_produzido = Decimal(str(peso_atual - peso_entrada))
                 ganho_arroba = (kg_produzido / Decimal('15')) * Decimal('0.5')
                 
-                # Busca os custos dos rateios e saídas de estoque
-                rateios = RateioCusto.objects.filter(animal=animal)
-                custo_fixo = sum(Decimal(str(rateio.valor)) for rateio in rateios if rateio.item_despesa.categoria.tipo == 'fixo')
-                custo_variavel = sum(Decimal(str(rateio.valor)) for rateio in rateios if rateio.item_despesa.categoria.tipo == 'variavel')
+                # Usa os dados já carregados pelo prefetch_related
+                rateios = animal.rateiocusto_set.all()
+                custo_fixo = sum(
+                    Decimal(str(rateio.valor)) 
+                    for rateio in rateios 
+                    if rateio.item_despesa.categoria.tipo == 'fixo'
+                )
+                custo_variavel = sum(
+                    Decimal(str(rateio.valor)) 
+                    for rateio in rateios 
+                    if rateio.item_despesa.categoria.tipo == 'variavel'
+                )
                 
                 # Adiciona custos das saídas de estoque
                 custo_variavel += Decimal(str(animal.custo_variavel or '0'))
@@ -278,8 +297,11 @@ def imprimir_pesagens(request):
                 custo_total = custo_fixo + custo_variavel
                 
                 if custo_total > 0 and ganho_arroba > 0:
-                    custo_arroba = custo_total / ganho_arroba
-                    dados['custo_arroba'] = round(float(custo_arroba), 2)
+                    custos_por_animal[animal.id] = round(float(custo_total / ganho_arroba), 2)
+        
+        # Usa o custo calculado do cache
+        if animal.id in custos_por_animal:
+            dados['custo_arroba'] = custos_por_animal[animal.id]
         
         dados_pesagens.append(dados)
     
@@ -289,7 +311,6 @@ def imprimir_pesagens(request):
     # Calcula a variação percentual para cada pesagem
     for i, dados in enumerate(dados_pesagens):
         if dados['gmd'] and dados['gmd'] > 0:  
-            # Procura próximo GMD do mesmo animal
             proximos_dados = [d for d in dados_pesagens[i+1:] if d['animal'] == dados['animal'] and d['gmd'] and d['gmd'] > 0]
             if proximos_dados:
                 gmd_anterior = proximos_dados[0]['gmd']
@@ -299,7 +320,7 @@ def imprimir_pesagens(request):
                     dados['variacao_positiva'] = variacao > 15
                     dados['variacao_negativa'] = variacao < -15
     
-    # Agrupa dados por data para calcular médias para os gráficos
+    # Agrupa dados por data para os gráficos
     dados_por_data = {}
     for dados in dados_pesagens:
         data = dados['data'].strftime('%d/%m/%Y')
@@ -316,7 +337,7 @@ def imprimir_pesagens(request):
         if dados.get('custo_arroba', 0) > 0:
             dados_por_data[data]['custos'].append(float(dados['custo_arroba']))
     
-    # Calcula médias por data para os gráficos - mantém ordem cronológica
+    # Calcula médias por data para os gráficos
     datas = sorted(dados_por_data.keys())
     medias_peso = []
     medias_gmd = []
@@ -346,6 +367,7 @@ def imprimir_pesagens(request):
     # Buscar informações do lote e animal selecionados
     lote_selecionado = None
     animal_selecionado = None
+    
     if lote_id:
         lote_selecionado = Lote.objects.filter(id=lote_id, usuario=request.user).first()
     if animal_id:
@@ -353,9 +375,9 @@ def imprimir_pesagens(request):
 
     # Preparar cabeçalho
     cabecalho = {
-        'empresa': 'Nome da Empresa',  # Personalizar conforme necessário
-        'cnpj': '00.000.000/0000-00',  # Personalizar conforme necessário
-        'endereco': 'Endereço da Empresa'  # Personalizar conforme necessário
+        'empresa': 'Nome da Empresa',
+        'cnpj': '00.000.000/0000-00',
+        'endereco': 'Endereço da Empresa'
     }
 
     # Serializar dados para os gráficos
