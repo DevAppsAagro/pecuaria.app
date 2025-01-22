@@ -7,8 +7,16 @@
     ],
     "routes": [
         {
+            "src": "/static/(.*)",
+            "dest": "/static/$1"
+        },
+        {
             "src": "/(.*)",
             "dest": "pecuaria_project/wsgi.py"
         }
-    ]
+    ],
+    "env": {
+        "DJANGO_SETTINGS_MODULE": "pecuaria_project.settings",
+        "PYTHONPATH": "."
+    }
 }
