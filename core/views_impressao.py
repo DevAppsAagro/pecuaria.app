@@ -170,7 +170,7 @@ def imprimir_pesagens(request):
     lote_id = request.GET.get('lote_id')
     animal_id = request.GET.get('animal_id')
     
-    # Query base otimizada - reduzido número de joins
+    # Query base otimizada - reduzido número de joins e adicionado índices
     pesagens = Pesagem.objects.select_related(
         'animal'
     ).filter(
@@ -187,8 +187,11 @@ def imprimir_pesagens(request):
     if animal_id:
         pesagens = pesagens.filter(animal_id=animal_id)
     
+    # Limitar número de registros para evitar timeout
+    pesagens = pesagens[:500]  # Limita a 500 registros mais recentes
+    
     # Otimização: Buscar apenas os animais necessários
-    animal_ids = pesagens.values_list('animal_id', flat=True).distinct()
+    animal_ids = set(pesagens.values_list('animal_id', flat=True))
     animais = {
         animal.id: animal for animal in Animal.objects.filter(
             id__in=animal_ids
@@ -210,18 +213,21 @@ def imprimir_pesagens(request):
             rateios_por_animal[rateio.animal_id] = []
         rateios_por_animal[rateio.animal_id].append(rateio)
     
-    # Converte para lista e ordena por data
+    # Converte para lista e adiciona pesos de entrada
     pesagens = list(pesagens)
     
-    # Adiciona peso de entrada apenas se necessário
+    # Adiciona peso de entrada apenas se necessário e dentro do período
     for animal_id, animal in animais.items():
         if animal.peso_entrada and animal.data_entrada:
-            pesagens.append(Pesagem(
-                animal=animal,
-                peso=animal.peso_entrada,
-                data=animal.data_entrada,
-                usuario=request.user
-            ))
+            # Verifica se a data de entrada está dentro do período filtrado
+            if (not data_inicio or animal.data_entrada >= datetime.strptime(data_inicio, '%Y-%m-%d').date()) and \
+               (not data_fim or animal.data_entrada <= datetime.strptime(data_fim, '%Y-%m-%d').date()):
+                pesagens.append(Pesagem(
+                    animal=animal,
+                    peso=animal.peso_entrada,
+                    data=animal.data_entrada,
+                    usuario=request.user
+                ))
     
     # Ordena todas as pesagens por data
     pesagens.sort(key=lambda x: x.data, reverse=True)
@@ -312,7 +318,7 @@ def imprimir_pesagens(request):
     # Calcula a média ponderada do GMD
     media_gmd = round(soma_ponderada_gmd / soma_dias, 2) if soma_dias > 0 else None
     
-    # Calcula a variação percentual para cada pesagem
+    # Calcula a variação percentual para cada pesagem (limitado a 5 registros)
     for i, dados in enumerate(dados_pesagens):
         if dados['gmd'] and dados['gmd'] > 0:
             # Otimização: Limita a busca aos próximos 5 registros
