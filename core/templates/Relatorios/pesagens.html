@@ -1,12 +1,14 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div id="pdf-content" class="container-fluid">
+<div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Relatório de Pesagens</h2>
-        <button onclick="exportarPDF()" class="btn btn-primary">
-            <i class="bi bi-file-pdf"></i> Exportar PDF
-        </button>
+        <div>
+            <a href="{% url 'imprimir_pesagens' %}?{{ request.GET.urlencode }}" target="_blank" class="btn btn-primary">
+                <i class="bi bi-printer"></i> Imprimir
+            </a>
+        </div>
     </div>
 
     <!-- Filtros -->
@@ -146,11 +148,9 @@
 
 <!-- Scripts necessários -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <script>
     // Dados do backend
-    // @ts-ignore
     const dados = {{ dados_graficos|safe }};
 
     // Configuração base para todos os gráficos
@@ -201,12 +201,6 @@
                         text: 'Peso (kg)'
                     }
                 }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Evolução do Peso'
-                }
             }
         }
     });
@@ -236,12 +230,6 @@
                         text: 'GMD (kg/dia)'
                     }
                 }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Evolução do GMD'
-                }
             }
         }
     });
@@ -265,54 +253,14 @@
             scales: {
                 ...configBase.scales,
                 y: {
-                    beginAtZero: true,
+                    beginAtZero: false,
                     title: {
                         display: true,
-                        text: 'R$/@'
+                        text: 'R$ por @'
                     }
-                }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Evolução do Custo por @'
                 }
             }
         }
     });
-
-    // Atualiza a lista de animais quando o lote é alterado
-    document.getElementById('lote').addEventListener('change', function() {
-        const loteId = this.value;
-        const animalSelect = document.getElementById('animal');
-        animalSelect.innerHTML = '<option value="">Todos os Animais</option>';
-        
-        if (loteId) {
-            fetch(`/relatorios/animais-por-lote/${loteId}/`)
-                .then(response => response.json())
-                .then(data => {
-                    data.forEach(animal => {
-                        const option = document.createElement('option');
-                        option.value = animal.id;
-                        option.textContent = animal.brinco_visual;
-                        animalSelect.appendChild(option);
-                    });
-                });
-        }
-    });
-
-    // Função para exportar PDF
-    function exportarPDF() {
-        const element = document.getElementById('pdf-content');
-        const opt = {
-            margin: 1,
-            filename: 'relatorio-pesagens.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
-
-        html2pdf().set(opt).from(element).save();
-    }
 </script>
 {% endblock %}
