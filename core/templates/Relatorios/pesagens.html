@@ -1,16 +1,13 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div id="pdf-content" class="container-fluid">
+<div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Relatório de Pesagens</h2>
         <div>
-            <a href="{% url 'imprimir_pesagens' %}?{{ request.GET.urlencode }}" target="_blank" class="btn btn-primary me-2">
+            <a href="{% url 'imprimir_pesagens' %}?{{ request.GET.urlencode }}" target="_blank" class="btn btn-primary">
                 <i class="bi bi-printer"></i> Imprimir
             </a>
-            <button onclick="exportarPDF()" class="btn btn-secondary">
-                <i class="bi bi-file-pdf"></i> Exportar PDF
-            </button>
         </div>
     </div>
 
@@ -151,7 +148,6 @@
 
 <!-- Scripts necessários -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <script>
     // Dados do backend
@@ -166,7 +162,7 @@
                 left: 10,
                 right: 10,
                 top: 20,
-                bottom: 30  // Aumenta margem inferior para as datas
+                bottom: 30
             }
         },
         scales: {
@@ -265,20 +261,6 @@
                 }
             }
         }
-    };
-
-    // Função para exportar PDF
-    function exportarPDF() {
-        const element = document.getElementById('pdf-content');
-        const opt = {
-            margin: 1,
-            filename: 'relatorio-pesagens.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
-
-        html2pdf().set(opt).from(element).save();
-    }
+    });
 </script>
 {% endblock %}
