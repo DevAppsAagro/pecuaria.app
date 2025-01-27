@@ -10,11 +10,26 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils import timezone
+from django.db.models import Q, Count, Sum, Max
+from django.db import transaction
 from datetime import datetime, date, timedelta
 import json
 import pandas as pd
 import numpy as np
-from .models import *
+
+from .models import (
+    Fazenda, Pasto, Animal, Lote, MovimentacaoAnimal, 
+    VariedadeCapim, Raca, FinalidadeLote, CategoriaAnimal,
+    UnidadeMedida, MotivoMorte, CategoriaCusto, SubcategoriaCusto,
+    Pesagem, ManejoSanitario, Maquina, Benfeitoria, ContaBancaria, 
+    Contato, Despesa, ItemDespesa, ParcelaDespesa, RateioCusto
+)
+
+from .models_estoque import Insumo, MovimentacaoEstoque
+from .models_compras import Compra, CompraAnimal
+from .models_vendas import Venda, VendaAnimal
+from .models_abates import Abate, AbateAnimal
+
 from .forms import *
 
 # URL do produto na Eduzz
