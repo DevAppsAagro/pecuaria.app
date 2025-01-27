@@ -3,34 +3,19 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import login, authenticate
 from django.contrib import messages
-from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse, HttpResponse
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
-from django.db.models import Q, Count, Sum, Max
-from django.db import transaction
-from datetime import datetime, date, timedelta
-from geopy.geocoders import Nominatim
-import pandas as pd
-import json
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils import timezone
-
-from .models import (
-    Fazenda, Pasto, Animal, Lote, MovimentacaoAnimal, 
-    VariedadeCapim, Raca, FinalidadeLote, CategoriaAnimal,
-    UnidadeMedida, MotivoMorte, CategoriaCusto, SubcategoriaCusto,
-    Pesagem, ManejoSanitario, Maquina, Benfeitoria, ContaBancaria, Contato, Despesa, ItemDespesa, ParcelaDespesa, RateioCusto
-)
-
-from .models_estoque import Insumo, MovimentacaoEstoque
-from .models_compras import Compra, CompraAnimal
-from .models_vendas import Venda, VendaAnimal
-from .models_abates import Abate, AbateAnimal
-
-from .static.templates.importacao_animais_modelo import criar_planilha_modelo
-import logging
+from datetime import datetime, date, timedelta
+import json
+import pandas as pd
+import numpy as np
+from .models import *
+from .forms import *
 
 # URL do produto na Eduzz
 EDUZZ_PRODUCT_URL = "https://chk.eduzz.com/40QDNRN3WB"
@@ -257,30 +242,6 @@ def financeiro_view(request):
 
 def awaiting_payment(request):
     return render(request, 'registration/awaiting_payment.html')
-
-@csrf_exempt
-def eduzz_webhook(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            trans_status = data.get('trans_status', '').lower()
-            
-            transaction = EduzzTransaction.objects.create(
-                transaction_id=data.get('trans_cod'),
-                status=trans_status,
-                email=data.get('cus_email'),
-                product_id=data.get('product_cod')
-            )
-            
-            if trans_status == 'approved':
-                pass
-                
-            return HttpResponse('OK', status=200)
-        except json.JSONDecodeError:
-            return HttpResponse('Invalid JSON', status=400)
-        except Exception as e:
-            return HttpResponse(str(e), status=500)
-    return HttpResponse('Method not allowed', status=405)
 
 @login_required
 def pasto_list(request):
@@ -1478,10 +1439,7 @@ def pastos_por_lote(request, lote_id):
                 'id': pasto.id,
                 'id_pasto': pasto.id_pasto,
                 'nome': pasto.nome,
-                'fazenda': {
-                    'nome': pasto.fazenda.nome,
-                    'id': pasto.fazenda.id
-                },
+                'fazenda_nome': pasto.fazenda.nome,
                 'fazenda_id': pasto.fazenda.id,
                 'area': float(pasto.area),
                 'capacidade_ua': float(pasto.capacidade_ua),
@@ -2617,68 +2575,6 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
             messages.error(self.request, f'Erro ao criar despesa: {str(e)}')
             return self.form_invalid(form)
 
-class DespesaUpdateView(LoginRequiredMixin, UpdateView):
-    model = Despesa
-    template_name = 'financeiro/despesa_form.html'
-    fields = ['numero_nf', 'data_emissao', 'data_vencimento', 'contato', 'forma_pagamento', 'arquivo']
-    success_url = reverse_lazy('despesas_list')
-
-    def get_queryset(self):
-        return Despesa.objects.filter(usuario=self.request.user)
-
-    def form_valid(self, form):
-        form.instance.usuario = self.request.user
-        return super().form_valid(form)
-
-class DespesaDeleteView(LoginRequiredMixin, DeleteView):
-    model = Despesa
-    template_name = 'financeiro/despesa_delete.html'
-    success_url = reverse_lazy('despesas_list')
-
-    def get_queryset(self):
-        return Despesa.objects.filter(usuario=self.request.user)
-
-@login_required
-def get_subcategorias(request, categoria_id):
-    try:
-        # Primeiro verifica se a categoria pertence ao usuário
-        categoria = CategoriaCusto.objects.get(id=categoria_id, usuario=request.user)
-        subcategorias = SubcategoriaCusto.objects.filter(categoria=categoria)
-        data = [{'id': sub.id, 'nome': sub.nome} for sub in subcategorias]
-        return JsonResponse(data, safe=False)
-    except CategoriaCusto.DoesNotExist:
-        return JsonResponse({'error': 'Categoria não encontrada'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-
-@login_required
-def get_destinos(request):
-    tipo_alocacao = request.GET.get('tipo_alocacao', '').lower()
-    usuario = request.user
-    
-    if tipo_alocacao == 'fazenda':
-        items = Fazenda.objects.filter(usuario=usuario)
-        data = [{'id': item.id, 'nome': item.nome} for item in items]
-    elif tipo_alocacao == 'lote':
-        items = Lote.objects.filter(fazenda__usuario=usuario)
-        data = [{'id': item.id, 'nome': str(item)} for item in items]
-    elif tipo_alocacao == 'maquina':
-        items = Maquina.objects.filter(fazenda__usuario=usuario)
-        data = [{'id': item.id, 'nome': f"{item.id_maquina} - {item.nome}"} for item in items]
-    elif tipo_alocacao == 'benfeitoria':
-        items = Benfeitoria.objects.filter(usuario=usuario)
-        data = [{'id': item.id, 'nome': f"{item.id_benfeitoria} - {item.nome}"} for item in items]
-    elif tipo_alocacao == 'pastagem':
-        items = Pasto.objects.filter(fazenda__usuario=usuario)
-        data = [{'id': item.id, 'nome': str(item)} for item in items]
-    elif tipo_alocacao == 'estoque':
-        items = Fazenda.objects.filter(usuario=usuario)
-        data = [{'id': item.id, 'nome': item.nome} for item in items]
-    else:
-        data = []
-    
-    return JsonResponse(data, safe=False)
-
 @login_required
 def despesa_detail(request, pk):
     despesa = get_object_or_404(Despesa, pk=pk, usuario=request.user)
@@ -2941,220 +2837,6 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
             return self.form_invalid(form)
 
 @login_required
-def animal_pdf(request, pk):
-    # Busca o animal
-    animal = get_object_or_404(Animal, pk=pk, usuario=request.user)
-    
-    # Cria o buffer para o PDF
-    buffer = BytesIO()
-    
-    # Cria o documento PDF
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=72,
-        leftMargin=72,
-        topMargin=72,
-        bottomMargin=72
-    )
-    
-    elements = []
-    
-    # Estilos personalizados
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=24,
-        spaceAfter=30,
-        alignment=TA_CENTER,
-        textColor=colors.HexColor('#2c3e50')
-    )
-    
-    subtitle_style = ParagraphStyle(
-        'CustomSubtitle',
-        parent=styles['Heading2'],
-        fontSize=16,
-        spaceBefore=20,
-        spaceAfter=10,
-        textColor=colors.HexColor('#34495e')
-    )
-    
-    normal_style = ParagraphStyle(
-        'CustomNormal',
-        parent=styles['Normal'],
-        fontSize=12,
-        textColor=colors.HexColor('#2c3e50')
-    )
-    
-    # Título
-    elements.append(Paragraph(f'Ficha do Animal', title_style))
-    elements.append(Paragraph(f'Brinco: {animal.brinco_visual}', subtitle_style))
-    elements.append(Spacer(1, 20))
-    
-    # Informações básicas
-    elements.append(Paragraph('Informações Básicas', subtitle_style))
-    data = [
-        ['Brinco Visual', animal.brinco_visual],
-        ['Brinco Eletrônico', animal.brinco_eletronico or '-'],
-        ['Raça', animal.raca.nome],
-        ['Categoria', animal.categoria_animal.nome],
-        ['Data de Entrada', animal.data_entrada.strftime('%d/%m/%Y')],
-        ['Situação', animal.situacao],
-        ['Fazenda Atual', animal.fazenda_atual.nome],
-        ['Lote', animal.lote.id_lote],
-        ['Pasto Atual', animal.pasto_atual.id_pasto if animal.pasto_atual else '-'],
-    ]
-    
-    # Última pesagem
-    ultima_pesagem = animal.pesagens.order_by('-data').first()
-    if ultima_pesagem:
-        # Se tem pesagem, usa ela
-        data.append([
-            'Peso Atual', f'{ultima_pesagem.peso} kg'
-        ])
-    elif animal.peso_entrada:
-        # Se não tem pesagem mas tem peso de entrada, usa ele
-        data.append([
-            'Peso de Entrada', f'{animal.peso_entrada} kg'
-        ])
-    
-    # Custos
-    rateios = RateioCusto.objects.filter(animal=animal)
-    custos_fixos_totais = sum(rateio.valor for rateio in rateios if rateio.item_despesa.categoria.tipo == 'fixo')
-    custos_variaveis_totais = sum(rateio.valor for rateio in rateios if rateio.item_despesa.categoria.tipo == 'variavel')
-    
-    custos_variaveis_totais += animal.custo_variavel or 0
-    
-    # Custo Total (soma de custos fixos e variáveis, sem incluir valor de aquisição)
-    custo_total = Decimal(str(custos_fixos_totais)) + Decimal(str(custos_variaveis_totais))
-
-    # Custos por Produção
-    peso_atual = Decimal(str(ultima_pesagem.peso if ultima_pesagem else 0))
-    peso_entrada = Decimal(str(animal.peso_entrada or 0))
-    kg_produzido = peso_atual - peso_entrada if peso_atual > 0 else Decimal('0')
-    arroba_produzida = (kg_produzido / Decimal('15')) * Decimal('0.5') if kg_produzido > 0 else Decimal('0')
-    
-    # Calcula custos por produção
-    custo_por_kg = custo_total / kg_produzido if kg_produzido > 0 else Decimal('0')
-    custo_por_arroba = custo_total / arroba_produzida if arroba_produzida > 0 else Decimal('0')
-
-    # Custos diários
-    custo_diario = custo_total / Decimal(str((date.today() - animal.data_entrada).days if animal.data_entrada else 0)) if animal.data_entrada else Decimal('0')
-    custo_diario_sem_aquisicao = custo_diario  # Agora é igual ao custo_diario pois não inclui valor de aquisição
-    custo_variavel_diario = Decimal(str(custos_variaveis_totais)) / Decimal(str((date.today() - animal.data_entrada).days if animal.data_entrada else 0)) if animal.data_entrada else Decimal('0')
-    custo_fixo_diario = Decimal(str(custos_fixos_totais)) / Decimal(str((date.today() - animal.data_entrada).days if animal.data_entrada else 0)) if animal.data_entrada else Decimal('0')
-    
-    # Busca informações de abate e venda
-    from .models_compras import CompraAnimal
-    from .models_vendas import VendaAnimal
-    from .models_abates import AbateAnimal
-    
-    abate_animal = AbateAnimal.objects.filter(animal=animal).first()
-    venda = VendaAnimal.objects.filter(animal=animal).first()
-    
-    # Estilo da tabela de informações básicas
-    table = Table(data, colWidths=[2.5*inch, 3.5*inch])
-    table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#2c3e50')),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#bdc3c7')),
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#ecf0f1')),
-        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#2c3e50')),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 12),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-    ]))
-    elements.append(table)
-    elements.append(Spacer(1, 30))
-    
-    # Histórico de Pesagens
-    elements.append(Paragraph('Histórico de Pesagens', subtitle_style))
-    
-    pesagens = animal.pesagens.all().order_by('-data')[:10]  # Últimas 10 pesagens
-    if pesagens:
-        pesagens_data = [['Data', 'Peso (kg)', 'GMD']]
-        for i, pesagem in enumerate(pesagens):
-            gmd = '-'
-            if i < len(pesagens) - 1:
-                dias = (pesagem.data - pesagens[i+1].data).days
-                if dias > 0:
-                    gmd = f'{(pesagem.peso - pesagens[i+1].peso) / dias:.2f}'
-            pesagens_data.append([
-                pesagem.data.strftime('%d/%m/%Y'),
-                str(pesagem.peso),
-                gmd
-            ])
-        
-        pesagens_table = Table(pesagens_data, colWidths=[2*inch, 2*inch, 2*inch])
-        pesagens_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#2c3e50')),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#bdc3c7')),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498db')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        elements.append(pesagens_table)
-    else:
-        elements.append(Paragraph('Nenhuma pesagem registrada', normal_style))
-    
-    elements.append(Spacer(1, 30))
-    
-    # Histórico de Manejos
-    elements.append(Paragraph('Histórico de Manejos', subtitle_style))
-    
-    manejos = animal.manejos_sanitarios.order_by('-data')[:10]  # Últimos 10 manejos
-    if manejos:
-        manejos_data = [['Data', 'Tipo de Manejo', 'Insumo', 'Observação']]
-        for manejo in manejos:
-            manejos_data.append([
-                manejo.data.strftime('%d/%m/%Y'),
-                manejo.tipo_manejo,
-                manejo.insumo,
-                manejo.observacao or '-'
-            ])
-        
-        manejos_table = Table(manejos_data, colWidths=[1.5*inch, 2*inch, 2*inch, 2*inch])
-        manejos_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#2c3e50')),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#bdc3c7')),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498db')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        elements.append(manejos_table)
-    else:
-        elements.append(Paragraph('Nenhum manejo registrado', normal_style))
-    
-    # Gera o PDF
-    doc.build(elements)
-    
-    # Prepara a resposta
-    buffer.seek(0)
-    response = HttpResponse(buffer.read(), content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="animal_{animal.brinco_visual}.pdf"'
-    
-    return response
-
-@login_required
 def fazenda_detail(request, pk):
     """
     Exibe os detalhes de uma fazenda específica
@@ -3249,7 +2931,7 @@ def animal_detail(request, pk):
     custos_fixos_totais = sum(rateio.valor for rateio in rateios if rateio.item_despesa.categoria.tipo == 'fixo')
     custos_variaveis_totais = sum(rateio.valor for rateio in rateios if rateio.item_despesa.categoria.tipo == 'variavel')
     custos_variaveis_totais += animal.custo_variavel or 0
-    custos_total = custos_fixos_totais + custos_variaveis_totais
+    custos_total = Decimal(str(custos_fixos_totais)) + Decimal(str(custos_variaveis_totais))
 
     # Calcula custos por kg e por @
     custo_por_kg = 0
@@ -3333,3 +3015,65 @@ def animal_detail(request, pk):
     }
     
     return render(request, 'animais/animal_detail.html', context)
+
+class DespesaUpdateView(LoginRequiredMixin, UpdateView):
+    model = Despesa
+    template_name = 'financeiro/despesa_form.html'
+    fields = ['numero_nf', 'data_emissao', 'data_vencimento', 'contato', 'forma_pagamento', 'arquivo']
+    success_url = reverse_lazy('despesas_list')
+
+    def get_queryset(self):
+        return Despesa.objects.filter(usuario=self.request.user)
+
+    def form_valid(self, form):
+        form.instance.usuario = self.request.user
+        return super().form_valid(form)
+
+class DespesaDeleteView(LoginRequiredMixin, DeleteView):
+    model = Despesa
+    template_name = 'financeiro/despesa_delete.html'
+    success_url = reverse_lazy('despesas_list')
+
+    def get_queryset(self):
+        return Despesa.objects.filter(usuario=self.request.user)
+
+@login_required
+def get_subcategorias(request, categoria_id):
+    try:
+        # Primeiro verifica se a categoria pertence ao usuário
+        categoria = CategoriaCusto.objects.get(id=categoria_id, usuario=request.user)
+        subcategorias = SubcategoriaCusto.objects.filter(categoria=categoria)
+        data = [{'id': sub.id, 'nome': sub.nome} for sub in subcategorias]
+        return JsonResponse(data, safe=False)
+    except CategoriaCusto.DoesNotExist:
+        return JsonResponse({'error': 'Categoria não encontrada'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def get_destinos(request):
+    tipo_alocacao = request.GET.get('tipo_alocacao', '').lower()
+    usuario = request.user
+    
+    if tipo_alocacao == 'fazenda':
+        items = Fazenda.objects.filter(usuario=usuario)
+        data = [{'id': item.id, 'nome': item.nome} for item in items]
+    elif tipo_alocacao == 'lote':
+        items = Lote.objects.filter(fazenda__usuario=usuario)
+        data = [{'id': item.id, 'nome': str(item)} for item in items]
+    elif tipo_alocacao == 'maquina':
+        items = Maquina.objects.filter(fazenda__usuario=usuario)
+        data = [{'id': item.id, 'nome': f"{item.id_maquina} - {item.nome}"} for item in items]
+    elif tipo_alocacao == 'benfeitoria':
+        items = Benfeitoria.objects.filter(usuario=usuario)
+        data = [{'id': item.id, 'nome': f"{item.id_benfeitoria} - {item.nome}"} for item in items]
+    elif tipo_alocacao == 'pastagem':
+        items = Pasto.objects.filter(fazenda__usuario=usuario)
+        data = [{'id': item.id, 'nome': str(item)} for item in items]
+    elif tipo_alocacao == 'estoque':
+        items = Fazenda.objects.filter(usuario=usuario)
+        data = [{'id': item.id, 'nome': item.nome} for item in items]
+    else:
+        data = []
+    
+    return JsonResponse(data, safe=False)

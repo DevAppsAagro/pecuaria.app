@@ -5,10 +5,10 @@ from . import views_estoque
 from . import views_nao_operacional
 from . import views_compras
 from . import views_vendas
-from django.contrib.auth import views as auth_views
 from . import views_parcelas
 from . import views_abates
-from .views_impressao import imprimir_animal
+from .views_impressao import imprimir_animal, imprimir_pesagens
+from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     # Dashboard
@@ -22,13 +22,13 @@ urlpatterns = [
     path('reproducao/', views.em_desenvolvimento, name='reproducao'),
     path('relatorios/', views_relatorios.relatorios_view, name='relatorios_list'),
     path('relatorios/pesagens/', views_relatorios.relatorio_pesagens, name='relatorio_pesagens'),
+    path('relatorios/pesagens/imprimir/', imprimir_pesagens, name='imprimir_pesagens'),
     path('api/animais-por-lote/<int:lote_id>/', views_relatorios.animais_por_lote, name='animais_por_lote'),
     
     # Animais
     path('animais/', views.animal_list, name='animal_list'),
     path('animais/novo/', views.animal_create, name='animal-create'),
     path('animais/<int:pk>/', views.animal_detail, name='animal_detail'),
-    path('animais/<int:pk>/pdf/', views.animal_pdf, name='animal_pdf'),
     path('animais/<int:pk>/editar/', views.animal_edit, name='animal_edit'),
     path('animais/<int:pk>/excluir/', views.animal_delete, name='animal_delete'),
     path('animais/importar/', views.animal_import, name='animal_import'),
@@ -37,7 +37,6 @@ urlpatterns = [
     path('animais/<int:animal_pk>/movimentacoes/nova/', views.movimentacao_create, name='movimentacao_create'),
     path('animal/<int:animal_pk>/movimentacao/criar/', views.movimentacao_create, name='movimentacao_create'),
     path('animal/<int:animal_pk>/movimentacao/historico/', views.movimentacao_list, name='movimentacao_list'),
-    path('animais/<int:pk>/pdf/', views.animal_pdf, name='animal_pdf'),
     path('animais/<int:pk>/imprimir/', imprimir_animal, name='imprimir_animal'),
     
     # Fazendas URLs
@@ -247,6 +246,5 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('register/', views.register_view, name='register'),
     path('aguardando-pagamento/', views.awaiting_payment, name='awaiting_payment'),
-    path('webhook/eduzz/', views.eduzz_webhook, name='eduzz_webhook'),
     path('configuracoes/', views.configuracoes, name='configuracoes'),
 ]
