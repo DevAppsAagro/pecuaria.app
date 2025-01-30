@@ -45,7 +45,22 @@
                         <label for="id_data_vencimento">Data de Vencimento</label>
                         <input type="date" name="data_vencimento" id="id_data_vencimento" class="form-control">
                     </div>
-                    <div class="col-md-9">
+                    <div class="col-md-3">
+                        <label for="id_data_pagamento">Data de Pagamento</label>
+                        <input type="date" name="data_pagamento" id="id_data_pagamento" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_conta_bancaria">Conta Bancária</label>
+                        <select name="conta_bancaria" id="id_conta_bancaria" class="form-select">
+                            <option value="">Selecione...</option>
+                            {% for conta in contas_bancarias %}
+                            <option value="{{ conta.id }}" {% if form.conta_bancaria.value == conta.id %}selected{% endif %}>
+                                {{ conta.banco }} - Ag: {{ conta.agencia }} - CC: {{ conta.conta }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
                         <label for="id_arquivo">Arquivo</label>
                         <input type="file" name="arquivo" id="id_arquivo" class="form-control">
                     </div>

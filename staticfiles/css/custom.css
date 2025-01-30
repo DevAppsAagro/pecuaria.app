@@ -1,0 +1,45 @@
+/* Google Font: Source Sans Pro */
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&display=swap');
+
+/* Configurações gerais de fonte */
+body {
+    font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+
+/* Navbar e Sidebar */
+.main-header,
+.main-sidebar {
+    font-family: 'Source Sans Pro', sans-serif !important;
+}
+
+/* Títulos e textos */
+.content-header h1,
+.brand-text {
+    font-weight: 300 !important;
+}
+
+.card-title {
+    font-weight: 600 !important;
+}
+
+/* Navegação */
+.nav-link,
+.btn {
+    font-weight: 400 !important;
+}
+
+/* Badges e elementos de destaque */
+.badge {
+    font-weight: 600 !important;
+}
+
+/* DataTables customização */
+.dataTables_wrapper {
+    font-family: 'Source Sans Pro', sans-serif !important;
+}
+
+/* Alerts e mensagens */
+.alert {
+    font-family: 'Source Sans Pro', sans-serif !important;
+    font-weight: 400 !important;
+}

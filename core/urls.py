@@ -7,12 +7,14 @@ from . import views_compras
 from . import views_vendas
 from . import views_parcelas
 from . import views_abates
-from .views_impressao import imprimir_animal, imprimir_pesagens
+from . import views_dashboard
+from . import views_impressao  # Importação correta do módulo
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     # Dashboard
-    path('', views.dashboard_view, name='dashboard'),
+    path('', views_dashboard.dashboard, name='dashboard'),
+    path('dashboard/atualizar/', views_dashboard.atualizar_dashboard, name='atualizar_dashboard'),
     
     # Página em desenvolvimento
     path('em-desenvolvimento/', views.em_desenvolvimento, name='em_desenvolvimento'),
@@ -22,7 +24,11 @@ urlpatterns = [
     path('reproducao/', views.em_desenvolvimento, name='reproducao'),
     path('relatorios/', views_relatorios.relatorios_view, name='relatorios_list'),
     path('relatorios/pesagens/', views_relatorios.relatorio_pesagens, name='relatorio_pesagens'),
-    path('relatorios/pesagens/imprimir/', imprimir_pesagens, name='imprimir_pesagens'),
+    path('relatorios/pesagens/imprimir/', views_impressao.imprimir_pesagens, name='imprimir_pesagens'),
+    path('relatorios/confinamento/', views_relatorios.relatorio_confinamento, name='relatorio_confinamento'),
+    path('relatorios/confinamento/imprimir/', views_impressao.imprimir_confinamento, name='imprimir_confinamento'),
+    path('relatorios/dre/', views_relatorios.relatorio_dre, name='relatorio_dre'),
+    path('relatorios/dre/atualizar/', views_relatorios.atualizar_dre, name='atualizar_dre'),
     path('api/animais-por-lote/<int:lote_id>/', views_relatorios.animais_por_lote, name='animais_por_lote'),
     
     # Animais
@@ -37,7 +43,7 @@ urlpatterns = [
     path('animais/<int:animal_pk>/movimentacoes/nova/', views.movimentacao_create, name='movimentacao_create'),
     path('animal/<int:animal_pk>/movimentacao/criar/', views.movimentacao_create, name='movimentacao_create'),
     path('animal/<int:animal_pk>/movimentacao/historico/', views.movimentacao_list, name='movimentacao_list'),
-    path('animais/<int:pk>/imprimir/', imprimir_animal, name='imprimir_animal'),
+    path('animais/<int:pk>/imprimir/', views_impressao.imprimir_animal, name='imprimir_animal'),
     
     # Fazendas URLs
     path('fazendas/', views.fazenda_list, name='fazenda_list'),
@@ -113,6 +119,7 @@ urlpatterns = [
     
     # Financeiro
     path('financeiro/despesas/', views.despesas_list, name='despesas_list'),
+    path('financeiro/despesas/print/', views_impressao.despesas_print, name='despesas_print'),
     path('financeiro/despesa/create/', views.DespesaCreateView.as_view(), name='despesa_create'),
     path('financeiro/despesa/<int:pk>/', views.despesa_detail, name='despesa_detail'),
     path('financeiro/despesa/<int:pk>/update/', views.DespesaUpdateView.as_view(), name='despesa_update'),
@@ -143,22 +150,17 @@ urlpatterns = [
     path('financeiro/abates/parcelas/<int:parcela_id>/historico/', views_abates.historico_pagamentos_abate, name='historico_pagamentos_abate'),
     path('api/animal/peso/', views_abates.get_peso_atual_json, name='animal_peso_api'),
     
+    # Compras
+    path('financeiro/compras/', views_compras.compras_list, name='compras_list'),
+    path('financeiro/compras/nova/', views_compras.criar_compra, name='compras_criar'),
+    path('financeiro/compras/<int:pk>/editar/', views_compras.editar_compra, name='compras_editar'),
+    path('financeiro/compras/<int:pk>/excluir/', views_compras.excluir_compra, name='compras_excluir'),
+    path('financeiro/compras/<int:pk>/detalhe/', views_compras.detalhe_compra, name='compras_detalhe'),
+    path('financeiro/compras/imprimir/', views_impressao.imprimir_compras, name='compras_print'),
+    
     # Parcelas URLs
     path('financeiro/parcelas/<int:parcela_id>/pagar/', views_parcelas.registrar_pagamento, name='registrar_pagamento'),
     path('financeiro/parcelas/<int:parcela_id>/historico/', views_parcelas.historico_pagamentos, name='historico_pagamentos'),
-    
-    # Compras URLs
-    path('financeiro/compras/', views_compras.compras_list, name='compras_list'),
-    path('financeiro/compras/nova/', views_compras.criar_compra, name='compras_criar'),
-    path('financeiro/compras/<int:pk>/', views_compras.detalhe_compra, name='compras_detalhe'),
-    path('financeiro/compras/<int:pk>/editar/', views_compras.editar_compra, name='compras_editar'),
-    path('financeiro/compras/<int:pk>/excluir/', views_compras.excluir_compra, name='compras_excluir'),
-    path('api/animal/<int:pk>/peso_entrada/', views_compras.get_peso_entrada, name='get_peso_entrada'),
-    
-    path('financeiro/vendas/', views.vendas_list, name='vendas_list'),
-    path('financeiro/abates/', views.abates_list, name='abates_list'),
-    path('financeiro/nao-operacional/', views_nao_operacional.lista_nao_operacional, name='nao_operacional_list'),
-    path('financeiro/contatos/', views.contatos_list, name='contatos_list'),
     
     # Movimentações Não Operacionais
     path('nao-operacional/', views_nao_operacional.lista_nao_operacional, name='lista_nao_operacional'),
@@ -174,10 +176,11 @@ urlpatterns = [
     
     # URLs para Contas Bancárias
     path('financeiro/contas-bancarias/', views.ContaBancariaListView.as_view(), name='contas_bancarias_list'),
-    path('financeiro/contas-bancarias/nova/', views.ContaBancariaCreateView.as_view(), name='conta_bancaria_create'),
-    path('financeiro/contas-bancarias/<int:pk>/editar/', views.ContaBancariaUpdateView.as_view(), name='conta_bancaria_update'),
-    path('financeiro/contas-bancarias/<int:pk>/excluir/', views.ContaBancariaDeleteView.as_view(), name='conta_bancaria_delete'),
-    
+    path('financeiro/contas-bancarias/criar/', views.ContaBancariaCreateView.as_view(), name='contas_bancarias_create'),
+    path('financeiro/contas-bancarias/<int:pk>/editar/', views.ContaBancariaUpdateView.as_view(), name='contas_bancarias_update'),
+    path('financeiro/contas-bancarias/<int:pk>/excluir/', views.ContaBancariaDeleteView.as_view(), name='contas_bancarias_delete'),
+    path('financeiro/extrato-bancario/', views.ExtratoBancarioListView.as_view(), name='extrato_bancario_list'),
+
     # APIs
     path('api/get-cidade-coordenadas/', views.get_cidade_coordenadas, name='get_cidade_coordenadas'),
     path('api/buscar_animal/<str:brinco>/', views.buscar_animal, name='buscar_animal'),

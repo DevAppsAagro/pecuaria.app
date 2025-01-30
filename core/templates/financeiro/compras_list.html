@@ -1,34 +1,461 @@
 {% extends 'base.html' %}
 
+{% block extra_head %}
+<!-- DataTables -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css">
+<style>
+    .btn-group .btn {
+        margin: 0 2px;
+    }
+    .btn-group .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(50,50,93,.11), 0 1px 3px rgba(0,0,0,.08);
+    }
+    
+    /* Estilos para os cards de status */
+    .small-box {
+        border-radius: 0.25rem;
+        position: relative;
+        display: block;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+    .small-box > .inner {
+        padding: 20px;
+        position: relative;
+        z-index: 2;
+    }
+
+    .small-box h3 {
+        font-size: 2.2rem;
+        font-weight: bold;
+        margin: 0 0 10px 0;
+        white-space: nowrap;
+        padding: 0;
+    }
+
+    .small-box p {
+        font-size: 1rem;
+        margin-bottom: 0;
+    }
+
+    .small-box .icon {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        z-index: 1;
+        font-size: 60px;
+    }
+
+    .small-box:hover {
+        text-decoration: none;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(50,50,93,.11), 0 1px 3px rgba(0,0,0,.08);
+        transition: all .3s ease;
+    }
+
+    /* Ícones específicos por cor de card */
+    .bg-success .icon {
+        color: rgba(255,255,255,0.3);
+    }
+
+    .bg-warning .icon {
+        color: rgba(0,0,0,0.2);
+    }
+
+    .bg-info .icon {
+        color: rgba(255,255,255,0.3);
+    }
+
+    .bg-danger .icon {
+        color: rgba(255,255,255,0.3);
+    }
+
+    .bg-success {
+        background-color: #28a745!important;
+        color: #fff;
+    }
+
+    .bg-warning {
+        background-color: #ffc107!important;
+        color: #1f2d3d;
+    }
+
+    .bg-danger {
+        background-color: #dc3545!important;
+        color: #fff;
+    }
+
+    .bg-info {
+        background-color: #17a2b8!important;
+        color: #fff;
+    }
+    
+    /* Demais estilos existentes */
+    .bg-gradient-primary {
+        color: #fff;
+    }
+    .bg-gradient-warning {
+        color: #1f2d3d;
+    }
+    .bg-gradient-danger {
+        color: #fff;
+    }
+    
+    /* Cor personalizada para o botão Nova Compra */
+    .btn-success-dark {
+        background-color: #00a65a !important;
+        border-color: #008d4c !important;
+        color: #fff !important;
+    }
+    .btn-success-dark:hover {
+        background-color: #008d4c !important;
+        border-color: #00733e !important;
+    }
+
+    /* Cor personalizada para o botão de ações */
+    .btn-actions {
+        background-color: #6c757d !important;
+        border-color: #5a6268 !important;
+        color: #fff !important;
+    }
+    .btn-actions:hover {
+        background-color: #5a6268 !important;
+        border-color: #545b62 !important;
+    }
+    
+    /* Ajustes para responsividade */
+    .dtr-details {
+        width: 100%;
+    }
+    .dtr-data {
+        word-break: break-word;
+    }
+    
+    /* Ajustes para o dropdown */
+    .dropdown-menu {
+        min-width: 200px;
+        padding: 0.5rem 0;
+        margin: 0;
+        border: 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    
+    .dropdown-item {
+        padding: 0.5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .dropdown-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .dropdown-item i {
+        width: 16px;
+        text-align: center;
+    }
+
+    /* Estilos para os filtros */
+    .form-select, .form-control {
+        border-radius: 0.25rem;
+        border: 1px solid #ced4da;
+        padding: 0.375rem 0.75rem;
+        font-size: 1rem;
+        line-height: 1.5;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+
+    .form-select:focus, .form-control:focus {
+        border-color: #80bdff;
+        outline: 0;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+
+    .form-label {
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container">
-    <h2 class="mb-4">Compras</h2>
-    <div class="card">
-        <div class="card-body">
-            <div class="d-flex justify-content-between mb-3">
-                <h5 class="card-title">Lista de Compras</h5>
-                <a href="{% url 'compras_list' %}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Nova Compra
-                </a>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Data</th>
-                            <th>Fornecedor</th>
-                            <th>Descrição</th>
-                            <th>Valor Total</th>
-                            <th>Status</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Os dados serão inseridos aqui -->
-                    </tbody>
-                </table>
+<div class="container-fluid">
+    <!-- Content Header -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">Compras</h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Home</a></li>
+                        <li class="breadcrumb-item active">Compras</li>
+                    </ol>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+            <div class="card card-primary card-outline">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-shopping-cart mr-1"></i>
+                        Lista de Compras
+                    </h3>
+                    <div class="card-tools">
+                        <div class="float-right">
+                            <a href="{% url 'compras_criar' %}" class="btn btn-success-dark elevation-2">
+                                <i class="fas fa-plus-circle mr-1"></i> Nova Compra
+                            </a>
+                            <a href="{% url 'compras_print' %}?{{ request.GET.urlencode }}" class="btn btn-secondary" target="_blank">
+                                <i class="fas fa-print"></i> Imprimir
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Filtros -->
+                    <div class="mb-4">
+                        <form method="get" class="row g-3">
+                            <div class="col-md-3">
+                                <label for="contato" class="form-label">Fornecedor</label>
+                                <select name="contato" id="contato" class="form-select">
+                                    <option value="">Todos</option>
+                                    {% for contato in contatos %}
+                                        <option value="{{ contato.id }}" {% if filtros.contato|stringformat:"s" == contato.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ contato.nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="fazenda" class="form-label">Fazenda</label>
+                                <select name="fazenda" id="fazenda" class="form-select">
+                                    <option value="">Todas</option>
+                                    {% for fazenda in fazendas %}
+                                        <option value="{{ fazenda.id }}" {% if filtros.fazenda|stringformat:"s" == fazenda.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ fazenda.nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="status" class="form-label">Status</label>
+                                <select name="status" id="status" class="form-select">
+                                    <option value="">Todos</option>
+                                    <option value="PENDENTE" {% if filtros.status == 'PENDENTE' %}selected{% endif %}>Pendente</option>
+                                    <option value="PAGO" {% if filtros.status == 'PAGO' %}selected{% endif %}>Pago</option>
+                                    <option value="VENCIDO" {% if filtros.status == 'VENCIDO' %}selected{% endif %}>Atrasado</option>
+                                    <option value="VENCE_HOJE" {% if filtros.status == 'VENCE_HOJE' %}selected{% endif %}>Vence Hoje</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="data_inicio" class="form-label">Data Inicial</label>
+                                <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ filtros.data_inicio|default:'' }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="data_fim" class="form-label">Data Final</label>
+                                <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ filtros.data_fim|default:'' }}">
+                            </div>
+                            <div class="col-12 mt-3">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Filtrar
+                                </button>
+                                <a href="{% url 'compras_list' %}" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Limpar Filtros
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Cards de Totais -->
+                    <div class="row mb-4">
+                        <div class="col-lg-3 col-6">
+                            <div class="small-box bg-success">
+                                <div class="inner">
+                                    <h3>{{ totais_status.PAGO.valor_formatado }}</h3>
+                                    <p>Total Pago</p>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-6">
+                            <div class="small-box bg-warning">
+                                <div class="inner">
+                                    <h3>{{ totais_status.PENDENTE.valor_formatado }}</h3>
+                                    <p>Pendente</p>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-6">
+                            <div class="small-box bg-info">
+                                <div class="inner">
+                                    <h3>{{ totais_status.VENCE_HOJE.valor_formatado }}</h3>
+                                    <p>Vence Hoje</p>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-calendar-check"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-6">
+                            <div class="small-box bg-danger">
+                                <div class="inner">
+                                    <h3>{{ totais_status.VENCIDO.valor_formatado }}</h3>
+                                    <p>Vencido</p>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table id="compras-table" class="table table-bordered table-striped dt-responsive nowrap" width="100%">
+                        <thead>
+                            <tr>
+                                <th>Data Compra</th>
+                                <th>Data Vencimento</th>
+                                <th>Fornecedor</th>
+                                <th>Valor Total</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for compra in compras %}
+                            <tr>
+                                <td>{{ compra.data|date:"d/m/Y" }}</td>
+                                <td>{{ compra.data_vencimento|date:"d/m/Y" }}</td>
+                                <td>{{ compra.vendedor.nome }}</td>
+                                <td>
+                                    <span class="badge bg-success">R$ {{ compra.valor_total|floatformat:2 }}</span>
+                                    {% if compra.numero_parcelas > 1 %}
+                                        <br>
+                                        <small class="text-muted">{{ compra.parcelas_pagas }}/{{ compra.numero_parcelas }} parcelas</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if compra.status == 'PAGO' %}
+                                        <span class="badge bg-success">Pago</span>
+                                    {% elif compra.status == 'PENDENTE' %}
+                                        <span class="badge bg-warning">Pendente</span>
+                                    {% elif compra.status == 'VENCIDO' %}
+                                        <span class="badge bg-danger">Atrasado</span>
+                                    {% elif compra.status == 'VENCE_HOJE' %}
+                                        <span class="badge bg-info">Vence Hoje</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button type="button" class="btn btn-actions btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="fas fa-cog"></i> Ações
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'compras_detalhe' compra.id %}">
+                                                    <i class="fas fa-eye text-primary"></i> Visualizar
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'compras_editar' compra.id %}">
+                                                    <i class="fas fa-pencil-alt text-warning"></i> Editar
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <hr class="dropdown-divider">
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item text-danger" href="{% url 'compras_excluir' compra.id %}">
+                                                    <i class="fas fa-trash-alt text-danger"></i> Excluir
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- DataTables & Plugins -->
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+<script>
+    $(document).ready(function() {
+        // Inicializa tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        });
+
+        // Inicializa dropdowns do Bootstrap
+        var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'))
+        var dropdownList = dropdownElementList.map(function (dropdownToggleEl) {
+            return new bootstrap.Dropdown(dropdownToggleEl)
+        });
+
+        // Inicializa DataTables
+        $('#compras-table').DataTable({
+            "responsive": true,
+            "autoWidth": false,
+            "language": {
+                "decimal": ",",
+                "thousands": ".",
+                "sEmptyTable": "Nenhum registro encontrado",
+                "sInfo": "Mostrando de _START_ até _END_ de _TOTAL_ registros",
+                "sInfoEmpty": "Mostrando 0 até 0 de 0 registros",
+                "sInfoFiltered": "(Filtrados de _MAX_ registros)",
+                "sInfoPostFix": "",
+                "sInfoThousands": ".",
+                "sLengthMenu": "_MENU_ resultados por página",
+                "sLoadingRecords": "Carregando...",
+                "sProcessing": "Processando...",
+                "sZeroRecords": "Nenhum registro encontrado",
+                "sSearch": "Pesquisar",
+                "oPaginate": {
+                    "sNext": "Próximo",
+                    "sPrevious": "Anterior",
+                    "sFirst": "Primeiro",
+                    "sLast": "Último"
+                },
+                "oAria": {
+                    "sSortAscending": ": Ordenar colunas de forma ascendente",
+                    "sSortDescending": ": Ordenar colunas de forma descendente"
+                }
+            },
+            "order": [[0, "desc"]], // Ordena por data de emissão por padrão
+            "pageLength": 25,
+            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                   "<'row'<'col-sm-12'tr>>" +
+                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>"
+        });
+    });
+</script>
 {% endblock %}

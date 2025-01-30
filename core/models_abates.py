@@ -38,6 +38,13 @@ class Abate(models.Model):
     def __str__(self):
         return f"Abate {self.id} - {self.data}"
 
+    @property
+    def valor_total(self):
+        """Retorna o valor total do abate somando os valores de todos os animais"""
+        from django.db.models import Sum
+        total = self.animais.aggregate(total=Sum('valor_total'))['total']
+        return total if total is not None else 0
+
     def atualizar_status(self):
         """Atualiza o status do abate baseado nas parcelas"""
         from django.db.models import Sum, F

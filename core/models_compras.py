@@ -48,6 +48,11 @@ class Compra(models.Model):
     def __str__(self):
         return f'Compra - {self.data}'
 
+    @property
+    def valor_total(self):
+        """Calcula o valor total da compra somando todos os animais"""
+        return self.animais.aggregate(total=models.Sum('valor_total'))['total'] or 0
+
     def save(self, *args, **kwargs):
         # Atualiza o status baseado nas datas
         from datetime import date

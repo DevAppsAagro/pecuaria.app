@@ -10,7 +10,8 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils import timezone
-from django.db.models import Q, Count, Sum, Max
+from django.db.models import Q, Count, Sum, Max, F, Value, DecimalField, ExpressionWrapper, Subquery, OuterRef
+from django.db.models.functions import Coalesce
 from django.db import transaction
 from datetime import datetime, date, timedelta
 import json
@@ -22,7 +23,7 @@ from .models import (
     VariedadeCapim, Raca, FinalidadeLote, CategoriaAnimal,
     UnidadeMedida, MotivoMorte, CategoriaCusto, SubcategoriaCusto,
     Pesagem, ManejoSanitario, Maquina, Benfeitoria, ContaBancaria, 
-    Contato, Despesa, ItemDespesa, ParcelaDespesa, RateioCusto
+    Contato, Despesa, ItemDespesa, ParcelaDespesa, RateioCusto, ExtratoBancario
 )
 
 from .models_estoque import Insumo, MovimentacaoEstoque
@@ -2395,11 +2396,84 @@ def benfeitoria_detail(request, pk):
 
 @login_required
 def despesas_list(request):
-    despesas = Despesa.objects.filter(usuario=request.user).order_by('-data_emissao')
-    return render(request, 'financeiro/despesas_list.html', {
-        'active_tab': 'financeiro',
-        'despesas': despesas
-    })
+    hoje = timezone.localdate()
+    
+    # Query base
+    despesas = Despesa.objects.filter(usuario=request.user)
+    
+    # Filtros
+    contato = request.GET.get('contato')
+    fazenda = request.GET.get('fazenda')
+    status = request.GET.get('status')
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_final')
+    
+    # Aplicar filtros
+    if contato:
+        despesas = despesas.filter(contato_id=contato)
+    if status:
+        despesas = despesas.filter(status=status)
+    if data_inicio:
+        despesas = despesas.filter(data_emissao__gte=data_inicio)
+    if data_fim:
+        despesas = despesas.filter(data_emissao__lte=data_fim)
+    if fazenda:
+        despesas = despesas.filter(itens__fazenda_destino_id=fazenda).distinct()
+    
+    # Ordenação
+    despesas = despesas.order_by('-data_emissao')
+    
+    # Dados para os filtros
+    contatos = Contato.objects.filter(usuario=request.user).order_by('nome')
+    fazendas = Fazenda.objects.filter(usuario=request.user).order_by('nome')
+    
+    # Calcular totais por status
+    totais_status = {
+        'PAGO': {'valor': 0, 'cor': 'success', 'icone': 'bi-check-circle'},
+        'PENDENTE': {'valor': 0, 'cor': 'warning', 'icone': 'bi-clock'},
+        'VENCIDO': {'valor': 0, 'cor': 'danger', 'icone': 'bi-exclamation-circle'},
+        'VENCE_HOJE': {'valor': 0, 'cor': 'info', 'icone': 'bi-calendar-check'},
+        'CANCELADO': {'valor': 0, 'cor': 'secondary', 'icone': 'bi-x-circle'}
+    }
+
+    # Dicionário para armazenar os valores totais
+    valores_totais = {}
+    
+    # Calcular totais
+    for despesa in despesas:
+        valor_total = sum(item.valor_total for item in despesa.itens.all())
+        valores_totais[despesa.id] = valor_total
+        
+        # Verificar status real da despesa
+        status_real = despesa.status
+        if status_real == 'PENDENTE' and despesa.data_vencimento == hoje:
+            status_real = 'VENCE_HOJE'
+        elif status_real == 'PENDENTE' and despesa.data_vencimento < hoje:
+            status_real = 'VENCIDO'
+        
+        # Adicionar ao total do status
+        if status_real in totais_status:
+            totais_status[status_real]['valor'] += valor_total
+
+    # Formatar valores para exibição
+    for status_info in totais_status.values():
+        status_info['valor_formatado'] = f"R$ {status_info['valor']:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
+
+    # Contexto
+    context = {
+        'despesas': despesas,
+        'valores_totais': valores_totais,
+        'totais_status': totais_status,
+        'filtros': {
+            'contato': Contato.objects.filter(id=contato).first() if contato else None,
+            'fazenda': Fazenda.objects.filter(id=fazenda).first() if fazenda else None,
+            'status': status,
+            'data_inicio': data_inicio,
+            'data_fim': data_fim
+        }
+    }
+    
+    return render(request, 'financeiro/despesas_list.html', context)
 
 @login_required
 def compras_list(request):
@@ -2439,6 +2513,62 @@ class ContaBancariaListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         return ContaBancaria.objects.filter(usuario=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Calcular totais
+        contas = self.get_queryset()
+        context['total_contas'] = contas.count()
+        context['total_saldo'] = Decimal('0.00')
+        context['total_contas_ativas'] = contas.filter(ativa=True).count()
+        context['total_contas_inativas'] = contas.filter(ativa=False).count()
+
+        # Atualiza o saldo de cada conta com base nas movimentações
+        for conta in contas:
+            # Busca todas as movimentações da conta
+            saldo = Decimal('0.00')
+            
+            # Despesas
+            despesas = Despesa.objects.filter(
+                usuario=self.request.user,
+                conta_bancaria=conta,
+                status='PAGO',
+                data_pagamento__isnull=False
+            )
+            saldo -= sum(despesa.valor_final() for despesa in despesas)
+            
+            # Abates
+            abates = Abate.objects.filter(
+                usuario=self.request.user,
+                conta_bancaria=conta,
+                status='PAGO',
+                data_pagamento__isnull=False
+            )
+            saldo += sum(abate.valor_total for abate in abates)
+            
+            # Movimentações não operacionais
+            nao_operacionais = MovimentacaoNaoOperacional.objects.filter(
+                usuario=self.request.user,
+                conta_bancaria=conta,
+                status='PAGO',
+                data_pagamento__isnull=False
+            )
+            for mov in nao_operacionais:
+                if mov.tipo == 'entrada':
+                    saldo += mov.valor
+                else:
+                    saldo -= mov.valor
+            
+            # Atualiza o saldo da conta
+            conta.saldo = saldo
+            conta.save()
+            
+            # Adiciona ao total geral
+            if conta.ativa:
+                context['total_saldo'] += saldo
+        
+        return context
 
 class ContaBancariaCreateView(LoginRequiredMixin, CreateView):
     model = ContaBancaria
@@ -2483,46 +2613,92 @@ class ContatoListView(LoginRequiredMixin, ListView):
     context_object_name = 'contatos'
 
     def get_queryset(self):
-        return Contato.objects.filter(usuario=self.request.user)
+        queryset = Contato.objects.filter(usuario=self.request.user)
+        
+        # Aplicar filtros
+        nome = self.request.GET.get('nome')
+        tipo = self.request.GET.get('tipo')
+        cidade = self.request.GET.get('cidade')
+        uf = self.request.GET.get('uf')
+        
+        if nome:
+            queryset = queryset.filter(nome__icontains=nome)
+        if tipo:
+            queryset = queryset.filter(tipo=tipo)
+        if cidade:
+            queryset = queryset.filter(cidade__icontains=cidade)
+        if uf:
+            queryset = queryset.filter(uf__iexact=uf)
+        
+        # Vendas (onde o contato é comprador)
+        vendas_subquery = VendaAnimal.objects.filter(
+            venda__comprador=OuterRef('pk')
+        ).values('venda__comprador').annotate(
+            total=Sum(F('valor_total'), output_field=DecimalField(max_digits=10, decimal_places=2))
+        ).values('total')
 
-class ContatoCreateView(LoginRequiredMixin, CreateView):
-    model = Contato
-    template_name = 'contatos/contato_form.html'
-    fields = ['nome', 'tipo', 'telefone', 'email', 'cidade', 'uf']
-    success_url = reverse_lazy('contatos_list')
+        # Compras (onde o contato é vendedor)
+        compras_subquery = CompraAnimal.objects.filter(
+            compra__vendedor=OuterRef('pk')
+        ).values('compra__vendedor').annotate(
+            total=Sum(F('valor_total'), output_field=DecimalField(max_digits=10, decimal_places=2))
+        ).values('total')
 
-    def form_valid(self, form):
-        form.instance.usuario = self.request.user
-        return super().form_valid(form)
+        # Despesas (onde o contato é fornecedor)
+        despesas_subquery = ItemDespesa.objects.filter(
+            despesa__contato=OuterRef('pk')
+        ).values('despesa__contato').annotate(
+            total=Sum(F('quantidade') * F('valor_unitario'))
+        ).values('total')
 
-class ContatoUpdateView(LoginRequiredMixin, UpdateView):
-    model = Contato
-    template_name = 'contatos/contato_form.html'
-    fields = ['nome', 'tipo', 'telefone', 'email', 'cidade', 'uf']
-    success_url = reverse_lazy('contatos_list')
+        # Adicionar anotações
+        queryset = queryset.annotate(
+            total_vendas=Coalesce(
+                Subquery(vendas_subquery, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
+            ),
+            total_compras=Coalesce(
+                Subquery(compras_subquery, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
+            ),
+            total_despesas=Coalesce(
+                Subquery(despesas_subquery, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
+            )
+        )
+        
+        return queryset
 
-    def get_queryset(self):
-        return Contato.objects.filter(usuario=self.request.user)
-
-class ContatoDeleteView(LoginRequiredMixin, DeleteView):
-    model = Contato
-    template_name = 'contatos/contato_delete.html'
-    success_url = reverse_lazy('contatos_list')
-
-    def get_queryset(self):
-        return Contato.objects.filter(usuario=self.request.user)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Calcular totais para os cards
+        contatos = self.get_queryset()
+        context['total_contatos'] = contatos.count()
+        context['total_vendas'] = contatos.aggregate(
+            total=Sum('total_vendas', output_field=DecimalField(max_digits=10, decimal_places=2))
+        )['total'] or 0
+        context['total_compras'] = contatos.aggregate(
+            total=Sum('total_compras', output_field=DecimalField(max_digits=10, decimal_places=2))
+        )['total'] or 0
+        context['total_despesas'] = contatos.aggregate(
+            total=Sum('total_despesas', output_field=DecimalField(max_digits=10, decimal_places=2))
+        )['total'] or 0
+        
+        return context
 
 class DespesaCreateView(LoginRequiredMixin, CreateView):
     model = Despesa
     template_name = 'financeiro/despesa_form.html'
     success_url = reverse_lazy('despesas_list')
-    fields = ['forma_pagamento', 'numero_nf', 'data_emissao', 'data_vencimento', 'contato', 'arquivo']
+    fields = ['forma_pagamento', 'numero_nf', 'data_emissao', 'data_vencimento', 'contato', 'arquivo', 'conta_bancaria']
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['categorias'] = CategoriaCusto.objects.filter(usuario=self.request.user)
         context['unidades'] = UnidadeMedida.objects.filter(Q(usuario=self.request.user) | Q(usuario__isnull=True))
         context['contatos'] = Contato.objects.filter(usuario=self.request.user, tipo='FO')
+        context['contas_bancarias'] = ContaBancaria.objects.filter(usuario=self.request.user, ativa=True)
         return context
 
     def form_valid(self, form):
@@ -2583,9 +2759,18 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
                         from .views_estoque import criar_entrada_estoque_from_despesa
                         criar_entrada_estoque_from_despesa(self.object, item_despesa, insumo)
 
-                messages.success(self.request, 'Despesa criada com sucesso!')
+                messages.success(self.request, 'Despesa criada e registrada com sucesso!')
                 return redirect(self.success_url)
 
+        except CategoriaCusto.DoesNotExist:
+            messages.error(self.request, 'Erro: Categoria de custo não encontrada.')
+            return self.form_invalid(form)
+        except SubcategoriaCusto.DoesNotExist:
+            messages.error(self.request, 'Erro: Subcategoria de custo não encontrada.')
+            return self.form_invalid(form)
+        except json.JSONDecodeError:
+            messages.error(self.request, 'Erro: Dados dos itens da despesa inválidos.')
+            return self.form_invalid(form)
         except Exception as e:
             messages.error(self.request, f'Erro ao criar despesa: {str(e)}')
             return self.form_invalid(form)
@@ -2663,7 +2848,7 @@ def pasto_detail(request, pk):
     # Busca o último peso de cada animal no pasto
     from django.db.models import Max, F, ExpressionWrapper, DecimalField
     from django.db.models.functions import Coalesce
-    
+
     # Subconsulta para pegar o último peso de cada animal
     ultima_pesagem = Pesagem.objects.filter(
         animal__pasto_atual=pasto,
@@ -2777,13 +2962,14 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
     model = Despesa
     template_name = 'financeiro/despesa_form.html'
     success_url = reverse_lazy('despesas_list')
-    fields = ['forma_pagamento', 'numero_nf', 'data_emissao', 'data_vencimento', 'contato', 'arquivo']
+    fields = ['forma_pagamento', 'numero_nf', 'data_emissao', 'data_vencimento', 'contato', 'arquivo', 'conta_bancaria']
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['categorias'] = CategoriaCusto.objects.filter(usuario=self.request.user)
         context['unidades'] = UnidadeMedida.objects.filter(Q(usuario=self.request.user) | Q(usuario__isnull=True))
         context['contatos'] = Contato.objects.filter(usuario=self.request.user, tipo='FO')
+        context['contas_bancarias'] = ContaBancaria.objects.filter(usuario=self.request.user, ativa=True)
         return context
 
     def form_valid(self, form):
@@ -2844,9 +3030,18 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
                         from .views_estoque import criar_entrada_estoque_from_despesa
                         criar_entrada_estoque_from_despesa(self.object, item_despesa, insumo)
 
-                messages.success(self.request, 'Despesa criada com sucesso!')
+                messages.success(self.request, 'Despesa criada e registrada com sucesso!')
                 return redirect(self.success_url)
 
+        except CategoriaCusto.DoesNotExist:
+            messages.error(self.request, 'Erro: Categoria de custo não encontrada.')
+            return self.form_invalid(form)
+        except SubcategoriaCusto.DoesNotExist:
+            messages.error(self.request, 'Erro: Subcategoria de custo não encontrada.')
+            return self.form_invalid(form)
+        except json.JSONDecodeError:
+            messages.error(self.request, 'Erro: Dados dos itens da despesa inválidos.')
+            return self.form_invalid(form)
         except Exception as e:
             messages.error(self.request, f'Erro ao criar despesa: {str(e)}')
             return self.form_invalid(form)
@@ -2874,6 +3069,8 @@ def fazenda_detail(request, pk):
                 'id': pasto.id,
                 'id_pasto': pasto.id_pasto,
                 'nome': pasto.nome,
+                'fazenda_nome': pasto.fazenda.nome,
+                'fazenda_id': pasto.fazenda.id,
                 'area': float(pasto.area),
                 'capacidade_ua': float(pasto.capacidade_ua),
                 'coordenadas': pasto.coordenadas,
@@ -3092,3 +3289,223 @@ def get_destinos(request):
         data = []
     
     return JsonResponse(data, safe=False)
+
+class DecimalJSONEncoder(DjangoJSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
+
+class ContatoCreateView(LoginRequiredMixin, CreateView):
+    model = Contato
+    template_name = 'contatos/contato_form.html'
+    fields = ['nome', 'tipo', 'telefone', 'email', 'cidade', 'uf']
+    success_url = reverse_lazy('contatos_list')
+
+    def form_valid(self, form):
+        form.instance.usuario = self.request.user
+        return super().form_valid(form)
+
+class ContatoUpdateView(LoginRequiredMixin, UpdateView):
+    model = Contato
+    template_name = 'contatos/contato_form.html'
+    fields = ['nome', 'tipo', 'telefone', 'email', 'cidade', 'uf']
+    success_url = reverse_lazy('contatos_list')
+
+    def get_queryset(self):
+        return Contato.objects.filter(usuario=self.request.user)
+
+class ContatoDeleteView(LoginRequiredMixin, DeleteView):
+    model = Contato
+    template_name = 'contatos/contato_delete.html'
+    success_url = reverse_lazy('contatos_list')
+
+    def get_queryset(self):
+        return Contato.objects.filter(usuario=self.request.user)
+
+class ExtratoBancarioListView(LoginRequiredMixin, ListView):
+    model = ExtratoBancario
+    template_name = 'financeiro/extrato_bancario_list.html'
+    context_object_name = 'movimentacoes'
+
+    def get_queryset(self):
+        from decimal import Decimal
+        from datetime import datetime
+        
+        queryset = []
+        conta_id = self.request.GET.get('conta')
+        data_inicio = self.request.GET.get('data_inicio')
+        data_fim = self.request.GET.get('data_fim')
+
+        if conta_id:
+            conta = ContaBancaria.objects.get(id=conta_id, usuario=self.request.user)
+            
+            # Calcula o saldo inicial
+            if data_inicio:
+                data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+                saldo = conta.calcular_saldo_em_data(data_inicio)
+            else:
+                saldo = conta.saldo
+
+            # Busca despesas pagas
+            despesas = Despesa.objects.filter(
+                usuario=self.request.user,
+                conta_bancaria_id=conta_id,
+                status='PAGO',
+                data_pagamento__isnull=False
+            ).select_related('conta_bancaria', 'contato')
+            
+            if data_inicio:
+                despesas = despesas.filter(data_pagamento__gte=data_inicio)
+            if data_fim:
+                despesas = despesas.filter(data_pagamento__lte=data_fim)
+
+            for despesa in despesas:
+                queryset.append({
+                    'data': despesa.data_pagamento,
+                    'tipo': 'SAIDA',
+                    'get_tipo_display': 'SAÍDA',
+                    'descricao': f"Despesa - {despesa.contato.nome}",
+                    'valor': -despesa.valor_final(),
+                    'conta': despesa.conta_bancaria
+                })
+
+            # Busca vendas pagas
+            vendas = Venda.objects.filter(
+                usuario=self.request.user,
+                conta_bancaria_id=conta_id,
+                status='PAGO',
+                data_pagamento__isnull=False
+            ).select_related('conta_bancaria', 'comprador')
+            
+            if data_inicio:
+                vendas = vendas.filter(data_pagamento__gte=data_inicio)
+            if data_fim:
+                vendas = vendas.filter(data_pagamento__lte=data_fim)
+
+            for venda in vendas:
+                queryset.append({
+                    'data': venda.data_pagamento,
+                    'tipo': 'ENTRADA',
+                    'get_tipo_display': 'ENTRADA',
+                    'descricao': f"Venda - {venda.comprador.nome}",
+                    'valor': venda.valor_total,
+                    'conta': venda.conta_bancaria
+                })
+
+            # Busca compras pagas
+            compras = Compra.objects.filter(
+                usuario=self.request.user,
+                conta_bancaria_id=conta_id,
+                status='PAGO',
+                data_pagamento__isnull=False
+            ).select_related('conta_bancaria', 'vendedor')
+            
+            if data_inicio:
+                compras = compras.filter(data_pagamento__gte=data_inicio)
+            if data_fim:
+                compras = compras.filter(data_pagamento__lte=data_fim)
+
+            for compra in compras:
+                queryset.append({
+                    'data': compra.data_pagamento,
+                    'tipo': 'SAIDA',
+                    'get_tipo_display': 'SAÍDA',
+                    'descricao': f"Compra - {compra.vendedor.nome}",
+                    'valor': -compra.valor_total,
+                    'conta': compra.conta_bancaria
+                })
+
+            # Busca abates com pagamentos
+            abates = Abate.objects.filter(
+                usuario=self.request.user,
+                conta_bancaria_id=conta_id,
+                status='PAGO',
+                data_pagamento__isnull=False
+            ).select_related('conta_bancaria', 'comprador')
+            
+            if data_inicio:
+                abates = abates.filter(data_pagamento__gte=data_inicio)
+            if data_fim:
+                abates = abates.filter(data_pagamento__lte=data_fim)
+
+            for abate in abates:
+                queryset.append({
+                    'data': abate.data_pagamento,
+                    'tipo': 'ENTRADA',
+                    'get_tipo_display': 'ENTRADA',
+                    'descricao': f"Abate - {abate.comprador.nome}",
+                    'valor': abate.valor_total,
+                    'conta': abate.conta_bancaria
+                })
+
+            # Busca movimentações não operacionais
+            nao_operacionais = MovimentacaoNaoOperacional.objects.filter(
+                usuario=self.request.user,
+                conta_bancaria_id=conta_id,
+                status='PAGO',
+                data_pagamento__isnull=False
+            ).select_related('conta_bancaria')
+            
+            if data_inicio:
+                nao_operacionais = nao_operacionais.filter(data_pagamento__gte=data_inicio)
+            if data_fim:
+                nao_operacionais = nao_operacionais.filter(data_pagamento__lte=data_fim)
+
+            for mov in nao_operacionais:
+                valor = mov.valor if mov.tipo == 'entrada' else -mov.valor
+                queryset.append({
+                    'data': mov.data_pagamento,
+                    'tipo': mov.tipo.upper(),
+                    'get_tipo_display': 'ENTRADA' if mov.tipo == 'entrada' else 'SAÍDA',
+                    'descricao': f"Não Operacional - {mov.observacoes}",
+                    'valor': valor,
+                    'conta': mov.conta_bancaria
+                })
+
+            # Ordena por data
+            queryset.sort(key=lambda x: x['data'])
+
+            # Calcular saldos
+            conta_selecionada = ContaBancaria.objects.filter(usuario=self.request.user).get(id=conta_id) if conta_id else None
+            saldo = conta_selecionada.saldo if conta_selecionada else Decimal('0.00')
+            
+            for mov in queryset:
+                saldo_anterior = saldo
+                saldo += Decimal(str(mov['valor']))
+                mov['saldo_anterior'] = saldo_anterior
+                mov['saldo_atual'] = saldo
+
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Adiciona lista de contas para o dropdown (apenas contas ativas do usuário)
+        context['contas'] = ContaBancaria.objects.filter(usuario=self.request.user, ativa=True)
+        
+        # Adiciona conta selecionada
+        conta_id = self.request.GET.get('conta')
+        if conta_id:
+            context['conta_selecionada'] = ContaBancaria.objects.filter(usuario=self.request.user).get(id=conta_id)
+        
+        # Adiciona datas do filtro
+        context['data_inicio'] = self.request.GET.get('data_inicio', '')
+        context['data_fim'] = self.request.GET.get('data_fim', '')
+        
+        # Calcular totais
+        movimentacoes = context['object_list']
+        context['total_entradas'] = sum((Decimal(str(m['valor'])) for m in movimentacoes if m['valor'] > 0), Decimal('0.00'))
+        context['total_saidas'] = abs(sum((Decimal(str(m['valor'])) for m in movimentacoes if m['valor'] < 0), Decimal('0.00')))
+        
+        # Calcular saldo no período
+        if movimentacoes:
+            context['saldo_inicial'] = movimentacoes[0]['saldo_anterior']
+            context['saldo_final_periodo'] = movimentacoes[-1]['saldo_atual']
+            context['saldo_periodo'] = context['saldo_final_periodo'] - context['saldo_inicial']
+        else:
+            context['saldo_inicial'] = context['conta_selecionada'].saldo if context.get('conta_selecionada') else Decimal('0.00')
+            context['saldo_final_periodo'] = context['saldo_inicial']
+            context['saldo_periodo'] = Decimal('0.00')
+        
+        return context

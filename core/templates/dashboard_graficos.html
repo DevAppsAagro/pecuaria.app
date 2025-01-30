@@ -1,0 +1,266 @@
+<!-- Gráficos -->
+<div class="container-fluid mt-4">
+    <!-- Primeira linha - Evolução de Peso e GMD -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Evolução do Peso</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="grafico-peso" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Evolução do GMD</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="grafico-gmd" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Segunda linha - Reprodução e Mortalidade -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Taxa de Prenhez por Estação</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="grafico-prenhez" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Indicadores de Perdas</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="grafico-perdas" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Terceira linha - Financeiro -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Custos Operacionais</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="grafico-custos-operacionais" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Distribuição de Custos</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="grafico-distribuicao-custos" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quarta linha - Confinamento -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Desempenho Confinamento</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="grafico-confinamento" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Evolução do ROI</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="grafico-roi" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Gráfico de Evolução do Peso
+const configPeso = {
+    type: 'line',
+    data: {
+        labels: {{ dados_graficos.evolucao_peso.labels|safe }},
+        datasets: [{
+            label: 'Peso (kg)',
+            data: {{ dados_graficos.evolucao_peso.data|safe }},
+            borderColor: '#007bff',
+            backgroundColor: '#007bff20',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false
+    }
+};
+
+// Gráfico de GMD
+const configGMD = {
+    type: 'line',
+    data: {
+        labels: {{ dados_graficos.evolucao_gmd.labels|safe }},
+        datasets: [{
+            label: 'GMD (kg/dia)',
+            data: {{ dados_graficos.evolucao_gmd.data|safe }},
+            borderColor: '#28a745',
+            backgroundColor: '#28a74520',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false
+    }
+};
+
+// Gráfico de Taxa de Prenhez
+const configPrenhez = {
+    type: 'bar',
+    data: {
+        labels: {{ dados_graficos.taxa_prenhez.labels|safe }},
+        datasets: [{
+            label: 'Taxa (%)',
+            data: {{ dados_graficos.taxa_prenhez.data|safe }},
+            backgroundColor: '#6f42c1'
+        }, {
+            label: 'Meta',
+            type: 'line',
+            data: Array(5).fill({{ dados_graficos.taxa_prenhez.meta }}),
+            borderColor: '#dc3545',
+            borderDash: [5, 5],
+            fill: false
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false
+    }
+};
+
+// Gráfico de Perdas
+const configPerdas = {
+    type: 'bar',
+    data: {
+        labels: {{ dados_graficos.perdas_reproducao.labels|safe }},
+        datasets: [{
+            label: 'Taxa (%)',
+            data: {{ dados_graficos.perdas_reproducao.data|safe }},
+            backgroundColor: '#dc3545'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false
+    }
+};
+
+// Gráfico de Custos Operacionais
+const configCustosOperacionais = {
+    type: 'line',
+    data: {
+        labels: {{ dados_graficos.custos_operacionais.labels|safe }},
+        datasets: [{
+            label: 'Receitas',
+            data: {{ dados_graficos.custos_operacionais.receitas|safe }},
+            borderColor: '#28a745',
+            backgroundColor: '#28a74520'
+        }, {
+            label: 'Despesas',
+            data: {{ dados_graficos.custos_operacionais.despesas|safe }},
+            borderColor: '#dc3545',
+            backgroundColor: '#dc354520'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false
+    }
+};
+
+// Gráfico de Distribuição de Custos
+const configDistribuicaoCustos = {
+    type: 'pie',
+    data: {
+        labels: {{ dados_graficos.distribuicao_custos.labels|safe }},
+        datasets: [{
+            data: {{ dados_graficos.distribuicao_custos.data|safe }},
+            backgroundColor: ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6c757d']
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false
+    }
+};
+
+// Gráfico de Desempenho Confinamento
+const configConfinamento = {
+    type: 'bar',
+    data: {
+        labels: {{ dados_graficos.desempenho_confinamento.labels|safe }},
+        datasets: [{
+            label: 'Peso (kg)',
+            data: {{ dados_graficos.desempenho_confinamento.data|safe }},
+            backgroundColor: '#17a2b8'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false
+    }
+};
+
+// Gráfico de ROI
+const configROI = {
+    type: 'line',
+    data: {
+        labels: {{ dados_graficos.evolucao_roi.labels|safe }},
+        datasets: [{
+            label: 'ROI (%)',
+            data: {{ dados_graficos.evolucao_roi.data|safe }},
+            borderColor: '#fd7e14',
+            backgroundColor: '#fd7e1420',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false
+    }
+};
+
+// Inicialização dos gráficos
+window.addEventListener('load', function() {
+    new Chart(document.getElementById('grafico-peso'), configPeso);
+    new Chart(document.getElementById('grafico-gmd'), configGMD);
+    new Chart(document.getElementById('grafico-prenhez'), configPrenhez);
+    new Chart(document.getElementById('grafico-perdas'), configPerdas);
+    new Chart(document.getElementById('grafico-custos-operacionais'), configCustosOperacionais);
+    new Chart(document.getElementById('grafico-distribuicao-custos'), configDistribuicaoCustos);
+    new Chart(document.getElementById('grafico-confinamento'), configConfinamento);
+    new Chart(document.getElementById('grafico-roi'), configROI);
+});
+</script>

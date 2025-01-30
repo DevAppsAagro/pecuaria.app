@@ -1,0 +1,232 @@
+{% extends 'impressao/base_print.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h2>Relatório de Compras</h2>
+            <p class="text-muted">
+                Gerado em {{ data_impressao|date:"d/m/Y H:i" }} por {{ usuario.get_full_name|default:usuario.username }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Totais -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Totais por Status</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 col-sm-6">
+                            <div class="info-box bg-success">
+                                <span class="info-box-icon"><i class="fas fa-check-circle"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Total Pago</span>
+                                    <span class="info-box-number">{{ totais_status.PAGO.valor_formatado }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="info-box bg-warning">
+                                <span class="info-box-icon"><i class="fas fa-clock"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Pendente</span>
+                                    <span class="info-box-number">{{ totais_status.PENDENTE.valor_formatado }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="info-box bg-info">
+                                <span class="info-box-icon"><i class="fas fa-calendar-check"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Vence Hoje</span>
+                                    <span class="info-box-number">{{ totais_status.VENCE_HOJE.valor_formatado }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="info-box bg-danger">
+                                <span class="info-box-icon"><i class="fas fa-exclamation-circle"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Vencido</span>
+                                    <span class="info-box-number">{{ totais_status.VENCIDO.valor_formatado }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros Aplicados -->
+    {% if filtros.contato or filtros.fazenda or filtros.status or filtros.data_inicio or filtros.data_fim %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Filtros Aplicados</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        {% if filtros.contato %}
+                            <li><strong>Fornecedor:</strong> {{ filtros.contato }}</li>
+                        {% endif %}
+                        {% if filtros.fazenda %}
+                            <li><strong>Fazenda:</strong> {{ filtros.fazenda }}</li>
+                        {% endif %}
+                        {% if filtros.status %}
+                            <li><strong>Status:</strong> {{ filtros.status }}</li>
+                        {% endif %}
+                        {% if filtros.data_inicio %}
+                            <li><strong>Data Inicial:</strong> {{ filtros.data_inicio|date:"d/m/Y" }}</li>
+                        {% endif %}
+                        {% if filtros.data_fim %}
+                            <li><strong>Data Final:</strong> {{ filtros.data_fim|date:"d/m/Y" }}</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Lista de Compras -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Lista de Compras</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Vencimento</th>
+                                    <th>Nota Fiscal</th>
+                                    <th>Fornecedor</th>
+                                    <th>Valor Total</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for compra in compras %}
+                                <tr>
+                                    <td>{{ compra.data|date:"d/m/Y" }}</td>
+                                    <td>{{ compra.data_vencimento|date:"d/m/Y" }}</td>
+                                    <td>{{ compra.numero_nf }}</td>
+                                    <td>{{ compra.vendedor.nome }}</td>
+                                    <td>R$ {{ compra.valor_total|floatformat:2 }}</td>
+                                    <td>
+                                        {% if compra.status == 'PAGO' %}
+                                            <span class="badge bg-success">Pago</span>
+                                        {% elif compra.status == 'PENDENTE' %}
+                                            <span class="badge bg-warning">Pendente</span>
+                                        {% elif compra.status == 'VENCIDO' %}
+                                            <span class="badge bg-danger">Atrasado</span>
+                                        {% elif compra.status == 'VENCE_HOJE' %}
+                                            <span class="badge bg-info">Vence Hoje</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        .badge {
+            border: none !important;
+            padding: 0.25em 0.4em !important;
+        }
+        
+        .badge.bg-success {
+            background-color: #28a745 !important;
+            color: #fff !important;
+        }
+        
+        .badge.bg-warning {
+            background-color: #ffc107 !important;
+            color: #000 !important;
+        }
+        
+        .badge.bg-danger {
+            background-color: #dc3545 !important;
+            color: #fff !important;
+        }
+        
+        .badge.bg-info {
+            background-color: #17a2b8 !important;
+            color: #fff !important;
+        }
+        
+        .info-box {
+            border: 1px solid #ddd !important;
+            margin-bottom: 1rem !important;
+        }
+        
+        .info-box.bg-success {
+            background-color: #28a745 !important;
+            color: #fff !important;
+        }
+        
+        .info-box.bg-warning {
+            background-color: #ffc107 !important;
+            color: #000 !important;
+        }
+        
+        .info-box.bg-danger {
+            background-color: #dc3545 !important;
+            color: #fff !important;
+        }
+        
+        .info-box.bg-info {
+            background-color: #17a2b8 !important;
+            color: #fff !important;
+        }
+        
+        .info-box-icon {
+            background: rgba(0,0,0,.1) !important;
+        }
+        
+        .card {
+            border: 1px solid #ddd !important;
+            margin-bottom: 1rem !important;
+        }
+        
+        .table {
+            width: 100% !important;
+            margin-bottom: 1rem !important;
+            color: #212529 !important;
+            border-collapse: collapse !important;
+        }
+        
+        .table th,
+        .table td {
+            padding: 0.75rem !important;
+            border: 1px solid #dee2e6 !important;
+        }
+        
+        .table thead th {
+            border-bottom: 2px solid #dee2e6 !important;
+        }
+        
+        .table-striped tbody tr:nth-of-type(odd) {
+            background-color: rgba(0,0,0,.05) !important;
+        }
+    }
+</style>
+{% endblock %}

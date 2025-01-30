@@ -4,6 +4,7 @@ from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from decimal import Decimal
+from django.db.models import Sum
 
 class Fazenda(models.Model):
     ESTADOS_CHOICES = [
@@ -467,6 +468,78 @@ class ContaBancaria(models.Model):
         self.saldo = novo_saldo
         self.data_saldo = data or timezone.now().date()
         self.save()
+        
+        # Cria uma movimentação não operacional para ajuste de saldo
+        ExtratoBancario.objects.create(
+            conta=self,
+            data=self.data_saldo,
+            tipo='nao_operacional',
+            descricao='Ajuste de Saldo',
+            valor=novo_saldo - self.saldo if novo_saldo > self.saldo else -(self.saldo - novo_saldo),
+            saldo_anterior=self.saldo,
+            saldo_atual=novo_saldo,
+            referencia_id=0,
+            usuario=self.usuario
+        )
+
+    def calcular_saldo_em_data(self, data):
+        from decimal import Decimal
+        
+        # Pega todas as movimentações até a data
+        movimentacoes = ExtratoBancario.objects.filter(
+            conta=self,
+            data__lte=data
+        ).values('valor')
+        
+        # Soma todas as movimentações
+        total_movimentacoes = sum([mov['valor'] for mov in movimentacoes], Decimal('0.00'))
+        
+        return total_movimentacoes
+
+class ExtratoBancario(models.Model):
+    TIPO_CHOICES = [
+        ('despesa', 'Despesa'),
+        ('venda', 'Venda'),
+        ('abate', 'Abate'),
+        ('nao_operacional', 'Não Operacional'),
+    ]
+    
+    conta = models.ForeignKey(ContaBancaria, on_delete=models.CASCADE, related_name='movimentacoes')
+    data = models.DateField('Data da Movimentação')
+    tipo = models.CharField('Tipo', max_length=20, choices=TIPO_CHOICES)
+    descricao = models.CharField('Descrição', max_length=200)
+    valor = models.DecimalField('Valor', max_digits=15, decimal_places=2)
+    saldo_anterior = models.DecimalField('Saldo Anterior', max_digits=15, decimal_places=2)
+    saldo_atual = models.DecimalField('Saldo Atual', max_digits=15, decimal_places=2)
+    referencia_id = models.IntegerField('ID de Referência')  # ID da despesa, venda, etc
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Extrato Bancário'
+        verbose_name_plural = 'Extratos Bancários'
+        ordering = ['-data', '-created_at']
+    
+    def __str__(self):
+        return f"{self.conta} - {self.tipo} - {self.valor} em {self.data}"
+
+    def save(self, *args, **kwargs):
+        # Se for uma nova movimentação
+        if not self.id:
+            self.saldo_anterior = self.conta.saldo
+            
+            # Calcula o novo saldo baseado no tipo de movimentação
+            if self.tipo in ['venda', 'abate', 'nao_operacional'] and self.valor > 0:
+                self.saldo_atual = self.saldo_anterior + self.valor
+            else:
+                self.saldo_atual = self.saldo_anterior - abs(self.valor)
+            
+            # Atualiza o saldo da conta
+            self.conta.saldo = self.saldo_atual
+            self.conta.data_saldo = self.data
+            self.conta.save()
+        
+        super().save(*args, **kwargs)
 
 class Pesagem(models.Model):
     animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name='pesagens')
@@ -540,7 +613,7 @@ class Despesa(models.Model):
         ('AV', 'À Vista'),
         ('PR', 'Parcelado'),
     ]
-
+    
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     numero_nf = models.CharField('Número NF', max_length=50, blank=True, null=True)
     data_emissao = models.DateField('Data de Emissão')
@@ -553,50 +626,58 @@ class Despesa(models.Model):
     desconto = models.DecimalField('Desconto', max_digits=10, decimal_places=2, default=0)
     observacao = models.TextField('Observação', blank=True, null=True)
     arquivo = models.FileField('Arquivo', upload_to='despesas/', blank=True, null=True)
-
+    conta_bancaria = models.ForeignKey('ContaBancaria', on_delete=models.PROTECT, verbose_name='Conta Bancária', null=True, blank=True)
+    
     class Meta:
         verbose_name = 'Despesa'
         verbose_name_plural = 'Despesas'
         ordering = ['-data_emissao']
-
+    
     def __str__(self):
-        return f"Despesa {self.numero_nf or 'S/N'} - {self.contato.nome}"
-
-    @property
+        return f"{self.contato.nome} - {self.data_emissao}"
+    
     def valor_total(self):
-        return sum(item.valor_total for item in self.itens.all())
-
-    @property
+        from decimal import Decimal
+        return self.itens.aggregate(total=Sum('valor_total'))['total'] or Decimal('0.00')
+    
     def valor_final(self):
-        return self.valor_total + self.multa_juros - self.desconto
-
-    @property
+        return self.valor_total() + self.multa_juros - self.desconto
+    
     def info_parcelas(self):
         if self.forma_pagamento == 'PR':
-            parcelas = ParcelaDespesa.objects.filter(despesa=self)
-            total_parcelas = parcelas.count()
-            parcelas_pagas = parcelas.filter(status='PAGO').count()
-            proxima_parcela = parcelas.filter(status='PENDENTE').order_by('data_vencimento').first()
-            
-            return {
-                'total': total_parcelas,
-                'pagas': parcelas_pagas,
-                'proxima_data': proxima_parcela.data_vencimento if proxima_parcela else None
-            }
+            return self.parcelas.all()
         return None
-
+    
     def save(self, *args, **kwargs):
+        is_new = not self.id
+        old_status = None if is_new else Despesa.objects.get(id=self.id).status
+        
         hoje = timezone.now().date()
         
-        if not self.data_pagamento and self.data_vencimento:  # Verifica se data_vencimento não é None
+        if not self.data_pagamento and self.data_vencimento:
             if self.data_vencimento < hoje:
                 self.status = 'VENCIDO'
             elif self.data_vencimento == hoje:
                 self.status = 'VENCE_HOJE'
-            elif self.status in ['VENCIDO', 'VENCE_HOJE']:  # Se a data foi alterada
+            elif self.status in ['VENCIDO', 'VENCE_HOJE']:
                 self.status = 'PENDENTE'
         
         super().save(*args, **kwargs)
+        
+        # Se a despesa foi paga e tem conta bancária associada
+        if self.status == 'PAGO' and self.conta_bancaria and (is_new or old_status != 'PAGO'):
+            valor_total = self.valor_final()
+            
+            # Cria registro no extrato bancário
+            ExtratoBancario.objects.create(
+                conta=self.conta_bancaria,
+                data=self.data_pagamento,
+                tipo='despesa',
+                descricao=f"Despesa - {self.contato.nome}",
+                valor=-valor_total,  # Valor negativo para despesa
+                referencia_id=self.id,
+                usuario=self.usuario
+            )
 
 class ItemDespesa(models.Model):
     despesa = models.ForeignKey(Despesa, on_delete=models.CASCADE, related_name='itens')
@@ -744,6 +825,12 @@ class MovimentacaoNaoOperacional(models.Model):
         ('saida', 'Saída'),
     ]
     
+    STATUS_CHOICES = [
+        ('PENDENTE', 'Pendente'),
+        ('PAGO', 'Pago'),
+        ('CANCELADO', 'Cancelado'),
+    ]
+    
     data = models.DateField('Data')
     data_vencimento = models.DateField('Data de Vencimento')
     data_pagamento = models.DateField('Data de Pagamento/Recebimento', null=True, blank=True)
@@ -752,6 +839,7 @@ class MovimentacaoNaoOperacional(models.Model):
     fazenda = models.ForeignKey('Fazenda', on_delete=models.PROTECT)
     observacoes = models.TextField('Observações', blank=True)
     valor = models.DecimalField('Valor', max_digits=10, decimal_places=2)
+    status = models.CharField('Status', max_length=10, choices=STATUS_CHOICES, default='PENDENTE')
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     data_cadastro = models.DateTimeField('Data de Cadastro', auto_now_add=True)
     data_atualizacao = models.DateTimeField('Data de Atualização', auto_now=True)
@@ -762,4 +850,27 @@ class MovimentacaoNaoOperacional(models.Model):
         ordering = ['-data', '-data_cadastro']
 
     def __str__(self):
-        return f"{self.get_tipo_display()} - {self.data} - R$ {self.valor}"
+        return f"{self.get_tipo_display()} - {self.valor} - {self.data}"
+
+    def save(self, *args, **kwargs):
+        # Se tiver data de pagamento, marca como PAGO
+        if self.data_pagamento:
+            self.status = 'PAGO'
+        # Se não tiver data de pagamento e o status for PAGO, volta para PENDENTE
+        elif self.status == 'PAGO':
+            self.status = 'PENDENTE'
+            
+        super().save(*args, **kwargs)
+        
+        # Se a movimentação foi paga e o status mudou para PAGO
+        if self.status == 'PAGO':
+            # Cria registro no extrato bancário
+            ExtratoBancario.objects.create(
+                conta=self.conta_bancaria,
+                data=self.data_pagamento,
+                tipo='nao_operacional',
+                descricao=f"Movimentação Não Operacional - {self.get_tipo_display()}",
+                valor=self.valor if self.tipo == 'entrada' else -self.valor,
+                referencia_id=self.id,
+                usuario=self.usuario
+            )

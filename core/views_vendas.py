@@ -14,27 +14,66 @@ from .models_vendas import Venda, VendaAnimal
 from .models_parcelas_venda import ParcelaVenda
 from .forms_vendas import VendaForm
 from .models_pagamentos_venda import PagamentoVenda
+from django.utils import timezone
 
 @login_required
 def lista_vendas(request):
     search_query = request.GET.get('search', '')
     vendas = Venda.objects.filter(usuario=request.user)
-    
+
     if search_query:
         vendas = vendas.filter(
-            Q(animais__animal__brinco_visual__icontains=search_query) |
-            Q(comprador__nome__icontains=search_query)
+            Q(comprador__nome__icontains=search_query) |
+            Q(animais__animal__brinco_visual__icontains=search_query)
         ).distinct()
-    
-    paginator = Paginator(vendas, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    context = {
-        'page_obj': page_obj,
-        'search_query': search_query
+
+    # Filtros
+    status = request.GET.get('status')
+    data_inicial = request.GET.get('data_inicial')
+    data_final = request.GET.get('data_final')
+
+    if status:
+        vendas = vendas.filter(status=status)
+    if data_inicial:
+        vendas = vendas.filter(data__gte=data_inicial)
+    if data_final:
+        vendas = vendas.filter(data__lte=data_final)
+
+    # Totais por status
+    totais_status = {
+        'PAGO': {'valor': 0, 'valor_formatado': 'R$ 0,00'},
+        'PENDENTE': {'valor': 0, 'valor_formatado': 'R$ 0,00'},
+        'VENCE_HOJE': {'valor': 0, 'valor_formatado': 'R$ 0,00'},
+        'VENCIDO': {'valor': 0, 'valor_formatado': 'R$ 0,00'}
     }
-    
+
+    hoje = timezone.now().date()
+
+    for venda in vendas:
+        valor_total = sum(animal.valor_total for animal in venda.animais.all())
+        if venda.status == 'PAGO':
+            totais_status['PAGO']['valor'] += valor_total
+        elif venda.status == 'PENDENTE':
+            if venda.data_vencimento == hoje:
+                totais_status['VENCE_HOJE']['valor'] += valor_total
+            elif venda.data_vencimento < hoje:
+                totais_status['VENCIDO']['valor'] += valor_total
+            else:
+                totais_status['PENDENTE']['valor'] += valor_total
+
+    # Formata os valores
+    for status in totais_status:
+        totais_status[status]['valor_formatado'] = f"R$ {totais_status[status]['valor']:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
+
+    context = {
+        'vendas': vendas,
+        'search_query': search_query,
+        'totais_status': totais_status,
+        'status_filter': status,
+        'data_inicial': data_inicial,
+        'data_final': data_final
+    }
+
     return render(request, 'core/vendas/lista.html', context)
 
 def criar_parcelas_venda(venda, valor_total):

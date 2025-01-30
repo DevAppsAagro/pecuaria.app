@@ -1,0 +1,201 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title|default:"Impressão" }}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <style>
+        @media print {
+            body {
+                padding: 20px;
+                font-size: 14px;
+            }
+            
+            .container-fluid {
+                width: 100%;
+                padding-right: 15px;
+                padding-left: 15px;
+                margin-right: auto;
+                margin-left: auto;
+            }
+            
+            .table {
+                width: 100%;
+                margin-bottom: 1rem;
+                color: #212529;
+                border-collapse: collapse;
+            }
+            
+            .table th,
+            .table td {
+                padding: 0.75rem;
+                vertical-align: top;
+                border-top: 1px solid #dee2e6;
+            }
+            
+            .table thead th {
+                vertical-align: bottom;
+                border-bottom: 2px solid #dee2e6;
+            }
+            
+            .table tbody + tbody {
+                border-top: 2px solid #dee2e6;
+            }
+            
+            .table-bordered {
+                border: 1px solid #dee2e6;
+            }
+            
+            .table-bordered th,
+            .table-bordered td {
+                border: 1px solid #dee2e6;
+            }
+            
+            .table-bordered thead th,
+            .table-bordered thead td {
+                border-bottom-width: 2px;
+            }
+            
+            .table-striped tbody tr:nth-of-type(odd) {
+                background-color: rgba(0, 0, 0, 0.05);
+            }
+            
+            .text-center {
+                text-align: center !important;
+            }
+            
+            .text-right {
+                text-align: right !important;
+            }
+            
+            .text-muted {
+                color: #6c757d !important;
+            }
+            
+            .mb-4 {
+                margin-bottom: 1.5rem !important;
+            }
+            
+            .mt-4 {
+                margin-top: 1.5rem !important;
+            }
+            
+            .card {
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                min-width: 0;
+                word-wrap: break-word;
+                background-color: #fff;
+                background-clip: border-box;
+                border: 1px solid rgba(0,0,0,.125);
+                border-radius: .25rem;
+                margin-bottom: 1rem;
+            }
+            
+            .card-header {
+                padding: .75rem 1.25rem;
+                margin-bottom: 0;
+                background-color: rgba(0,0,0,.03);
+                border-bottom: 1px solid rgba(0,0,0,.125);
+            }
+            
+            .card-body {
+                flex: 1 1 auto;
+                min-height: 1px;
+                padding: 1.25rem;
+            }
+            
+            .info-box {
+                min-height: 80px;
+                margin-bottom: 1rem;
+                padding: .5rem;
+                border: 1px solid rgba(0,0,0,.125);
+                border-radius: .25rem;
+            }
+            
+            .info-box-icon {
+                float: left;
+                width: 70px;
+                text-align: center;
+                font-size: 2rem;
+                line-height: 70px;
+                background: rgba(0,0,0,.1);
+                border-radius: .25rem;
+            }
+            
+            .info-box-content {
+                margin-left: 80px;
+                padding: .5rem 0;
+            }
+            
+            .info-box-text {
+                display: block;
+                font-size: 1rem;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            .info-box-number {
+                display: block;
+                font-weight: bold;
+                font-size: 1.25rem;
+            }
+            
+            .badge {
+                display: inline-block;
+                padding: .25em .4em;
+                font-size: 75%;
+                font-weight: 700;
+                line-height: 1;
+                text-align: center;
+                white-space: nowrap;
+                vertical-align: baseline;
+                border-radius: .25rem;
+            }
+            
+            .bg-success {
+                background-color: #28a745 !important;
+                color: #fff;
+            }
+            
+            .bg-warning {
+                background-color: #ffc107 !important;
+                color: #000;
+            }
+            
+            .bg-danger {
+                background-color: #dc3545 !important;
+                color: #fff;
+            }
+            
+            .bg-info {
+                background-color: #17a2b8 !important;
+                color: #fff;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% block content %}{% endblock %}
+    
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+    
+    <script>
+        window.onload = function() {
+            window.print();
+        }
+    </script>
+</body>
+</html>

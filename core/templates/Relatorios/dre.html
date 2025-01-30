@@ -1,0 +1,368 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Demonstração do Resultado do Exercício (DRE)</h4>
+            <div>
+                <button class="btn btn-light" onclick="exportarPDF()">
+                    <i class="bi bi-file-pdf"></i> Exportar PDF
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Filtros -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <label class="form-label">Período</label>
+                    <select class="form-select" id="periodo">
+                        <option value="mensal">Mensal</option>
+                        <option value="trimestral">Trimestral</option>
+                        <option value="anual">Anual</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Fazenda</label>
+                    <select class="form-select" id="fazenda">
+                        <option value="">Todas as Fazendas</option>
+                        {% for fazenda in fazendas %}
+                            <option value="{{ fazenda.id }}">{{ fazenda.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Data Inicial</label>
+                    <input type="date" class="form-control" id="data_inicial">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Data Final</label>
+                    <input type="date" class="form-control" id="data_final">
+                </div>
+            </div>
+
+            <!-- Relatório DRE -->
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Descrição</th>
+                            <th class="text-end">Valor (R$)</th>
+                            <th class="text-end">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Receitas -->
+                        <tr class="table-primary">
+                            <td colspan="3"><strong>1. RECEITAS</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Receitas de Vendas de Animais</td>
+                            <td class="text-end">{{ receitas_vendas|default:"0.00" }}</td>
+                            <td class="text-end">{{ percentual_vendas|default:"0.00" }}%</td>
+                        </tr>
+                        <tr>
+                            <td>Receitas de Abates</td>
+                            <td class="text-end">{{ receitas_abate|default:"0.00" }}</td>
+                            <td class="text-end">{{ percentual_abate|default:"0.00" }}%</td>
+                        </tr>
+
+                        <!-- Custos e Despesas -->
+                        <tr class="table-danger">
+                            <td colspan="3"><strong>2. CUSTOS E DESPESAS</strong></td>
+                        </tr>
+                        
+                        <!-- Custos Fixos -->
+                        <tr class="table-warning">
+                            <td colspan="3"><strong>2.1 CUSTOS FIXOS</strong></td>
+                        </tr>
+                        <tbody id="custos_fixos_container">
+                        {% for categoria in custos_fixos %}
+                        <tr>
+                            <td style="padding-left: 20px;"><strong>{{ categoria.nome }}</strong></td>
+                            <td class="text-end">{{ categoria.valor|default:"0.00" }}</td>
+                            <td class="text-end">{{ categoria.percentual|default:"0.00" }}%</td>
+                        </tr>
+                            {% for subcategoria in categoria.subcategorias %}
+                            <tr>
+                                <td style="padding-left: 40px;">{{ subcategoria.nome }}</td>
+                                <td class="text-end">{{ subcategoria.valor|default:"0.00" }}</td>
+                                <td class="text-end">{{ subcategoria.percentual|default:"0.00" }}%</td>
+                            </tr>
+                            {% endfor %}
+                        {% endfor %}
+                        </tbody>
+                        <tr class="table-warning">
+                            <td><strong>Total Custos Fixos</strong></td>
+                            <td class="text-end" id="custos_fixos_total"><strong>{{ total_custos_fixos|default:"0.00" }}</strong></td>
+                            <td class="text-end" id="custos_fixos_percentual"><strong>{{ percentual_custos_fixos|default:"0.00" }}%</strong></td>
+                        </tr>
+
+                        <!-- Custos Variáveis -->
+                        <tr class="table-info">
+                            <td colspan="3"><strong>2.2 CUSTOS VARIÁVEIS</strong></td>
+                        </tr>
+                        {% for categoria in custos_variaveis %}
+                        <tr>
+                            <td style="padding-left: 20px;"><strong>{{ categoria.nome }}</strong></td>
+                            <td class="text-end">{{ categoria.valor|default:"0.00" }}</td>
+                            <td class="text-end">{{ categoria.percentual|default:"0.00" }}%</td>
+                        </tr>
+                            {% for subcategoria in categoria.subcategorias %}
+                            <tr>
+                                <td style="padding-left: 40px;">{{ subcategoria.nome }}</td>
+                                <td class="text-end">{{ subcategoria.valor|default:"0.00" }}</td>
+                                <td class="text-end">{{ subcategoria.percentual|default:"0.00" }}%</td>
+                            </tr>
+                            {% endfor %}
+                        {% endfor %}
+                        <tr class="table-info">
+                            <td><strong>Total Custos Variáveis</strong></td>
+                            <td class="text-end"><strong>{{ total_custos_variaveis|default:"0.00" }}</strong></td>
+                            <td class="text-end"><strong>{{ percentual_custos_variaveis|default:"0.00" }}%</strong></td>
+                        </tr>
+
+                        <!-- Investimentos -->
+                        <tr class="table-success">
+                            <td colspan="3"><strong>2.3 INVESTIMENTOS</strong></td>
+                        </tr>
+                        {% for categoria in investimentos %}
+                        <tr>
+                            <td style="padding-left: 20px;"><strong>{{ categoria.nome }}</strong></td>
+                            <td class="text-end">{{ categoria.valor|default:"0.00" }}</td>
+                            <td class="text-end">{{ categoria.percentual|default:"0.00" }}%</td>
+                        </tr>
+                            {% for subcategoria in categoria.subcategorias %}
+                            <tr>
+                                <td style="padding-left: 40px;">{{ subcategoria.nome }}</td>
+                                <td class="text-end">{{ subcategoria.valor|default:"0.00" }}</td>
+                                <td class="text-end">{{ subcategoria.percentual|default:"0.00" }}%</td>
+                            </tr>
+                            {% endfor %}
+                        {% endfor %}
+                        <tr class="table-success">
+                            <td><strong>Total Investimentos</strong></td>
+                            <td class="text-end"><strong>{{ total_investimentos|default:"0.00" }}</strong></td>
+                            <td class="text-end"><strong>{{ percentual_investimentos|default:"0.00" }}%</strong></td>
+                        </tr>
+
+                        <!-- Total Geral de Custos -->
+                        <tr class="table-danger">
+                            <td><strong>TOTAL GERAL DE CUSTOS E DESPESAS</strong></td>
+                            <td class="text-end"><strong>{{ total_geral_custos|default:"0.00" }}</strong></td>
+                            <td class="text-end"><strong>{{ percentual_geral_custos|default:"0.00" }}%</strong></td>
+                        </tr>
+
+                        <!-- Resultado Operacional -->
+                        <tr class="table-success">
+                            <td><strong>3. RESULTADO OPERACIONAL</strong></td>
+                            <td class="text-end"><strong>{{ resultado_operacional|default:"0.00" }}</strong></td>
+                            <td class="text-end"><strong>{{ percentual_resultado|default:"0.00" }}%</strong></td>
+                        </tr>
+
+                        <!-- Receitas/Despesas Não Operacionais -->
+                        <tr class="table-info">
+                            <td colspan="3"><strong>4. NÃO OPERACIONAL</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Receitas Não Operacionais</td>
+                            <td class="text-end">{{ receitas_nao_operacionais|default:"0.00" }}</td>
+                            <td class="text-end">{{ percentual_rec_nao_op|default:"0.00" }}%</td>
+                        </tr>
+                        <tr>
+                            <td>Despesas Não Operacionais</td>
+                            <td class="text-end">{{ despesas_nao_operacionais|default:"0.00" }}</td>
+                            <td class="text-end">{{ percentual_desp_nao_op|default:"0.00" }}%</td>
+                        </tr>
+
+                        <!-- Resultado Final -->
+                        <tr class="table-warning">
+                            <td><strong>5. RESULTADO FINAL</strong></td>
+                            <td class="text-end"><strong>{{ resultado_final|default:"0.00" }}</strong></td>
+                            <td class="text-end"><strong>{{ percentual_final|default:"0.00" }}%</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Receitas -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">Receitas</h5>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <tbody>
+                                <tr>
+                                    <td>Vendas de Animais</td>
+                                    <td class="text-end">R$ <span id="receitas_vendas">0.00</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Abates</td>
+                                    <td class="text-end">R$ <span id="receitas_abates">{{ receitas_abate|default:"0.00" }}</span></td>
+                                </tr>
+                                <tr class="table-active">
+                                    <td><strong>Total de Receitas</strong></td>
+                                    <td class="text-end"><strong>R$ <span id="receitas_totais">0.00</span></strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Patrimônio -->
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">Ativo</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Saldo em Estoque: R$ {{ saldo_estoque|default:"0.00" }}</p>
+                            <p>Total Ativo: R$ {{ total_ativo|default:"0.00" }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header bg-warning">
+                            <h5 class="mb-0">Passivo</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Total Passivo: R$ {{ total_passivo|default:"0.00" }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">Imobilizado</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Total Imobilizado: R$ {{ total_imobilizado|default:"0.00" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Atualizar relatório quando os filtros mudarem
+    const filtros = ['periodo', 'fazenda', 'data_inicial', 'data_final'];
+    filtros.forEach(filtro => {
+        document.getElementById(filtro).addEventListener('change', atualizarRelatorio);
+    });
+
+    // Carregar relatório inicial
+    atualizarRelatorio();
+});
+
+function atualizarRelatorio() {
+    // Coletar valores dos filtros
+    const filtros = {
+        periodo: document.getElementById('periodo').value,
+        fazenda: document.getElementById('fazenda').value,
+        data_inicial: document.getElementById('data_inicial').value,
+        data_final: document.getElementById('data_final').value
+    };
+
+    console.log('Enviando filtros:', filtros);
+
+    // Fazer requisição AJAX para atualizar os dados
+    fetch('{% url "atualizar_dre" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(filtros)
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Dados recebidos:', data);
+        atualizarDRE(data);
+    })
+    .catch(error => {
+        console.error('Erro ao atualizar DRE:', error);
+    });
+}
+
+function atualizarDRE(data) {
+    // Verificar se há erro
+    if (data.error) {
+        console.error('Erro do servidor:', data.error);
+        return;
+    }
+
+    // Atualizar receitas
+    $('#receitas_vendas').text(formatarMoeda(data.receitas_vendas));
+    $('#receitas_abates').text(formatarMoeda(data.receitas_abates));
+    $('#receitas_totais').text(formatarMoeda(data.receitas_totais));
+
+    // Atualizar custos fixos
+    const custoFixosContainer = $('#custos_fixos_container');
+    custoFixosContainer.empty(); // Limpa o conteúdo atual
+
+    if (data.custos_fixos && Array.isArray(data.custos_fixos)) {
+        data.custos_fixos.forEach(categoria => {
+            // Adiciona a linha da categoria
+            custoFixosContainer.append(`
+                <tr>
+                    <td><strong>${categoria.nome}</strong></td>
+                    <td class="text-end"><strong>${formatarMoeda(categoria.valor)}</strong></td>
+                    <td class="text-end"><strong>${categoria.percentual}%</strong></td>
+                </tr>
+            `);
+
+            // Adiciona as linhas das subcategorias
+            if (categoria.subcategorias && Array.isArray(categoria.subcategorias)) {
+                categoria.subcategorias.forEach(sub => {
+                    custoFixosContainer.append(`
+                        <tr>
+                            <td style="padding-left: 40px;">${sub.nome}</td>
+                            <td class="text-end">${formatarMoeda(sub.valor)}</td>
+                            <td class="text-end">${sub.percentual}%</td>
+                        </tr>
+                    `);
+                });
+            }
+        });
+    }
+
+    // Atualizar totais
+    $('#custos_fixos_total').text(formatarMoeda(data.total_custos_fixos || 0));
+    $('#custos_fixos_percentual').text((data.percentual_custos_fixos || 0) + '%');
+}
+
+function exportarPDF() {
+    // Implementar exportação para PDF
+    window.print();
+}
+
+// Função para obter o token CSRF
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function formatarMoeda(valor) {
+    if (valor === undefined || valor === null) return 'R$ 0,00';
+    return `R$ ${parseFloat(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+</script>
+{% endblock %}
+{% endblock %}

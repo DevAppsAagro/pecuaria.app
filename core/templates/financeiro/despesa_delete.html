@@ -1,17 +1,59 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container">
-    <div class="card">
-        <div class="card-body">
-            <h5 class="card-title">Confirmar Exclusão</h5>
-            <p>Você tem certeza que deseja excluir a despesa "{{ object.numero_nf }}" de {{ object.data_emissao|date:"d/m/Y" }}?</p>
-            <form method="post">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-danger">Confirmar Exclusão</button>
-                <a href="{% url 'despesas_list' %}" class="btn btn-secondary">Cancelar</a>
-            </form>
+<div class="container-fluid">
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">Excluir Despesa</h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'despesas_list' %}">Despesas</a></li>
+                        <li class="breadcrumb-item active">Excluir</li>
+                    </ol>
+                </div>
+            </div>
         </div>
     </div>
+
+    <section class="content">
+        <div class="container-fluid">
+            <div class="card card-danger card-outline">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-trash-alt mr-1"></i>
+                        Confirmar Exclusão
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5><i class="icon fas fa-exclamation-triangle"></i> Atenção!</h5>
+                        <p>Você está prestes a excluir a seguinte despesa:</p>
+                        <ul class="mb-0">
+                            <li><strong>Nota Fiscal:</strong> {{ object.numero_nf }}</li>
+                            <li><strong>Data de Emissão:</strong> {{ object.data_emissao|date:"d/m/Y" }}</li>
+                            <li><strong>Fornecedor:</strong> {{ object.contato.nome }}</li>
+                            <li><strong>Valor Total:</strong> R$ {{ object.valor_total|floatformat:2 }}</li>
+                        </ul>
+                    </div>
+                    <p class="text-danger">Esta ação não pode ser desfeita. Todos os dados relacionados a esta despesa serão permanentemente excluídos.</p>
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="text-right">
+                            <a href="{% url 'despesas_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash-alt"></i> Confirmar Exclusão
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
 </div>
 {% endblock %}

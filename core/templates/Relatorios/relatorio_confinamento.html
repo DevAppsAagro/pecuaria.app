@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Relatório de Confinamento</h2>
+        <a href="{% url 'imprimir_confinamento' %}" target="_blank" class="btn btn-primary">
+            <i class="bi bi-printer"></i> Imprimir Relatório
+        </a>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Data Início</label>
+                    <input type="date" class="form-control" name="data_inicio">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Data Fim</label>
+                    <input type="date" class="form-control" name="data_fim">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Lote</label>
+                    <select class="form-select" name="lote_id">
+                        <option value="">Todos os Lotes</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">Filtrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Informações Gerais -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Informações Gerais</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <p><strong>Lote:</strong> PASTO-0003</p>
+                            <p><strong>Status:</strong> Em Andamento</p>
+                            <p><strong>Raça:</strong> Nelore</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Data Início:</strong> 01/01/2024</p>
+                            <p><strong>Idade Média:</strong> 24 meses</p>
+                            <p><strong>Origem:</strong> Fazenda São João</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Total de Animais:</strong> 100</p>
+                            <p><strong>Mortalidade:</strong> 1%</p>
+                            <p><strong>Dias em Confinamento:</strong> 90</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Peso Médio Entrada:</strong> 360 kg</p>
+                            <p><strong>Peso Médio Atual:</strong> 480 kg</p>
+                            <p><strong>GMD:</strong> 1.33 kg/dia</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Indicadores Econômicos e Zootécnicos -->
+    <div class="row mb-4">
+        <!-- Indicadores Econômicos -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Indicadores Econômicos</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <tbody>
+                                <tr>
+                                    <td>Preço Transferência Macho (@)</td>
+                                    <td class="text-end">R$ 300,00</td>
+                                </tr>
+                                <tr>
+                                    <td>Preço Transferência Macho (cab)</td>
+                                    <td class="text-end">R$ 4.500,00</td>
+                                </tr>
+                                <tr>
+                                    <td>Custo com Pastagem</td>
+                                    <td class="text-end">R$ 15.000,00</td>
+                                </tr>
+                                <tr>
+                                    <td>Custo com Nutrição</td>
+                                    <td class="text-end">R$ 45.000,00</td>
+                                </tr>
+                                <tr>
+                                    <td>Custo Operacional</td>
+                                    <td class="text-end">R$ 25.000,00</td>
+                                </tr>
+                                <tr>
+                                    <td>Custo Total</td>
+                                    <td class="text-end">R$ 85.000,00</td>
+                                </tr>
+                                <tr>
+                                    <td>Custo por @ Produzida</td>
+                                    <td class="text-end">R$ 180,00</td>
+                                </tr>
+                                <tr>
+                                    <td>Preço Venda @ (boi gordo)</td>
+                                    <td class="text-end">R$ 250,00</td>
+                                </tr>
+                                <tr>
+                                    <td>Lucro</td>
+                                    <td class="text-end text-success">R$ 35.000,00</td>
+                                </tr>
+                                <tr>
+                                    <td>ROI</td>
+                                    <td class="text-end text-success">41.18%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Indicadores Zootécnicos -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Indicadores Zootécnicos</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <tbody>
+                                <tr>
+                                    <td>Peso Médio Entrada</td>
+                                    <td class="text-end">360 kg</td>
+                                </tr>
+                                <tr>
+                                    <td>Peso Médio Atual</td>
+                                    <td class="text-end">480 kg</td>
+                                </tr>
+                                <tr>
+                                    <td>Ganho de Peso Total</td>
+                                    <td class="text-end">120 kg</td>
+                                </tr>
+                                <tr>
+                                    <td>GMD</td>
+                                    <td class="text-end">1.33 kg/dia</td>
+                                </tr>
+                                <tr>
+                                    <td>Conversão Alimentar</td>
+                                    <td class="text-end">6.5:1</td>
+                                </tr>
+                                <tr>
+                                    <td>Consumo Nutrição</td>
+                                    <td class="text-end">13 kg/dia</td>
+                                </tr>
+                                <tr>
+                                    <td>Rendimento de Carcaça</td>
+                                    <td class="text-end">54%</td>
+                                </tr>
+                                <tr>
+                                    <td>@ Produzidas</td>
+                                    <td class="text-end">472 @</td>
+                                </tr>
+                                <tr>
+                                    <td>Eficiência Alimentar</td>
+                                    <td class="text-end">15.4%</td>
+                                </tr>
+                                <tr>
+                                    <td>Uniformidade do Lote</td>
+                                    <td class="text-end">85%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Evolução do Ganho de Peso</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="pesoChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Composição de Custos</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="custosChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Gráfico de Evolução do Peso
+    const ctxPeso = document.getElementById('pesoChart').getContext('2d');
+    new Chart(ctxPeso, {
+        type: 'line',
+        data: {
+            labels: ['Jan', 'Fev', 'Mar', 'Abr'],
+            datasets: [{
+                label: 'Peso Médio (kg)',
+                data: [360, 400, 440, 480],
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            responsive: true
+        }
+    });
+
+    // Gráfico de Custos
+    const ctxCustos = document.getElementById('custosChart').getContext('2d');
+    new Chart(ctxCustos, {
+        type: 'pie',
+        data: {
+            labels: ['Nutrição', 'Pastagem', 'Operacional'],
+            datasets: [{
+                data: [45000, 15000, 25000],
+                backgroundColor: [
+                    'rgb(255, 99, 132)',
+                    'rgb(54, 162, 235)',
+                    'rgb(255, 205, 86)'
+                ]
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            responsive: true
+        }
+    });
+</script>
+{% endblock %}
+{% endblock %}

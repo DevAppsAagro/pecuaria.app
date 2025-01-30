@@ -6,33 +6,88 @@ from django.contrib import messages
 from django.db.models import Q
 from django.core.paginator import Paginator
 from django.http import JsonResponse
-from .models import Animal, Contato, ContaBancaria
+from .models import Animal, Contato, ContaBancaria, Fazenda
 from .models_compras import Compra, CompraAnimal
 from .models_parcelas import ParcelaCompra
 from .forms_compras import CompraForm
+from django.utils import timezone
 
 @login_required
 def compras_list(request):
-    search_query = request.GET.get('search', '')
+    hoje = timezone.localdate()
     
+    # Query base
     compras = Compra.objects.filter(usuario=request.user)
     
-    if search_query:
-        compras = compras.filter(
-            Q(animais__animal__brinco_visual__icontains=search_query) |
-            Q(vendedor__nome__icontains=search_query)
-        ).distinct()
+    # Filtros
+    contato = request.GET.get('contato')
+    fazenda = request.GET.get('fazenda')
+    status = request.GET.get('status')
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
     
-    paginator = Paginator(compras, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    # Aplicar filtros
+    if contato:
+        compras = compras.filter(vendedor_id=contato)
+    if status:
+        compras = compras.filter(status=status)
+    if data_inicio:
+        compras = compras.filter(data__gte=data_inicio)
+    if data_fim:
+        compras = compras.filter(data__lte=data_fim)
+    if fazenda:
+        compras = compras.filter(fazenda_destino_id=fazenda)
     
+    # Ordenação
+    compras = compras.order_by('-data')
+    
+    # Dados para os filtros
+    contatos = Contato.objects.filter(usuario=request.user, tipo='FO').order_by('nome')
+    fazendas = Fazenda.objects.filter(usuario=request.user).order_by('nome')
+    
+    # Calcular totais por status
+    totais_status = {
+        'PAGO': {'valor': 0, 'cor': 'success', 'icone': 'fa-check-circle'},
+        'PENDENTE': {'valor': 0, 'cor': 'warning', 'icone': 'fa-clock'},
+        'VENCIDO': {'valor': 0, 'cor': 'danger', 'icone': 'fa-exclamation-circle'},
+        'VENCE_HOJE': {'valor': 0, 'cor': 'info', 'icone': 'fa-calendar-check'},
+    }
+
+    # Calcular totais
+    for compra in compras:
+        valor_total = sum(item.valor_total for item in compra.animais.all())
+        
+        # Verificar status real da compra
+        if compra.status == 'PAGO':
+            totais_status['PAGO']['valor'] += valor_total
+        elif compra.status == 'PENDENTE':
+            if compra.data_vencimento == hoje:
+                totais_status['VENCE_HOJE']['valor'] += valor_total
+            elif compra.data_vencimento < hoje:
+                totais_status['VENCIDO']['valor'] += valor_total
+            else:
+                totais_status['PENDENTE']['valor'] += valor_total
+
+    # Formatar valores para exibição
+    for status_info in totais_status.values():
+        status_info['valor_formatado'] = f"R$ {status_info['valor']:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
+
+    # Contexto
     context = {
-        'page_obj': page_obj,
-        'search_query': search_query
+        'compras': compras,
+        'contatos': contatos,
+        'fazendas': fazendas,
+        'totais_status': totais_status,
+        'filtros': {
+            'contato': contato,
+            'fazenda': fazenda,
+            'status': status,
+            'data_inicio': data_inicio,
+            'data_fim': data_fim
+        }
     }
     
-    return render(request, 'core/compras/lista.html', context)
+    return render(request, 'financeiro/compras_list.html', context)
 
 def criar_parcelas(compra, valor_total):
     """Cria as parcelas para uma compra"""

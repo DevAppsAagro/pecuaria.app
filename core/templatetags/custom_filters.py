@@ -122,3 +122,19 @@ def format_currency_br(value):
         return f"R$ {format_decimal_br(value)}"
     except (ValueError, TypeError, AttributeError):
         return value
+
+@register.filter
+def get_item(dictionary, key):
+    """Retorna um item do dicionário pela chave"""
+    return dictionary.get(key)
+
+@register.filter
+def format_status(value):
+    status_map = {
+        'PAGO': 'Pago',
+        'PENDENTE': 'Pendente',
+        'VENCIDO': 'Vencido',
+        'VENCE_HOJE': 'Vence Hoje',
+        'CANCELADO': 'Cancelado'
+    }
+    return status_map.get(value, value)

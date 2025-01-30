@@ -1,0 +1,305 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Despesas</title>
+    <style>
+        /* Reset básico */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Configurações básicas */
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            background: white;
+            padding: 20mm;
+        }
+
+        /* Cabeçalho */
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+        }
+
+        header h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        header p {
+            font-size: 12px;
+            margin: 2px 0;
+        }
+
+        /* Título do relatório */
+        .relatorio-titulo {
+            text-align: center;
+            font-size: 16px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        /* Seções */
+        .secao {
+            margin: 15px 0;
+            page-break-inside: avoid;
+        }
+
+        .secao h2 {
+            font-size: 14px;
+            background: #f5f5f5;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+
+        /* Filtros aplicados */
+        .filtros-info {
+            font-size: 12px;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+        }
+
+        .filtro-item {
+            margin: 5px 0;
+        }
+
+        .filtro-label {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        /* Tabela de despesas */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: left;
+        }
+
+        th {
+            background: #f5f5f5;
+            font-weight: bold;
+        }
+
+        /* Status */
+        .status {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .status-pago { background: #d4edda; color: #155724; }
+        .status-pendente { background: #fff3cd; color: #856404; }
+        .status-vencido { background: #f8d7da; color: #721c24; }
+        .status-vence-hoje { background: #cce5ff; color: #004085; }
+        .status-cancelado { background: #e2e3e5; color: #383d41; }
+
+        /* Totais */
+        .totais {
+            margin-top: 20px;
+            border-top: 2px solid #333;
+            padding-top: 10px;
+            text-align: right;
+        }
+
+        .total-item {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+
+        .total-label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        /* Rodapé */
+        footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            font-size: 10px;
+            text-align: center;
+            color: #666;
+        }
+
+        /* Botão de Impressão */
+        .print-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 1000;
+            display: block;
+        }
+
+        .print-button:hover {
+            background-color: #0056b3;
+        }
+
+        .print-button.hidden {
+            display: none !important;
+        }
+
+        @media print {
+            .print-button {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Cabeçalho -->
+    <header>
+        <h1>{{ cabecalho.empresa }}</h1>
+        <p>CNPJ: {{ cabecalho.cnpj }}</p>
+        <p>{{ cabecalho.endereco }}</p>
+        <p>{{ cabecalho.cidade }} - {{ cabecalho.estado }}</p>
+    </header>
+
+    <!-- Título do Relatório -->
+    <div class="relatorio-titulo">
+        Relatório de Despesas
+    </div>
+
+    <!-- Filtros Aplicados -->
+    <div class="filtros-info">
+        <div class="filtro-item">
+            <span class="filtro-label">Período:</span>
+            {% if filtros.data_inicio or filtros.data_fim %}
+                {% if filtros.data_inicio %}De {{ filtros.data_inicio|date:"d/m/Y" }}{% endif %}
+                {% if filtros.data_fim %}até {{ filtros.data_fim|date:"d/m/Y" }}{% endif %}
+            {% else %}
+                Todas as datas
+            {% endif %}
+        </div>
+        {% if filtros.contato %}
+        <div class="filtro-item">
+            <span class="filtro-label">Fornecedor:</span>
+            {{ filtros.contato.nome }}
+        </div>
+        {% endif %}
+        {% if filtros.fazenda %}
+        <div class="filtro-item">
+            <span class="filtro-label">Fazenda:</span>
+            {{ filtros.fazenda.nome }}
+        </div>
+        {% endif %}
+        {% if filtros.status %}
+        <div class="filtro-item">
+            <span class="filtro-label">Status:</span>
+            {{ filtros.status|format_status }}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Lista de Despesas -->
+    <div class="secao">
+        <table>
+            <thead>
+                <tr>
+                    <th>Data Emissão</th>
+                    <th>Data Vencimento</th>
+                    <th>Fornecedor</th>
+                    <th>NF</th>
+                    <th>Valor</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for despesa in despesas %}
+                <tr>
+                    <td>{{ despesa.data_emissao|date:"d/m/Y" }}</td>
+                    <td>{{ despesa.data_vencimento|date:"d/m/Y" }}</td>
+                    <td>{{ despesa.contato.nome }}</td>
+                    <td>{{ despesa.numero_nf|default:"S/N" }}</td>
+                    <td style="text-align: right;">R$ {{ valores_totais|get_item:despesa.id|floatformat:2 }}</td>
+                    <td>
+                        {% if despesa.status == 'PAGO' %}
+                            <span class="status status-pago">Pago</span>
+                        {% elif despesa.status == 'PENDENTE' %}
+                            <span class="status status-pendente">Pendente</span>
+                        {% elif despesa.status == 'VENCIDO' %}
+                            <span class="status status-vencido">Atrasado</span>
+                        {% elif despesa.status == 'VENCE_HOJE' %}
+                            <span class="status status-vence-hoje">Vence Hoje</span>
+                        {% elif despesa.status == 'CANCELADO' %}
+                            <span class="status status-cancelado">Cancelado</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Totais -->
+    <div class="totais">
+        <div class="total-item">
+            <span class="total-label">Total Geral:</span>
+            R$ {{ total_geral|floatformat:2 }}
+        </div>
+        <div class="total-item">
+            <span class="total-label">Total Pago:</span>
+            R$ {{ total_pago|floatformat:2 }}
+        </div>
+        <div class="total-item">
+            <span class="total-label">Total Pendente:</span>
+            R$ {{ total_pendente|floatformat:2 }}
+        </div>
+    </div>
+
+    <!-- Rodapé -->
+    <footer>
+        <p>{{ cabecalho.empresa }} - CNPJ: {{ cabecalho.cnpj }}</p>
+        <p>{{ cabecalho.endereco }} - {{ cabecalho.cidade }}/{{ cabecalho.estado }}</p>
+        <p>Sistema de Gestão Pecuária</p>
+        <p>Emitido em: {% now "d/m/Y H:i" %}</p>
+    </footer>
+
+    <!-- Botão de Impressão -->
+    <button onclick="handlePrint()" class="print-button">
+        <i class="bi bi-printer"></i> Imprimir
+    </button>
+
+    <script>
+        // Função para lidar com a impressão
+        function handlePrint() {
+            // Esconde o botão
+            document.querySelector('.print-button').classList.add('hidden');
+            
+            // Chama a impressão após um pequeno delay para garantir que o botão sumiu
+            setTimeout(function() {
+                window.print();
+                
+                // Restaura o botão após a impressão
+                window.onafterprint = function() {
+                    document.querySelector('.print-button').classList.remove('hidden');
+                };
+            }, 100);
+        }
+    </script>
+</body>
+</html>

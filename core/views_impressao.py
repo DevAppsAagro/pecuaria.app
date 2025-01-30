@@ -4,9 +4,11 @@ from django.utils import timezone
 from datetime import datetime
 from decimal import Decimal
 from .models import Animal, Pesagem, ManejoSanitario, MovimentacaoAnimal, RateioCusto, Lote
-from .models_compras import CompraAnimal
+from .models_compras import CompraAnimal, Compra
 from .models_vendas import VendaAnimal
 from .models_abates import AbateAnimal
+from django.db.models import Sum, F
+from core.models import Despesa, Contato, Fazenda
 
 @login_required
 def imprimir_animal(request, pk):
@@ -410,3 +412,180 @@ def imprimir_pesagens(request):
     }
     
     return render(request, 'impressao/pesagens_print.html', context)
+
+@login_required
+def imprimir_confinamento(request):
+    # Por enquanto retornamos apenas o template com dados fictícios
+    # Posteriormente implementaremos a lógica real com os dados do banco
+    context = {
+        'cabecalho': {
+            'empresa': 'Nome da Empresa'
+        },
+        'lote': 'PASTO-0003',
+        'status': 'Em Andamento',
+        'data_inicio': '01/01/2024',
+        'total_animais': 100,
+        'dias_confinamento': 90,
+        'gmd': 1.33,
+        'preco_transferencia_arroba': '300,00',
+        'custo_pastagem': '15.000,00',
+        'custo_nutricao': '45.000,00',
+        'custo_total': '85.000,00',
+        'lucro': '35.000,00',
+        'roi': '41,18',
+        'peso_medio_entrada': 360,
+        'peso_medio_atual': 480,
+        'ganho_peso_total': 120,
+        'conversao_alimentar': 6.5,
+        'arrobas_produzidas': 472
+    }
+    return render(request, 'impressao/confinamento_print.html', context)
+
+@login_required
+def despesas_print(request):
+    # Query base
+    despesas = Despesa.objects.filter(usuario=request.user)
+    
+    # Filtros
+    contato = request.GET.get('contato')
+    fazenda = request.GET.get('fazenda')
+    status = request.GET.get('status')
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+    
+    # Aplicar filtros
+    if contato:
+        despesas = despesas.filter(contato_id=contato)
+    if status:
+        despesas = despesas.filter(status=status)
+    if data_inicio:
+        despesas = despesas.filter(data_emissao__gte=data_inicio)
+    if data_fim:
+        despesas = despesas.filter(data_emissao__lte=data_fim)
+    if fazenda:
+        despesas = despesas.filter(itens__fazenda_destino_id=fazenda).distinct()
+    
+    # Ordenação
+    despesas = despesas.order_by('-data_emissao')
+    
+    # Calcular valores totais
+    valores_totais = {}
+    total_geral = 0
+    total_pago = 0
+    
+    for despesa in despesas:
+        # Calcula o valor total desta despesa
+        valor_itens = sum(item.valor_total for item in despesa.itens.all())
+        valor_total = valor_itens + (despesa.multa_juros or 0) - (despesa.desconto or 0)
+        
+        # Armazena no dicionário
+        valores_totais[despesa.id] = valor_total
+        
+        # Atualiza os totais
+        total_geral += valor_total
+        if despesa.status == 'PAGO':
+            total_pago += valor_total
+    
+    total_pendente = total_geral - total_pago
+    
+    # Dados para os filtros
+    filtros = {
+        'contato': Contato.objects.filter(id=contato, usuario=request.user).first() if contato else None,
+        'fazenda': Fazenda.objects.filter(id=fazenda, usuario=request.user).first() if fazenda else None,
+        'status': status,
+        'data_inicio': data_inicio,
+        'data_fim': data_fim
+    }
+    
+    # Dados do cabeçalho
+    cabecalho = {
+        'empresa': request.user.first_name,
+        'cnpj': request.user.profile.cnpj if hasattr(request.user, 'profile') else '',
+        'endereco': request.user.profile.endereco if hasattr(request.user, 'profile') else '',
+        'cidade': request.user.profile.cidade if hasattr(request.user, 'profile') else '',
+        'estado': request.user.profile.estado if hasattr(request.user, 'profile') else ''
+    }
+    
+    return render(request, 'impressao/despesas_print.html', {
+        'despesas': despesas,
+        'valores_totais': valores_totais,
+        'filtros': filtros,
+        'cabecalho': cabecalho,
+        'total_geral': total_geral,
+        'total_pago': total_pago,
+        'total_pendente': total_pendente,
+        'now': timezone.now()
+    })
+
+@login_required
+def imprimir_compras(request):
+    hoje = timezone.localdate()
+    
+    # Query base
+    compras = Compra.objects.filter(usuario=request.user)
+    
+    # Filtros
+    contato = request.GET.get('contato')
+    fazenda = request.GET.get('fazenda')
+    status = request.GET.get('status')
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+    
+    # Aplicar filtros
+    if contato:
+        compras = compras.filter(vendedor_id=contato)
+    if status:
+        compras = compras.filter(status=status)
+    if data_inicio:
+        compras = compras.filter(data__gte=data_inicio)
+    if data_fim:
+        compras = compras.filter(data__lte=data_fim)
+    if fazenda:
+        compras = compras.filter(fazenda_destino_id=fazenda)
+    
+    # Ordenação
+    compras = compras.order_by('-data')
+    
+    # Calcular totais por status
+    totais_status = {
+        'PAGO': {'valor': 0, 'cor': 'success', 'icone': 'fa-check-circle'},
+        'PENDENTE': {'valor': 0, 'cor': 'warning', 'icone': 'fa-clock'},
+        'VENCIDO': {'valor': 0, 'cor': 'danger', 'icone': 'fa-exclamation-circle'},
+        'VENCE_HOJE': {'valor': 0, 'cor': 'info', 'icone': 'fa-calendar-check'},
+    }
+
+    # Calcular totais
+    for compra in compras:
+        valor_total = sum(item.valor_total for item in compra.animais.all())
+        
+        # Verificar status real da compra
+        if compra.status == 'PAGO':
+            totais_status['PAGO']['valor'] += valor_total
+        elif compra.status == 'PENDENTE':
+            if compra.data_vencimento == hoje:
+                totais_status['VENCE_HOJE']['valor'] += valor_total
+            elif compra.data_vencimento < hoje:
+                totais_status['VENCIDO']['valor'] += valor_total
+            else:
+                totais_status['PENDENTE']['valor'] += valor_total
+
+    # Formatar valores para exibição
+    for status_info in totais_status.values():
+        status_info['valor_formatado'] = f"R$ {status_info['valor']:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
+
+    # Contexto
+    context = {
+        'compras': compras,
+        'totais_status': totais_status,
+        'filtros': {
+            'contato': contato,
+            'fazenda': fazenda,
+            'status': status,
+            'data_inicio': data_inicio,
+            'data_fim': data_fim
+        },
+        'data_impressao': timezone.now(),
+        'usuario': request.user
+    }
+    
+    return render(request, 'impressao/compras_print.html', context)

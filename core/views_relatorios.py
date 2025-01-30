@@ -1,9 +1,16 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from .models import Animal, Lote, Pesagem, RateioCusto
+from .models import Animal, Lote, Pesagem, RateioCusto, Fazenda, CategoriaCusto, Despesa
+from .models_compras import Compra
+from .models_vendas import Venda
+from .models_abates import Abate
 from .models_estoque import RateioMovimentacao
 from decimal import Decimal
+import json
+from django.db import models
+from datetime import datetime
+from django.utils import timezone
 
 @login_required
 def relatorios_view(request):
@@ -263,3 +270,238 @@ def relatorio_pesagens(request):
     }
     
     return render(request, 'Relatorios/pesagens.html', context)
+
+@login_required
+def relatorio_confinamento(request):
+    # Por enquanto retornamos apenas o template com dados fictícios
+    # Posteriormente implementaremos a lógica real
+    return render(request, 'Relatorios/relatorio_confinamento.html')
+
+@login_required
+def relatorio_dre(request):
+    context = {
+        'fazendas': Fazenda.objects.filter(usuario=request.user)
+    }
+    return render(request, 'Relatorios/dre.html', context)
+
+@login_required
+def atualizar_dre(request):
+    try:
+        if request.method == 'POST':
+            # Verificar Content-Type
+            if request.content_type != 'application/json':
+                print("Content-Type inválido:", request.content_type)
+                return JsonResponse({'error': 'Content-Type deve ser application/json'}, status=400)
+
+            try:
+                # Tentar ler o corpo da requisição
+                body = request.body.decode('utf-8')
+                print("Body recebido:", body)
+                
+                # Tentar decodificar o JSON
+                data = json.loads(body)
+                print("Dados recebidos:", data)
+            except json.JSONDecodeError as e:
+                print("Erro ao decodificar JSON:", str(e))
+                print("Body recebido:", request.body)
+                return JsonResponse({'error': 'Dados inválidos'}, status=400)
+            except Exception as e:
+                print("Erro ao ler body:", str(e))
+                return JsonResponse({'error': 'Erro ao ler dados'}, status=400)
+
+            # Extrair e validar filtros
+            fazenda_id = data.get('fazenda')
+            data_inicial = data.get('data_inicial')
+            data_final = data.get('data_final')
+
+            print(f"Filtros: fazenda={fazenda_id}, data_inicial={data_inicial}, data_final={data_final}")
+
+            # Converter datas se fornecidas
+            if data_inicial:
+                try:
+                    data_inicial = datetime.strptime(data_inicial, '%Y-%m-%d').date()
+                except ValueError:
+                    return JsonResponse({'error': 'Data inicial inválida'}, status=400)
+            
+            if data_final:
+                try:
+                    data_final = datetime.strptime(data_final, '%Y-%m-%d').date()
+                except ValueError:
+                    return JsonResponse({'error': 'Data final inválida'}, status=400)
+
+            # Se não houver data final, usar data atual
+            if not data_final:
+                data_final = timezone.now().date()
+
+            # Se não houver data inicial, usar primeiro dia do mês atual
+            if not data_inicial:
+                data_inicial = data_final.replace(day=1)
+
+            print(f"Datas processadas: inicial={data_inicial}, final={data_final}")
+
+            # Filtros base para todos os custos
+            filtros_base = {}
+            if fazenda_id:
+                filtros_base['itens__fazenda_destino_id'] = fazenda_id
+            if data_inicial and data_final:
+                filtros_base['data_emissao__range'] = [data_inicial, data_final]
+
+            print("Filtros base:", filtros_base)
+
+            try:
+                # Buscar categorias de custo do usuário
+                custos_fixos = []
+                categorias_fixas = CategoriaCusto.objects.filter(
+                    usuario=request.user,
+                    tipo='fixo'
+                ).prefetch_related('subcategorias')
+
+                print(f"Total de categorias fixas: {categorias_fixas.count()}")
+
+                for categoria in categorias_fixas:
+                    print(f"Processando categoria {categoria.nome}")
+                    
+                    valor_categoria = Despesa.objects.filter(
+                        usuario=request.user,
+                        itens__categoria=categoria,
+                        **filtros_base
+                    ).aggregate(
+                        total_geral=models.Sum('itens__valor_total')
+                    )['total_geral'] or 0
+
+                    print(f"Valor categoria {categoria.nome}: {valor_categoria}")
+
+                    subcategorias_data = []
+                    for subcategoria in categoria.subcategorias.all():
+                        print(f"  Processando subcategoria {subcategoria.nome}")
+                        
+                        valor_subcategoria = Despesa.objects.filter(
+                            usuario=request.user,
+                            itens__categoria=categoria,
+                            itens__subcategoria=subcategoria,
+                            **filtros_base
+                        ).aggregate(
+                            total_geral=models.Sum('itens__valor_total')
+                        )['total_geral'] or 0
+
+                        print(f"  Valor subcategoria {subcategoria.nome}: {valor_subcategoria}")
+
+                        subcategorias_data.append({
+                            'nome': subcategoria.nome,
+                            'valor': float(valor_subcategoria),
+                            'percentual': 0  # Será calculado depois
+                        })
+
+                    custos_fixos.append({
+                        'nome': categoria.nome,
+                        'valor': float(valor_categoria),
+                        'percentual': 0,  # Será calculado depois
+                        'subcategorias': subcategorias_data
+                    })
+
+                # Calcular receitas de abates
+                filtros_abates = {}
+                if fazenda_id:
+                    filtros_abates['animais__animal__fazenda_atual_id'] = fazenda_id
+                if data_inicial and data_final:
+                    filtros_abates['data__range'] = [data_inicial, data_final]
+
+                # Primeiro, pegar todos os abates que atendem aos filtros
+                abates = Abate.objects.filter(
+                    usuario=request.user,
+                    **filtros_abates
+                )
+
+                # Depois, calcular o valor total somando os valores dos animais
+                receitas_abates = abates.annotate(
+                    total_abate=models.Sum('animais__valor_total')
+                ).aggregate(
+                    total=models.Sum('total_abate')
+                )['total'] or 0
+
+                print(f"Receitas de abates: {receitas_abates}")
+
+                # Calcular receitas de vendas
+                filtros_vendas = {}
+                if fazenda_id:
+                    filtros_vendas['animais__animal__fazenda_atual_id'] = fazenda_id
+                if data_inicial and data_final:
+                    filtros_vendas['data__range'] = [data_inicial, data_final]
+
+                # Primeiro, pegar todas as vendas que atendem aos filtros
+                vendas = Venda.objects.filter(
+                    usuario=request.user,
+                    **filtros_vendas
+                )
+
+                # Depois, calcular o valor total somando os valores dos animais
+                receitas_vendas = vendas.annotate(
+                    total_venda=models.Sum(
+                        models.Case(
+                            models.When(
+                                tipo_venda='UN',
+                                then=models.F('valor_unitario') * models.Count('animais')
+                            ),
+                            models.When(
+                                tipo_venda='KG',
+                                then=models.F('valor_unitario') * models.Sum('animais__peso_vivo')
+                            ),
+                            default=0,
+                            output_field=models.DecimalField()
+                        )
+                    )
+                ).aggregate(
+                    total=models.Sum('total_venda')
+                )['total'] or 0
+
+                print(f"Receitas de vendas: {receitas_vendas}")
+
+                # Calcular totais
+                receitas_totais = float(receitas_abates) + float(receitas_vendas)
+                
+                response_data = {
+                    'receitas_vendas': float(receitas_vendas),
+                    'receitas_abates': float(receitas_abates),
+                    'receitas_totais': receitas_totais,
+                    'custos_fixos': custos_fixos,
+                    'custos_variaveis': [],
+                    'investimentos': [],
+                    'total_custos_fixos': sum(c['valor'] for c in custos_fixos),
+                    'total_custos_variaveis': 0.0,
+                    'total_investimentos': 0.0,
+                    'total_geral_custos': 0.0,
+                    'percentual_custos_fixos': 0.0,
+                    'percentual_custos_variaveis': 0.0,
+                    'percentual_investimentos': 0.0,
+                    'saldo_estoque': 0.0,
+                    'total_ativo': 0.0,
+                    'total_passivo': 0.0,
+                    'total_imobilizado': 0.0
+                }
+                
+                # Calcular percentuais se houver receita
+                if receitas_totais > 0:
+                    total_custos_fixos = response_data['total_custos_fixos']
+                    response_data['percentual_custos_fixos'] = round((total_custos_fixos / receitas_totais) * 100, 2)
+                    
+                    # Atualizar percentuais das categorias
+                    for categoria in custos_fixos:
+                        categoria['percentual'] = round((categoria['valor'] / receitas_totais) * 100, 2)
+                        for subcategoria in categoria['subcategorias']:
+                            subcategoria['percentual'] = round((subcategoria['valor'] / receitas_totais) * 100, 2)
+                
+                return JsonResponse(response_data)
+
+            except Exception as e:
+                print("Erro ao processar dados:", str(e))
+                import traceback
+                traceback.print_exc()
+                return JsonResponse({'error': f'Erro ao processar dados: {str(e)}'}, status=500)
+
+        else:
+            return JsonResponse({'error': 'Método não permitido'}, status=405)
+    except Exception as e:
+        print("Erro ao processar requisição:", str(e))
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': f'Erro ao processar requisição: {str(e)}'}, status=500)
