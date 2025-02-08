@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/public/css/custom.css">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
 <body class="hold-transition {% if not user.is_authenticated %}bg-light{% else %}sidebar-mini{% endif %}">

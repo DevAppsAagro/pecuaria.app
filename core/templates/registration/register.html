@@ -7,7 +7,7 @@
     <div class="col-lg-6 d-none d-lg-flex bg-dark">
         <div class="w-100 d-flex align-items-center justify-content-center p-5">
             <div class="text-center text-white" style="max-width: 600px;">
-                <img src="/public/img/banner-logo.svg" alt="PecuaristaPRO" style="width: 600px; height: 200px;" class="mb-4">
+                <img src="{% static 'img/banner-logo.svg' %}" alt="PecuaristaPRO" style="width: 600px; height: 200px;" class="mb-4">
                 <p class="lead">Gestão inteligente para sua fazenda</p>
                 <p class="opacity-75">Sistema completo para gestão de fazendas, controle de rebanho, financeiro e muito mais.</p>
             </div>
@@ -21,7 +21,7 @@
                 <div class="mx-auto" style="max-width: 400px;">
                     <!-- Logo acima do formulário -->
                     <div class="text-center mb-4">
-                        <img src="/public/img/form-logo.svg" alt="PecuaristaPRO" style="height: 50px;" class="mb-3">
+                        <img src="{% static 'img/form-logo.svg' %}" alt="PecuaristaPRO" style="height: 50px;" class="mb-3">
                         <p class="text-muted">Crie sua conta para começar</p>
                     </div>
                     <form method="post">
@@ -81,7 +81,7 @@
         <footer class="py-3 bg-light">
             <div class="mx-auto" style="max-width: 400px;">
                 <div class="text-center">
-                    <img src="/public/img/logo.svg" alt="LWL Solutions" height="40" class="mb-2">
+                    <img src="{% static 'img/logo.svg' %}" alt="LWL Solutions" height="40" class="mb-2">
                     <p class="text-muted mb-0 small">
                         LWL Solutions Ltda &copy; 2020-{% now "Y" %} - Todos os direitos reservados<br>
                         CNPJ: 48.837.685/0001-51
