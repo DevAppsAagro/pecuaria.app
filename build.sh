@@ -4,7 +4,7 @@
 pip install -r requirements.txt
 
 # Coleta arquivos estáticos
-python manage.py collectstatic --noinput
+python3.9 manage.py collectstatic --noinput
 
 # Aplica as migrações
 python manage.py migrate
