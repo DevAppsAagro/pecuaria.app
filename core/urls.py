@@ -250,6 +250,4 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('aguardando-pagamento/', views.awaiting_payment, name='awaiting_payment'),
     path('configuracoes/', views.configuracoes, name='configuracoes'),
-    
-    path('favicon.ico', views.serve_favicon, name='favicon'),
 ]

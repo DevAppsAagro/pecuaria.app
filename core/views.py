@@ -3651,7 +3651,3 @@ class DespesasListView(LoginRequiredMixin, ListView):
         
         return context
 
-@login_required
-def serve_favicon(request):
-    favicon_path = os.path.join(settings.BASE_DIR, 'public', 'favicon.ico')
-    return FileResponse(open(favicon_path, 'rb'), content_type='image/x-icon')
