@@ -22,3 +22,11 @@ def divide(value, arg):
 def add_days(value, days):
     """Adiciona um número de dias a uma data"""
     return value + timedelta(days=int(days))
+
+@register.filter(name='get')
+def get(dictionary, key):
+    """
+    Retorna o valor de um dicionário usando a chave fornecida.
+    Uso: {{ dicionario|get:chave }}
+    """
+    return dictionary.get(key, '')

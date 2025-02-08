@@ -241,41 +241,35 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const selectAll = document.getElementById('select-all');
+        const selectAllCheckbox = document.getElementById('select-all');
         const animalCheckboxes = document.querySelectorAll('.animal-checkbox');
         const bulkActionSelect = document.getElementById('bulk-action');
         const applyButton = document.getElementById('apply-action');
         const selectionCounter = document.getElementById('selection-counter');
         const filtrosContador = document.getElementById('filtros-contador');
-        const fazendaSelect = document.getElementById('fazenda');
-        const loteSelect = document.getElementById('lote');
-        const pastoSelect = document.getElementById('pasto');
-        const categoriaSelect = document.getElementById('categoria');
-        const racaSelect = document.getElementById('raca');
-        const brincoInput = document.getElementById('brinco');
-        const filtrosForm = document.getElementById('filtros-form');
-        const limparFiltrosBtn = document.getElementById('limpar-filtros');
 
         // Função para atualizar o contador de seleção
         function updateSelectionCounter() {
-            const checkedCount = document.querySelectorAll('.animal-checkbox:checked').length;
-            selectionCounter.textContent = `${checkedCount} selecionado${checkedCount !== 1 ? 's' : ''}`;
+            const selectedCount = document.querySelectorAll('.animal-checkbox:checked').length;
+            selectionCounter.textContent = `${selectedCount} selecionados`;
         }
 
         // Função para atualizar o contador de filtros ativos
         function updateFiltrosContador() {
-            const form = document.getElementById('filtros-form');
-            const formData = new FormData(form);
-            let filtrosAtivos = 0;
-            for (let [key, value] of formData.entries()) {
-                if (value) filtrosAtivos++;
-            }
-            if (filtrosAtivos > 0) {
-                filtrosContador.textContent = `(${filtrosAtivos} filtro${filtrosAtivos !== 1 ? 's' : ''} ativo${filtrosAtivos !== 1 ? 's' : ''})`;
+            const params = new URLSearchParams(window.location.search);
+            let activeFilters = 0;
+            params.forEach((value, key) => {
+                if (value && ['fazenda', 'lote', 'pasto', 'categoria', 'raca', 'brinco'].includes(key)) {
+                    activeFilters++;
+                }
+            });
+            if (activeFilters > 0) {
+                filtrosContador.textContent = `(${activeFilters} filtros ativos)`;
             } else {
                 filtrosContador.textContent = '';
             }
@@ -283,10 +277,9 @@
 
         // Função para atualizar o botão de aplicar
         function updateApplyButton() {
-            const checkedBoxes = document.querySelectorAll('.animal-checkbox:checked');
-            const selectedAction = bulkActionSelect.value;
-            applyButton.disabled = checkedBoxes.length === 0 || !selectedAction;
-            updateSelectionCounter();
+            const hasSelection = document.querySelectorAll('.animal-checkbox:checked').length > 0;
+            const hasAction = bulkActionSelect.value !== '';
+            applyButton.disabled = !(hasSelection && hasAction);
         }
 
         // Atualizar botão quando a ação é alterada
@@ -294,58 +287,41 @@
 
         // Atualizar botão quando checkboxes são alterados
         animalCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', updateApplyButton);
+            checkbox.addEventListener('change', () => {
+                updateSelectionCounter();
+                updateApplyButton();
+                
+                // Atualizar o estado do checkbox "Selecionar Todos"
+                const allChecked = Array.from(animalCheckboxes).every(cb => cb.checked);
+                selectAllCheckbox.checked = allChecked;
+            });
         });
 
-        // Selecionar/Deselecionar todos
-        selectAll.addEventListener('change', function() {
-            animalCheckboxes.forEach(cb => {
-                cb.checked = this.checked;
+        // Manipular o checkbox "Selecionar Todos"
+        selectAllCheckbox.addEventListener('change', () => {
+            animalCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
             });
+            updateSelectionCounter();
             updateApplyButton();
         });
 
-        // Atualizar "Selecionar Todos" quando checkboxes individuais são alterados
-        animalCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                const allChecked = Array.from(animalCheckboxes).every(cb => cb.checked);
-                const someChecked = Array.from(animalCheckboxes).some(cb => cb.checked);
-                selectAll.checked = allChecked;
-                selectAll.indeterminate = someChecked && !allChecked;
-            });
-        });
+        // Inicializar contadores
+        updateSelectionCounter();
+        updateFiltrosContador();
+        updateApplyButton();
 
-        // Filtros dependentes
-        fazendaSelect.addEventListener('change', function() {
-            const fazendaId = this.value;
-            
-            // Atualizar lotes
-            Array.from(loteSelect.options).forEach(option => {
-                if (option.value === '') return; // Pular a opção "Todos"
-                const shouldShow = !fazendaId || option.dataset.fazenda === fazendaId;
-                option.style.display = shouldShow ? '' : 'none';
-            });
-            
-            // Atualizar pastos
-            Array.from(pastoSelect.options).forEach(option => {
-                if (option.value === '') return; // Pular a opção "Todos"
-                const shouldShow = !fazendaId || option.dataset.fazenda === fazendaId;
-                option.style.display = shouldShow ? '' : 'none';
-            });
-        });
-
-        // Limpar filtros
-        if (limparFiltrosBtn) {
-            limparFiltrosBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                window.location.href = "{% url 'animal_list' %}";
+        // Se houver uma mensagem de sucesso nos parâmetros da URL, mostrar alerta
+        const urlParams = new URLSearchParams(window.location.search);
+        const successMessage = urlParams.get('success_message');
+        if (successMessage) {
+            Swal.fire({
+                title: 'Sucesso!',
+                text: decodeURIComponent(successMessage),
+                icon: 'success',
+                confirmButtonText: 'OK'
             });
         }
-
-        // Inicializar contadores
-        updateFiltrosContador();
-        updateSelectionCounter();
     });
 </script>
-{% endblock %}
 {% endblock %}

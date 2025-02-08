@@ -1,6 +1,7 @@
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from core.models.configuracoes import *
+from django.db.models import Q
 
 # Raças
 class RacaListView(ListView):
@@ -40,6 +41,9 @@ class CategoriaCustoListView(ListView):
     model = CategoriaCusto
     template_name = 'configuracoes/categoria_custo_list.html'
     context_object_name = 'categorias'
+
+    def get_queryset(self):
+        return CategoriaCusto.objects.filter(Q(usuario=self.request.user) | Q(usuario__isnull=True))
 
 # Variedades de Capim
 class VariedadeCapimListView(ListView):

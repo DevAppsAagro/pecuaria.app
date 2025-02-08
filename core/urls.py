@@ -9,13 +9,9 @@ from . import views_parcelas
 from . import views_abates
 from . import views_dashboard
 from . import views_impressao
-from . import views_debug  # Importação do módulo de debug
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
-    # Rota temporária para debug
-    path('financeiro/despesas/debug/', views_debug.DespesasListViewDebug.as_view(), name='despesas_list_debug'),
-    
     # Dashboard
     path('', views_dashboard.dashboard, name='dashboard'),
     path('dashboard/atualizar/', views_dashboard.atualizar_dashboard, name='atualizar_dashboard'),

@@ -178,7 +178,7 @@ function atualizarPastos() {
                     data.pastos.forEach(pasto => {
                         const option = document.createElement('option');
                         option.value = pasto.id;
-                        option.textContent = `${pasto.id_pasto} - ${pasto.fazenda.nome}`;
+                        option.textContent = `${pasto.id_pasto} - ${pasto.fazenda_nome}`;
                         // Se este é o pasto atual, marca como selecionado
                         if (pasto.id == pastoAtualId) {
                             option.selected = true;

@@ -302,6 +302,14 @@ def saida_nutricao_estoque(request):
                             gmd = (ultima_pesagem.peso - penultima_pesagem.peso) / dias
                             gmd_total += gmd
                             animais_com_gmd += 1
+                    # Se tiver apenas uma pesagem, tenta calcular com o peso de entrada
+                    elif len(ultimas_pesagens) == 1 and animal.peso_entrada and animal.data_entrada:
+                        ultima_pesagem = ultimas_pesagens[0]
+                        dias = (ultima_pesagem.data - animal.data_entrada).days
+                        if dias > 0:
+                            gmd = (ultima_pesagem.peso - animal.peso_entrada) / dias
+                            gmd_total += gmd
+                            animais_com_gmd += 1
                     
                     # Pega o último peso para a média de peso
                     ultima_pesagem = ultimas_pesagens[0] if ultimas_pesagens else None
@@ -363,32 +371,92 @@ class SaidaNutricaoListView(ListView):
                     pesos = []
                     gmds = []
                     
+                    print("\n=== Iniciando cálculo de GMD para o lote ===")
+                    
                     for animal in animais:
-                        # Pega as duas últimas pesagens para calcular o GMD
-                        ultimas_pesagens = animal.pesagens.order_by('-data')[:2]
-                        if len(ultimas_pesagens) >= 2:
-                            ultima_pesagem = ultimas_pesagens[0]
-                            penultima_pesagem = ultimas_pesagens[1]
-                            
-                            # Calcula o GMD
-                            dias = (ultima_pesagem.data - penultima_pesagem.data).days
-                            if dias > 0:
-                                gmd = (ultima_pesagem.peso - penultima_pesagem.peso) / dias
-                                gmds.append(gmd)
+                        print(f"\nAnimal {animal.brinco_visual}:")
+                        print(f"- Peso entrada: {animal.peso_entrada}kg")
+                        print(f"- Data entrada: {animal.data_entrada}")
                         
-                        # Pega o último peso para a média de peso
-                        ultima_pesagem = ultimas_pesagens[0] if ultimas_pesagens else None
-                        if ultima_pesagem:
+                        # Busca todas as pesagens do animal
+                        pesagens = list(Pesagem.objects.filter(
+                            animal=animal
+                        ).order_by('-data'))
+                        
+                        # Adiciona o peso de entrada como primeira pesagem se não estiver na lista
+                        if animal.peso_entrada and animal.data_entrada:
+                            peso_entrada_existe = any(
+                                p.data == animal.data_entrada and abs(p.peso - animal.peso_entrada) < 0.01 
+                                for p in pesagens
+                            )
+                            if not peso_entrada_existe:
+                                peso_entrada = Pesagem(
+                                    animal=animal,
+                                    peso=animal.peso_entrada,
+                                    data=animal.data_entrada,
+                                    usuario=self.request.user
+                                )
+                                pesagens.append(peso_entrada)
+                        
+                        # Ordena todas as pesagens por data decrescente
+                        pesagens.sort(key=lambda x: x.data, reverse=True)
+                        
+                        if pesagens:
+                            ultima_pesagem = pesagens[0]
+                            print(f"- Última pesagem: {ultima_pesagem.peso}kg em {ultima_pesagem.data}")
+                            # Adiciona o último peso conhecido para média do lote
                             pesos.append(ultima_pesagem.peso)
-                    
-                    peso_medio = sum(pesos) / len(pesos) if pesos else 0
-                    gmd_medio = sum(gmds) / len(gmds) if gmds else 0
-                    
-                    # Adiciona os dados calculados ao lote
-                    lote.quantidade_atual = quantidade_atual
-                    lote.peso_medio = peso_medio
-                    lote.gmd_medio = gmd_medio
-                    
+                            
+                            # Se tiver mais de uma pesagem, calcula o GMD entre as duas últimas
+                            if len(pesagens) >= 2:
+                                penultima_pesagem = pesagens[1]
+                                dias = (ultima_pesagem.data - penultima_pesagem.data).days
+                                print(f"- Dias entre pesagens: {dias}")
+                                
+                                if dias > 0:
+                                    ganho = ultima_pesagem.peso - penultima_pesagem.peso
+                                    gmd = round(ganho / dias, 2)
+                                    print(f"- Ganho: {ganho}kg em {dias} dias")
+                                    print(f"- GMD calculado: {gmd}kg/dia")
+                                    
+                                    if gmd > 0:  # Só considera GMDs positivos
+                                        gmds.append(gmd)
+                                        print(f"- GMD positivo, adicionado à média")
+                                    else:
+                                        print(f"- GMD negativo, ignorado")
+                                else:
+                                    print("- Dias = 0, não é possível calcular GMD")
+                            elif len(pesagens) == 1 and animal.peso_entrada and animal.data_entrada:
+                                dias = (ultima_pesagem.data - animal.data_entrada).days
+                                if dias > 0:
+                                    gmd = (ultima_pesagem.peso - animal.peso_entrada) / dias
+                                    gmds.append(gmd)
+                            else:
+                                print("- Apenas uma pesagem disponível")
+                        else:
+                            print("- Sem pesagens registradas")
+                            if animal.peso_entrada:
+                                print(f"- Usando peso de entrada ({animal.peso_entrada}kg) para média")
+                                # Se não tem pesagem, usa o peso de entrada para a média
+                                pesos.append(animal.peso_entrada)
+                
+                # Calcula as médias com proteção contra divisão por zero
+                peso_medio = sum(pesos) / len(pesos) if pesos else 0
+                gmd_medio = sum(gmds) / len(gmds) if gmds else 0
+                
+                print(f"\nResultados do lote:")
+                print(f"- Número de animais com GMD calculado: {len(gmds)}")
+                if gmds:
+                    print(f"- GMDs individuais: {[round(gmd, 2) for gmd in gmds]}")
+                else:
+                    print("- Nenhum GMD calculado")
+                print(f"- Peso médio: {peso_medio:.2f}kg")
+                print(f"- GMD médio: {gmd_medio:.2f}kg/dia")
+                
+                # Adiciona os dados calculados ao lote
+                lote.peso_medio = peso_medio
+                lote.gmd_medio = gmd_medio
+                
                 saidas_data.append(saida)
             except Exception as e:
                 print(f"Erro ao processar saída {saida.id}: {str(e)}")
@@ -558,34 +626,103 @@ class SaidaNutricaoCreateView(CreateView):
                 pesos = []
                 gmds = []
                 
-                for animal in animais:
-                    ultima_pesagem = Pesagem.objects.filter(
-                        animal=animal
-                    ).order_by('-data').first()
-                    
-                    if ultima_pesagem:
-                        pesos.append(ultima_pesagem.peso)
-                    
-                    # Usa a propriedade gmd do animal
-                    gmd = animal.gmd
-                    if gmd > 0:  # Só considera GMDs positivos
-                        gmds.append(gmd)
+                print(f"\n=== Iniciando cálculo de GMD para o lote {lote.id_lote} ===")
+                print(f"Quantidade de animais: {quantidade_atual}")
                 
+                for animal in animais:
+                    print(f"\nAnimal {animal.brinco_visual}:")
+                    print(f"- Peso entrada: {animal.peso_entrada}kg")
+                    print(f"- Data entrada: {animal.data_entrada}")
+                    
+                    # Busca todas as pesagens do animal
+                    pesagens = list(Pesagem.objects.filter(
+                        animal=animal
+                    ).order_by('-data'))
+                    
+                    # Adiciona o peso de entrada como primeira pesagem se não estiver na lista
+                    if animal.peso_entrada and animal.data_entrada:
+                        peso_entrada_existe = any(
+                            p.data == animal.data_entrada and abs(p.peso - animal.peso_entrada) < 0.01 
+                            for p in pesagens
+                        )
+                        if not peso_entrada_existe:
+                            peso_entrada = Pesagem(
+                                animal=animal,
+                                peso=animal.peso_entrada,
+                                data=animal.data_entrada,
+                                usuario=self.request.user
+                            )
+                            pesagens.append(peso_entrada)
+                    
+                    # Ordena todas as pesagens por data decrescente
+                    pesagens.sort(key=lambda x: x.data, reverse=True)
+                    
+                    if pesagens:
+                        ultima_pesagem = pesagens[0]
+                        print(f"- Última pesagem: {ultima_pesagem.peso}kg em {ultima_pesagem.data}")
+                        # Adiciona o último peso conhecido para média do lote
+                        pesos.append(ultima_pesagem.peso)
+                        
+                        # Se tiver mais de uma pesagem, calcula o GMD entre as duas últimas
+                        if len(pesagens) >= 2:
+                            penultima_pesagem = pesagens[1]
+                            dias = (ultima_pesagem.data - penultima_pesagem.data).days
+                            print(f"- Dias entre pesagens: {dias}")
+                            
+                            if dias > 0:
+                                ganho = ultima_pesagem.peso - penultima_pesagem.peso
+                                gmd = round(ganho / dias, 2)
+                                print(f"- Ganho: {ganho}kg em {dias} dias")
+                                print(f"- GMD calculado: {gmd}kg/dia")
+                                
+                                if gmd > 0:  # Só considera GMDs positivos
+                                    gmds.append(gmd)
+                                    print(f"- GMD positivo, adicionado à média")
+                                else:
+                                    print(f"- GMD negativo, ignorado")
+                            else:
+                                print("- Dias = 0, não é possível calcular GMD")
+                        elif len(pesagens) == 1 and animal.peso_entrada and animal.data_entrada:
+                            dias = (ultima_pesagem.data - animal.data_entrada).days
+                            if dias > 0:
+                                gmd = (ultima_pesagem.peso - animal.peso_entrada) / dias
+                                gmds.append(gmd)
+                        else:
+                            print("- Apenas uma pesagem disponível")
+                    else:
+                        print("- Sem pesagens registradas")
+                        if animal.peso_entrada:
+                            print(f"- Usando peso de entrada ({animal.peso_entrada}kg) para média")
+                            # Se não tem pesagem, usa o peso de entrada para a média
+                            pesos.append(animal.peso_entrada)
+                
+                # Calcula as médias com proteção contra divisão por zero
                 peso_medio = sum(pesos) / len(pesos) if pesos else 0
                 gmd_medio = sum(gmds) / len(gmds) if gmds else 0
                 
+                print(f"\nResultados do lote {lote.id_lote}:")
+                print(f"- Número de animais com GMD calculado: {len(gmds)}")
+                if gmds:
+                    print(f"- GMDs individuais: {[round(gmd, 2) for gmd in gmds]}")
+                else:
+                    print("- Nenhum GMD calculado")
+                print(f"- Peso médio: {peso_medio:.2f}kg")
+                print(f"- GMD médio: {gmd_medio:.2f}kg/dia")
+                
                 # Adiciona os dados calculados ao lote
-                lote.quantidade_atual = quantidade_atual
                 lote.peso_medio = peso_medio
                 lote.gmd_medio = gmd_medio
                 
-                lotes_data.append(lote)
-                
-                print(f"Lote {lote.id_lote}: qtd={quantidade_atual}, peso={peso_medio:.2f}, gmd={gmd_medio:.3f}")
+                lotes_data.append({
+                    'lote': lote,
+                    'quantidade_atual': quantidade_atual,
+                    'peso_medio': peso_medio,
+                    'gmd_medio': gmd_medio
+                })
             except Exception as e:
                 print(f"Erro ao processar lote {lote.id_lote}: {str(e)}")
                 continue
-            
+        
         context['lotes'] = lotes_data
         return context
 
@@ -632,11 +769,11 @@ class SaidaNutricaoView(ListView):
                 if hasattr(animal, 'gmd'):
                     gmds.append(animal.gmd)
             
+            # Calcula as médias com proteção contra divisão por zero
             peso_medio = sum(pesos) / len(pesos) if pesos else 0
             gmd_medio = sum(gmds) / len(gmds) if gmds else 0
             
             # Adiciona os dados calculados ao lote
-            lote.quantidade_atual = quantidade_atual
             lote.peso_medio = peso_medio
             lote.gmd_medio = gmd_medio
             lotes_data.append(lote)
@@ -685,19 +822,23 @@ def saida_nutricao_detail(request, pk):
         # Calcula o consumo por cabeça
         consumo_por_cabeca = saida.quantidade / count if count > 0 else 0
         
+        # Calcula o valor por animal
+        valor_por_animal = saida.valor_total / count if count > 0 else 0
+        
         # Atualiza ou cria os rateios para cada animal
         RateioMovimentacao.objects.filter(movimentacao=saida).delete()  # Remove rateios antigos
         for animal_info in animais_com_peso:
             RateioMovimentacao.objects.create(
                 movimentacao=saida,
                 animal=animal_info['animal'],
-                valor=consumo_por_cabeca  # Usando o campo valor em vez de quantidade_rateio
+                valor=valor_por_animal  # Usando o valor_por_animal correto
             )
     else:
         peso_medio = 0
         count = 0
         consumo_diario_lote = 0
         consumo_por_cabeca = 0
+        valor_por_animal = 0
     
     # Busca os rateios atualizados
     rateios = RateioMovimentacao.objects.filter(
