@@ -17,6 +17,7 @@
     ],
     "env": {
         "DJANGO_SETTINGS_MODULE": "pecuaria_project.settings",
-        "PYTHONPATH": "."
+        "PYTHONPATH": ".",
+        "TZ": "UTC"
     }
 }
