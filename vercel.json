@@ -15,9 +15,17 @@
             "config": {
                 "distDir": "staticfiles"
             }
+        },
+        {
+            "src": "public/**",
+            "use": "@vercel/static"
         }
     ],
     "routes": [
+        {
+            "src": "/img/(.*)",
+            "dest": "/public/img/$1"
+        },
         {
             "src": "/static/(.*)",
             "dest": "/static/$1"
