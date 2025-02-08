@@ -127,7 +127,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 STATICFILES_DIRS = [
@@ -135,15 +135,18 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'public'),  # Adicionando pasta public para desenvolvimento
 ]
 
-# Configuração de MIME types para SVG
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+# Configuração de MIME types
 MIMETYPES = {
     '.svg': 'image/svg+xml',
-    '.ico': 'image/x-icon',  # Adicionando MIME type para .ico
+    '.ico': 'image/x-icon',
 }
 
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# URLs para servir arquivos em desenvolvimento
+if DEBUG:
+    STATIC_URL = '/public/'  # Em desenvolvimento, serve da pasta public
 
 CORS_ALLOW_ALL_ORIGINS = True  # Apenas para desenvolvimento
 CORS_ALLOW_CREDENTIALS = True
