@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login, authenticate
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, FileResponse
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -3650,3 +3650,8 @@ class DespesasListView(LoginRequiredMixin, ListView):
         context['active_tab'] = 'financeiro'
         
         return context
+
+@login_required
+def serve_favicon(request):
+    favicon_path = os.path.join(settings.BASE_DIR, 'public', 'favicon.ico')
+    return FileResponse(open(favicon_path, 'rb'), content_type='image/x-icon')
