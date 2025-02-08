@@ -1,20 +1,15 @@
 {
-    "builds": [
-        {
-            "src": "pecuaria_project/wsgi.py",
-            "use": "@vercel/python"
-        }
-    ],
-    "routes": [
-        {
-            "src": "/static/(.*)",
-            "dest": "/static/$1"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "pecuaria_project/wsgi.py"
-        }
-    ],
+    "builds": [{
+        "src": "pecuaria_project/wsgi.py",
+        "use": "@vercel/python"
+    }],
+    "routes": [{
+        "src": "/static/(.*)",
+        "dest": "/static/$1"
+    }, {
+        "src": "/(.*)",
+        "dest": "pecuaria_project/wsgi.py"
+    }],
     "env": {
         "DJANGO_SETTINGS_MODULE": "pecuaria_project.settings",
         "PYTHONPATH": ".",
