@@ -132,6 +132,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'core', 'static'),
+    os.path.join(BASE_DIR, 'public'),  
 ]
 
 # Configuração de MIME types
@@ -143,9 +144,9 @@ MIMETYPES = {
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Configuração para servir arquivos estáticos no Vercel
+# Em produção, os arquivos estáticos são servidos diretamente pelo Vercel
 if not DEBUG:
-    STATIC_ROOT = os.path.join(BASE_DIR, 'public')  # No Vercel, coleta para pasta public
+    STATIC_ROOT = os.path.join(BASE_DIR, 'public')
 
 CORS_ALLOW_ALL_ORIGINS = True  # Apenas para desenvolvimento
 CORS_ALLOW_CREDENTIALS = True
