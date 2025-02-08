@@ -1,3 +1,9 @@
 <!-- Favicon -->
-<link rel="icon" type="image/x-icon" href="/favicon.ico">
-<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+{% load static %}
+{% if not DEBUG %}
+<link rel="icon" type="image/x-icon" href="/public/favicon.ico">
+<link rel="shortcut icon" type="image/x-icon" href="/public/favicon.ico">
+{% else %}
+<link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
+<link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
+{% endif %}

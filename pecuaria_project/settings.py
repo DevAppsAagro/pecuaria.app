@@ -133,12 +133,14 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'core', 'static'),
+    os.path.join(BASE_DIR, 'public'),  # Adicionando pasta public para desenvolvimento
 ]
 
 # Configuração de MIME types para SVG
 STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
 MIMETYPES = {
     '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',  # Adicionando MIME type para .ico
 }
 
 MEDIA_URL = 'media/'
