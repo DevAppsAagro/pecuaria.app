@@ -1,43 +1,117 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block auth_content %}
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-4">
-        <div class="card">
-            <div class="card-body">
-                <h3 class="card-title text-center mb-4">Registro</h3>
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="id_username" class="form-label">Usuário</label>
-                        <input type="text" name="username" class="form-control" id="id_username" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="id_email" class="form-label">Email</label>
-                        <input type="email" name="email" class="form-control" id="id_email" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="id_password1" class="form-label">Senha</label>
-                        <input type="password" name="password1" class="form-control" id="id_password1" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="id_password2" class="form-label">Confirme a Senha</label>
-                        <input type="password" name="password2" class="form-control" id="id_password2" required>
-                    </div>
-                    {% if form.errors %}
-                        <div class="alert alert-danger">
-                            {{ form.errors }}
-                        </div>
-                    {% endif %}
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Registrar</button>
-                    </div>
-                </form>
-                <div class="text-center mt-3">
-                    <p>Já tem uma conta? <a href="{% url 'login' %}">Faça login</a></p>
-                </div>
+<div class="row g-0 min-vh-100">
+    <!-- Banner Lateral -->
+    <div class="col-lg-6 d-none d-lg-flex bg-dark">
+        <div class="w-100 d-flex align-items-center justify-content-center p-5">
+            <div class="text-center text-white" style="max-width: 600px;">
+                <img src="{% static 'img/banner-logo.svg' %}" alt="PecuaristaPRO" style="width: 600px; height: 200px;" class="mb-4">
+                <p class="lead">Gestão inteligente para sua fazenda</p>
+                <p class="opacity-75">Sistema completo para gestão de fazendas, controle de rebanho, financeiro e muito mais.</p>
             </div>
         </div>
     </div>
+    
+    <!-- Formulário -->
+    <div class="col-12 col-lg-6 d-flex flex-column">
+        <div class="flex-grow-1 d-flex align-items-center">
+            <div class="w-100 px-4">
+                <div class="mx-auto" style="max-width: 400px;">
+                    <!-- Logo acima do formulário -->
+                    <div class="text-center mb-4">
+                        <img src="{% static 'img/form-logo.svg' %}" alt="PecuaristaPRO" style="height: 50px;" class="mb-3">
+                        <p class="text-muted">Crie sua conta para começar</p>
+                    </div>
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="id_username" class="form-label text-start d-block">Usuário</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+                                <input type="text" name="username" class="form-control" id="id_username" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="id_email" class="form-label text-start d-block">Email</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-envelope"></i></span>
+                                <input type="email" name="email" class="form-control" id="id_email" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="id_password1" class="form-label text-start d-block">Senha</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
+                                <input type="password" name="password1" class="form-control" id="id_password1" required>
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword1">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="id_password2" class="form-label text-start d-block">Confirme a Senha</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-lock-fill"></i></span>
+                                <input type="password" name="password2" class="form-control" id="id_password2" required>
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword2">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                {{ form.errors }}
+                            </div>
+                        {% endif %}
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary py-2">
+                                <i class="bi bi-person-plus me-2"></i>Registrar
+                            </button>
+                        </div>
+                        <div class="text-center mt-4">
+                            <p class="mb-0">Já tem uma conta? <a href="{% url 'login' %}" class="text-primary text-decoration-none">Faça login</a></p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <!-- Footer -->
+        <footer class="py-3 bg-light">
+            <div class="mx-auto" style="max-width: 400px;">
+                <div class="text-center">
+                    <img src="{% static 'img/logo.svg' %}" alt="LWL Solutions" height="40" class="mb-2">
+                    <p class="text-muted mb-0 small">
+                        LWL Solutions Ltda &copy; 2020-{% now "Y" %} - Todos os direitos reservados<br>
+                        CNPJ: 48.837.685/0001-51
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
 </div>
+
+<script>
+// Toggle password visibility for both password fields
+function setupPasswordToggle(buttonId, inputId) {
+    document.getElementById(buttonId).addEventListener('click', function() {
+        const passwordInput = document.getElementById(inputId);
+        const icon = this.querySelector('i');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            passwordInput.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    });
+}
+
+setupPasswordToggle('togglePassword1', 'id_password1');
+setupPasswordToggle('togglePassword2', 'id_password2');
+</script>
 {% endblock %}

@@ -1,35 +1,101 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block auth_content %}
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-4">
-        <div class="card">
-            <div class="card-body">
-                <h3 class="card-title text-center mb-4">Login</h3>
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="id_username" class="form-label">Usuário</label>
-                        <input type="text" name="username" class="form-control" id="id_username" required>
+<div class="row g-0 min-vh-100">
+    <!-- Formulário -->
+    <div class="col-12 col-lg-6 d-flex flex-column">
+        <div class="flex-grow-1 d-flex align-items-center">
+            <div class="w-100 px-4">
+                <div class="mx-auto" style="max-width: 400px;">
+                    <div class="text-center mb-4">
+                        <img src="{% static 'img/form-logo.svg' %}" alt="PecuaristaPRO" style="height: 50px;" class="mb-3">
+                        <p class="text-muted">Entre com suas credenciais para continuar</p>
                     </div>
-                    <div class="mb-3">
-                        <label for="id_password" class="form-label">Senha</label>
-                        <input type="password" name="password" class="form-control" id="id_password" required>
-                    </div>
-                    {% if form.errors %}
-                        <div class="alert alert-danger">
-                            Email ou senha incorretos.
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="id_username" class="form-label text-start d-block">Usuário</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+                                <input type="text" name="username" class="form-control" id="id_username" required>
+                            </div>
                         </div>
-                    {% endif %}
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Entrar</button>
-                    </div>
-                </form>
-                <div class="text-center mt-3">
-                    <p>Não tem uma conta? <a href="{% url 'register' %}">Registre-se</a></p>
+                        <div class="mb-3">
+                            <label for="id_password" class="form-label text-start d-block">Senha</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
+                                <input type="password" name="password" class="form-control" id="id_password" required>
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mb-3 d-flex justify-content-between align-items-center">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="rememberMe" name="remember_me">
+                                <label class="form-check-label" for="rememberMe">Lembrar de mim</label>
+                            </div>
+                            <a href="#" class="text-decoration-none">Esqueceu a senha?</a>
+                        </div>
+                        {% if form.errors %}
+                            <div class="alert alert-danger d-flex align-items-center">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                <div>Email ou senha incorretos.</div>
+                            </div>
+                        {% endif %}
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary py-2">
+                                <i class="bi bi-box-arrow-in-right me-2"></i>Entrar
+                            </button>
+                        </div>
+                        <div class="text-center mt-4">
+                            <p class="mb-0">Não tem uma conta? <a href="{% url 'register' %}" class="text-primary text-decoration-none">Registre-se</a></p>
+                        </div>
+                    </form>
                 </div>
+            </div>
+        </div>
+        <!-- Footer -->
+        <footer class="py-3 bg-light">
+            <div class="mx-auto" style="max-width: 400px;">
+                <div class="text-center">
+                    <img src="{% static 'img/logo.svg' %}" alt="LWL Solutions" height="40" class="mb-2">
+                    <p class="text-muted mb-0 small">
+                        LWL Solutions Ltda &copy; 2020-{% now "Y" %} - Todos os direitos reservados<br>
+                        CNPJ: 48.837.685/0001-51
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Banner Lateral -->
+    <div class="col-lg-6 d-none d-lg-flex bg-dark">
+        <div class="w-100 d-flex align-items-center justify-content-center p-5">
+            <div class="text-center text-white" style="max-width: 600px;">
+                <img src="{% static 'img/banner-logo.svg' %}" alt="PecuaristaPRO" style="width: 600px; height: 200px;" class="mb-4">
+                <p class="lead">Gestão inteligente para sua fazenda</p>
+                <p class="opacity-75">Sistema completo para gestão de fazendas, controle de rebanho, financeiro e muito mais.</p>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('togglePassword').addEventListener('click', function() {
+    const passwordInput = document.getElementById('id_password');
+    const icon = this.querySelector('i');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+    } else {
+        passwordInput.type = 'password';
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
+    }
+});
+</script>
 {% endblock %}

@@ -20,7 +20,7 @@
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
-<body class="hold-transition sidebar-mini">
+<body class="hold-transition {% if not user.is_authenticated %}bg-light{% else %}sidebar-mini{% endif %}">
     {% if user.is_authenticated %}
     <div class="wrapper">
         <!-- Navbar -->
@@ -249,26 +249,22 @@
         </div>
     </div>
     {% else %}
-    <div class="login-page">
-        <div class="login-box">
-            {% if messages %}
-            <script>
-            {% for message in messages %}
-                Swal.fire({
-                    title: '{{ message }}',
-                    icon: '{{ message.tags }}',
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 3000
-                })
-            {% endfor %}
-            </script>
-            {% endif %}
-            {% block auth_content %}
-            {% endblock %}
-        </div>
-    </div>
+        {% if messages %}
+        <script>
+        {% for message in messages %}
+            Swal.fire({
+                title: '{{ message }}',
+                icon: '{{ message.tags }}',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000
+            })
+        {% endfor %}
+        </script>
+        {% endif %}
+        {% block auth_content %}
+        {% endblock %}
     {% endif %}
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
