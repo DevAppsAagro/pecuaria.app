@@ -30,6 +30,14 @@ class Fazenda(models.Model):
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     data_cadastro = models.DateTimeField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
+    timezone = models.CharField('Fuso Horário', max_length=50, default='America/Sao_Paulo',
+        choices=[
+            ('America/Manaus', 'Manaus (GMT-4)'),
+            ('America/Sao_Paulo', 'São Paulo (GMT-3)'),
+            ('America/Belem', 'Belém (GMT-3)'),
+            ('America/Rio_Branco', 'Rio Branco (GMT-5)'),
+            ('America/Cuiaba', 'Cuiabá (GMT-4)')
+        ])
 
     class Meta:
         verbose_name = 'Fazenda'
@@ -482,20 +490,6 @@ class ContaBancaria(models.Model):
             usuario=self.usuario
         )
 
-    def calcular_saldo_em_data(self, data):
-        from decimal import Decimal
-        
-        # Pega todas as movimentações até a data
-        movimentacoes = ExtratoBancario.objects.filter(
-            conta=self,
-            data__lte=data
-        ).values('valor')
-        
-        # Soma todas as movimentações
-        total_movimentacoes = sum([mov['valor'] for mov in movimentacoes], Decimal('0.00'))
-        
-        return total_movimentacoes
-
 class ExtratoBancario(models.Model):
     TIPO_CHOICES = [
         ('despesa', 'Despesa'),
@@ -643,6 +637,13 @@ class Despesa(models.Model):
     def valor_final(self):
         return self.valor_total() + self.multa_juros - self.desconto
     
+    @property
+    def dias_atraso(self):
+        from django.utils import timezone
+        if self.status == 'VENCIDO' and self.data_vencimento:
+            return (timezone.now().date() - self.data_vencimento).days
+        return 0
+    
     def info_parcelas(self):
         if self.forma_pagamento == 'PR':
             return self.parcelas.all()
@@ -654,12 +655,16 @@ class Despesa(models.Model):
         
         hoje = timezone.now().date()
         
-        if not self.data_pagamento and self.data_vencimento:
+        # Se tem data de pagamento, status é PAGO
+        if self.data_pagamento:
+            self.status = 'PAGO'
+        # Se não tem data de pagamento, verifica vencimento
+        elif self.data_vencimento:
             if self.data_vencimento < hoje:
                 self.status = 'VENCIDO'
             elif self.data_vencimento == hoje:
                 self.status = 'VENCE_HOJE'
-            elif self.status in ['VENCIDO', 'VENCE_HOJE']:
+            else:
                 self.status = 'PENDENTE'
         
         super().save(*args, **kwargs)
@@ -716,11 +721,12 @@ class ItemDespesa(models.Model):
     def realizar_rateio(self):
         # Se for item de estoque, não faz rateio
         if self.categoria.alocacao == 'estoque':
+            print(f"Não realizando rateio para item {self.id} - É um item de estoque")
             return
             
         # Inicializa animais como None
         animais = None
-        print(f"Realizando rateio para item {self.id} - Categoria: {self.categoria.nome} - Tipo: {self.categoria.tipo}")
+        print(f"Realizando rateio para item {self.id} - Categoria: {self.categoria.nome} - Tipo: {self.categoria.tipo} - Alocação: {self.categoria.alocacao}")
 
         # Verifica se o tipo de alocação é compatível com rateio
         if self.categoria.alocacao not in ['fazenda', 'lote']:
@@ -746,6 +752,9 @@ class ItemDespesa(models.Model):
                 data_entrada__lte=self.despesa.data_emissao
             )
             print(f"Encontrados {animais.count()} animais para rateio variável")
+        else:
+            print(f"Não foi possível realizar rateio - Tipo: {self.categoria.tipo}, Fazenda: {self.fazenda_destino}, Lote: {self.lote_destino}")
+            return
 
         # Se houver animais para ratear
         if animais and animais.exists():
@@ -760,6 +769,8 @@ class ItemDespesa(models.Model):
                     valor=valor_por_animal
                 )
                 print(f"Rateio criado para animal {animal.brinco_visual}: R$ {valor_por_animal}")
+        else:
+            print("Nenhum animal encontrado para realizar o rateio")
 
 class RateioCusto(models.Model):
     item_despesa = models.ForeignKey(ItemDespesa, on_delete=models.CASCADE)
@@ -800,24 +811,40 @@ class ParcelaDespesa(models.Model):
         unique_together = ['despesa', 'numero']
 
     def __str__(self):
-        return f"{self.despesa} - Parcela {self.numero}"
-
-    @property
+        return f"Parcela {self.numero} - {self.despesa}"
+    
     def valor_final(self):
         return self.valor + self.multa_juros - self.desconto
 
     def save(self, *args, **kwargs):
+        is_new = not self.id
+        old_status = None if is_new else ParcelaDespesa.objects.get(id=self.id).status
+        
         hoje = timezone.now().date()
         
-        if not self.data_pagamento and self.data_vencimento:  # Verifica se data_vencimento não é None
+        # Se tem data de pagamento, status é PAGO
+        if self.data_pagamento:
+            self.status = 'PAGO'
+        # Se não tem data de pagamento, verifica vencimento
+        elif self.data_vencimento:
             if self.data_vencimento < hoje:
                 self.status = 'VENCIDO'
             elif self.data_vencimento == hoje:
                 self.status = 'VENCE_HOJE'
-            elif self.status in ['VENCIDO', 'VENCE_HOJE']:  # Se a data foi alterada
+            else:
                 self.status = 'PENDENTE'
         
         super().save(*args, **kwargs)
+        
+        # Atualiza o status da despesa pai se todas as parcelas estiverem pagas
+        if self.status == 'PAGO' and (is_new or old_status != 'PAGO'):
+            todas_parcelas = self.despesa.parcelas.all()
+            todas_pagas = all(p.status == 'PAGO' for p in todas_parcelas)
+            
+            if todas_pagas:
+                self.despesa.status = 'PAGO'
+                self.despesa.data_pagamento = max(p.data_pagamento for p in todas_parcelas)
+                self.despesa.save()
 
 class MovimentacaoNaoOperacional(models.Model):
     TIPO_CHOICES = [

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load core_extras %}
 
 {% block extra_head %}
 <!-- DataTables -->
@@ -28,62 +29,32 @@
         padding: 20px;
         position: relative;
         z-index: 2;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        color: #fff!important;
     }
 
-    .small-box h3 {
-        font-size: 2.2rem;
-        font-weight: bold;
-        margin: 0 0 10px 0;
-        white-space: nowrap;
-        padding: 0;
-    }
-
-    .small-box p {
-        font-size: 1rem;
-        margin-bottom: 0;
+    .small-box h3, .small-box p {
+        color: #fff!important;
     }
 
     .small-box .icon {
-        position: absolute;
-        top: 15px;
-        right: 15px;
-        z-index: 1;
-        font-size: 60px;
+        color: #fff!important;
+        opacity: 0.3;
     }
 
-    .small-box:hover {
-        text-decoration: none;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 6px rgba(50,50,93,.11), 0 1px 3px rgba(0,0,0,.08);
-        transition: all .3s ease;
+    .bg-success, .bg-warning, .bg-danger, .bg-info {
+        color: #fff!important;
     }
 
-    .bg-success {
-        background-color: #28a745!important;
-        color: #fff;
+    .bg-gradient-warning {
+        color: #fff!important;
     }
 
-    .bg-warning {
-        background-color: #ffc107!important;
-        color: #1f2d3d;
-    }
-
-    .bg-danger {
-        background-color: #dc3545!important;
-        color: #fff;
-    }
-
-    .bg-info {
-        background-color: #17a2b8!important;
-        color: #fff;
-    }
-    
-    /* Demais estilos existentes */
     .bg-gradient-primary {
         color: #fff;
-    }
-    .bg-gradient-warning {
-        color: #1f2d3d;
     }
     .bg-gradient-danger {
         color: #fff;
@@ -181,6 +152,11 @@
     .bg-danger .icon {
         color: rgba(255,255,255,0.3);
     }
+
+    /* Ajuste do dropdown de paginação */
+    .dataTables_length select {
+        padding-right: 30px !important;  /* Espaço para a seta */
+    }
 </style>
 {% endblock %}
 
@@ -227,24 +203,24 @@
                     <!-- Filtros -->
                     <div class="mb-4">
                         <form method="get" class="row g-3">
-                            <div class="col-md-3">
-                                <label for="contato" class="form-label">Fornecedor</label>
-                                <select name="contato" id="contato" class="form-select">
-                                    <option value="">Todos</option>
-                                    {% for contato in contatos %}
-                                        <option value="{{ contato.id }}" {% if filtros.contato|stringformat:"s" == contato.id|stringformat:"s" %}selected{% endif %}>
-                                            {{ contato.nome }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label for="fazenda" class="form-label">Fazenda</label>
                                 <select name="fazenda" id="fazenda" class="form-select">
                                     <option value="">Todas</option>
                                     {% for fazenda in fazendas %}
-                                        <option value="{{ fazenda.id }}" {% if filtros.fazenda|stringformat:"s" == fazenda.id|stringformat:"s" %}selected{% endif %}>
+                                        <option value="{{ fazenda.id }}" {% if filtros.fazenda == fazenda.id|stringformat:"s" %}selected{% endif %}>
                                             {{ fazenda.nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="contato" class="form-label">Fornecedor</label>
+                                <select name="contato" id="contato" class="form-select">
+                                    <option value="">Todos</option>
+                                    {% for fornecedor in fornecedores %}
+                                        <option value="{{ fornecedor.id }}" {% if filtros.contato|stringformat:"s" == fornecedor.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ fornecedor.nome }}
                                         </option>
                                     {% endfor %}
                                 </select>
@@ -255,162 +231,123 @@
                                     <option value="">Todos</option>
                                     <option value="PENDENTE" {% if filtros.status == 'PENDENTE' %}selected{% endif %}>Pendente</option>
                                     <option value="PAGO" {% if filtros.status == 'PAGO' %}selected{% endif %}>Pago</option>
-                                    <option value="VENCIDO" {% if filtros.status == 'VENCIDO' %}selected{% endif %}>Atrasado</option>
+                                    <option value="VENCIDO" {% if filtros.status == 'VENCIDO' %}selected{% endif %}>Vencido</option>
                                     <option value="VENCE_HOJE" {% if filtros.status == 'VENCE_HOJE' %}selected{% endif %}>Vence Hoje</option>
                                     <option value="CANCELADO" {% if filtros.status == 'CANCELADO' %}selected{% endif %}>Cancelado</option>
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <label for="data_inicio" class="form-label">Data Inicial</label>
-                                <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ filtros.data_inicio|default:'' }}">
+                                <label for="data_inicio" class="form-label">Data Início</label>
+                                <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
+                                    {% if filtros.data_inicio and filtros.data_inicio|length == 10 %}
+                                    value="{{ filtros.data_inicio }}"
+                                    {% endif %}>
                             </div>
                             <div class="col-md-2">
-                                <label for="data_fim" class="form-label">Data Final</label>
-                                <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ filtros.data_fim|default:'' }}">
+                                <label for="data_fim" class="form-label">Data Fim</label>
+                                <input type="date" class="form-control" id="data_fim" name="data_fim"
+                                    {% if filtros.data_fim and filtros.data_fim|length == 10 %}
+                                    value="{{ filtros.data_fim }}"
+                                    {% endif %}>
                             </div>
-                            <div class="col-12 mt-3">
+                            <div class="col-md-2 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-search"></i> Filtrar
                                 </button>
-                                <a href="{% url 'despesas_list' %}" class="btn btn-secondary">
-                                    <i class="fas fa-times"></i> Limpar Filtros
-                                </a>
+                                {% if filtros.fazenda or filtros.contato or filtros.status or filtros.data_inicio or filtros.data_fim %}
+                                    <a href="{% url 'despesas_list' %}" class="btn btn-secondary ms-2">
+                                        <i class="fas fa-times"></i> Limpar
+                                    </a>
+                                {% endif %}
                             </div>
                         </form>
                     </div>
 
                     <!-- Cards de Totais -->
                     <div class="row mb-4">
+                        {% for status, info in totais_status.items %}
+                        {% if status != 'CANCELADO' %}
                         <div class="col-lg-3 col-6">
-                            <div class="small-box bg-success">
+                            <div class="small-box bg-{{ info.cor }}">
                                 <div class="inner">
-                                    <h3>{{ totais_status.PAGO.valor_formatado }}</h3>
-                                    <p>Total Pago</p>
+                                    <h3>{{ info.valor_formatado }}</h3>
+                                    <p>
+                                        {% if status == 'PAGO' %}Despesas Pagas
+                                        {% elif status == 'PENDENTE' %}Despesas Pendentes
+                                        {% elif status == 'VENCIDO' %}Despesas Vencidas
+                                        {% elif status == 'VENCE_HOJE' %}Vencem Hoje{% endif %}
+                                    </p>
                                 </div>
                                 <div class="icon">
-                                    <i class="fas fa-check-circle"></i>
+                                    <i class="bi {{ info.icone }}"></i>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-3 col-6">
-                            <div class="small-box bg-warning">
-                                <div class="inner">
-                                    <h3>{{ totais_status.PENDENTE.valor_formatado }}</h3>
-                                    <p>Pendente</p>
-                                </div>
-                                <div class="icon">
-                                    <i class="fas fa-clock"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-lg-3 col-6">
-                            <div class="small-box bg-info">
-                                <div class="inner">
-                                    <h3>{{ totais_status.VENCE_HOJE.valor_formatado }}</h3>
-                                    <p>Vence Hoje</p>
-                                </div>
-                                <div class="icon">
-                                    <i class="fas fa-calendar-check"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-lg-3 col-6">
-                            <div class="small-box bg-danger">
-                                <div class="inner">
-                                    <h3>{{ totais_status.VENCIDO.valor_formatado }}</h3>
-                                    <p>Vencido</p>
-                                </div>
-                                <div class="icon">
-                                    <i class="fas fa-exclamation-circle"></i>
-                                </div>
-                            </div>
-                        </div>
+                        {% endif %}
+                        {% endfor %}
                     </div>
 
-                    <table id="despesas-table" class="table table-bordered table-striped dt-responsive nowrap" width="100%">
-                        <thead>
-                            <tr>
-                                <th>Data Emissão</th>
-                                <th>Data Vencimento</th>
-                                <th>Nota Fiscal</th>
-                                <th>Fornecedor</th>
-                                <th>Valor Total</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for despesa in despesas %}
-                            <tr>
-                                <td>{{ despesa.data_emissao|date:"d/m/Y" }}</td>
-                                <td>
-                                    {% if despesa.forma_pagamento == 'PR' %}
-                                        {% with info=despesa.info_parcelas %}
-                                            {% if info.proxima_data %}
-                                                {{ info.proxima_data|date:"d/m/Y" }}
-                                            {% else %}
-                                                -
+                    <div class="table-responsive px-0">
+                        <table id="despesas-table" class="table table-bordered table-striped dt-responsive nowrap w-100">
+                            <thead>
+                                <tr>
+                                    <th>Nota Fiscal</th>
+                                    <th>Data Emissão</th>
+                                    <th>Vencimento</th>
+                                    <th>Fornecedor</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for despesa in despesas %}
+                                <tr>
+                                    <td><a href="{% url 'despesa_detail' pk=despesa.id %}">{{ despesa.numero_nf }}</a></td>
+                                    <td>{{ despesa.data_emissao|date:"d/m/Y" }}</td>
+                                    <td>{{ despesa.data_vencimento|date:"d/m/Y" }}</td>
+                                    <td>{{ despesa.contato.nome }}</td>
+                                    <td>
+                                        <span class="badge bg-success">R$ {{ despesa.valor_total|floatformat:2 }}</span>
+                                        {% if despesa.forma_pagamento == 'PR' %}
+                                            {% with info=despesa.info_parcelas %}
+                                                <br>
+                                                <small class="text-muted">{{ info.parcelas_pagas }}/{{ info.total_parcelas }} parcelas</small>
+                                            {% endwith %}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% with status_info=totais_status|get:despesa.status_real %}
+                                        <span class="badge bg-{{ status_info.cor }}">
+                                            <i class="fas {{ status_info.icone }}"></i>
+                                            {% if despesa.status_real == 'PAGO' %}Pago
+                                            {% elif despesa.status_real == 'PENDENTE' %}Pendente
+                                            {% elif despesa.status_real == 'VENCIDO' %}Atrasado
+                                            {% elif despesa.status_real == 'VENCE_HOJE' %}Vence Hoje{% endif %}
+                                            {% if despesa.status_real == 'VENCIDO' and despesa.dias_atraso > 0 %}
+                                                <br><small>{{ despesa.dias_atraso }} dias</small>
                                             {% endif %}
+                                        </span>
                                         {% endwith %}
-                                    {% else %}
-                                        {{ despesa.data_vencimento|date:"d/m/Y" }}
-                                    {% endif %}
-                                </td>
-                                <td>{{ despesa.numero_nf }}</td>
-                                <td>{{ despesa.contato.nome }}</td>
-                                <td>
-                                    <span class="badge bg-success">R$ {{ despesa.valor_total|floatformat:2 }}</span>
-                                    {% if despesa.forma_pagamento == 'PR' %}
-                                        {% with info=despesa.info_parcelas %}
-                                            <br>
-                                            <small class="text-muted">{{ info.parcelas_pagas }}/{{ info.total_parcelas }} parcelas</small>
-                                        {% endwith %}
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if despesa.status == 'PAGO' %}
-                                        <span class="badge bg-success">Pago</span>
-                                    {% elif despesa.status == 'PENDENTE' %}
-                                        <span class="badge bg-warning">Pendente</span>
-                                    {% elif despesa.status == 'VENCIDO' %}
-                                        <span class="badge bg-danger">Atrasado</span>
-                                    {% elif despesa.status == 'VENCE_HOJE' %}
-                                        <span class="badge bg-info">Vence Hoje</span>
-                                    {% elif despesa.status == 'CANCELADO' %}
-                                        <span class="badge bg-secondary">Cancelado</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="dropdown">
-                                        <button type="button" class="btn btn-actions btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="fas fa-cog"></i> Ações
-                                        </button>
-                                        <ul class="dropdown-menu">
-                                            <li>
-                                                <a class="dropdown-item" href="{% url 'despesa_detail' despesa.id %}">
-                                                    <i class="fas fa-eye text-primary"></i> Visualizar
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a class="dropdown-item" href="{% url 'despesa_update' despesa.id %}">
-                                                    <i class="fas fa-pencil-alt text-warning"></i> Editar
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <hr class="dropdown-divider">
-                                            </li>
-                                            <li>
-                                                <a class="dropdown-item text-danger" href="{% url 'despesa_delete' despesa.id %}">
-                                                    <i class="fas fa-trash-alt text-danger"></i> Excluir
-                                                </a>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="fas fa-cog"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="{% url 'despesa_detail' despesa.id %}"><i class="fas fa-eye"></i> Ver</a></li>
+                                                <li><a class="dropdown-item" href="{% url 'despesa_update' despesa.id %}"><i class="fas fa-pencil-alt"></i> Editar</a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item text-danger" href="{% url 'despesa_delete' despesa.id %}"><i class="fas fa-trash-alt"></i> Excluir</a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -420,61 +357,46 @@
 
 {% block extra_js %}
 <!-- DataTables & Plugins -->
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js" defer></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js" defer></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js" defer></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js" defer></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js" defer></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js" defer></script>
 <script>
-    $(document).ready(function() {
-        // Inicializa tooltips
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl)
-        });
-
-        // Inicializa dropdowns do Bootstrap
-        var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'))
-        var dropdownList = dropdownElementList.map(function (dropdownToggleEl) {
-            return new bootstrap.Dropdown(dropdownToggleEl)
-        });
-
-        // Inicializa DataTables
-        $('#despesas-table').DataTable({
-            "responsive": true,
-            "autoWidth": false,
-            "language": {
-                "decimal": ",",
-                "thousands": ".",
-                "sEmptyTable": "Nenhum registro encontrado",
-                "sInfo": "Mostrando de _START_ até _END_ de _TOTAL_ registros",
-                "sInfoEmpty": "Mostrando 0 até 0 de 0 registros",
-                "sInfoFiltered": "(Filtrados de _MAX_ registros)",
-                "sInfoPostFix": "",
-                "sInfoThousands": ".",
-                "sLengthMenu": "_MENU_ resultados por página",
-                "sLoadingRecords": "Carregando...",
-                "sProcessing": "Processando...",
-                "sZeroRecords": "Nenhum registro encontrado",
-                "sSearch": "Pesquisar",
-                "oPaginate": {
-                    "sNext": "Próximo",
-                    "sPrevious": "Anterior",
-                    "sFirst": "Primeiro",
-                    "sLast": "Último"
-                },
-                "oAria": {
-                    "sSortAscending": ": Ordenar colunas de forma ascendente",
-                    "sSortDescending": ": Ordenar colunas de forma descendente"
-                }
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializa DataTables com configurações otimizadas
+    $('#despesas-table').DataTable({
+        "responsive": true,
+        "autoWidth": false,
+        "processing": true,
+        "deferRender": true,
+        "pageLength": 25,
+        "order": [[1, "desc"]],
+        "columnDefs": [
+            {"orderable": false, "targets": 6}
+        ],
+        "language": {
+            "emptyTable": "Nenhum registro encontrado",
+            "info": "Mostrando _START_ até _END_ de _TOTAL_ registros",
+            "infoEmpty": "Mostrando 0 até 0 de 0 registros",
+            "infoFiltered": "(Filtrados de _MAX_ registros)",
+            "infoThousands": ".",
+            "loadingRecords": "Carregando...",
+            "processing": "Processando...",
+            "zeroRecords": "Nenhum registro encontrado",
+            "search": "Pesquisar:",
+            "paginate": {
+                "next": "Próximo",
+                "previous": "Anterior",
+                "first": "Primeiro",
+                "last": "Último"
             },
-            "order": [[0, "desc"]], // Ordena por data de emissão por padrão
-            "pageLength": 25,
-            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
-                   "<'row'<'col-sm-12'tr>>" +
-                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>"
-        });
+            "lengthMenu": "Exibir _MENU_ resultados por página",
+            "decimal": ",",
+            "thousands": "."
+        }
     });
+});
 </script>
 {% endblock %}

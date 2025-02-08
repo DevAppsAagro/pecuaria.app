@@ -17,6 +17,7 @@ from datetime import datetime, date, timedelta
 import json
 import pandas as pd
 import numpy as np
+from geopy.geocoders import Nominatim
 
 from .models import (
     Fazenda, Pasto, Animal, Lote, MovimentacaoAnimal, 
@@ -337,7 +338,7 @@ def pasto_create(request):
     
     fazenda_id = request.GET.get('fazenda')
     fazendas = Fazenda.objects.filter(usuario=request.user)
-    variedades_capim = VariedadeCapim.objects.filter(usuario=request.user)
+    variedades_capim = VariedadeCapim.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     
     # Configuração do mapa
     pastos_existentes = []
@@ -410,7 +411,7 @@ def pasto_edit(request, pk):
             return redirect('pasto_edit', pk=pk)
     
     fazendas = Fazenda.objects.filter(usuario=request.user)
-    variedades_capim = VariedadeCapim.objects.filter(usuario=request.user)
+    variedades_capim = VariedadeCapim.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     
     # Obter os pastos existentes da mesma fazenda
     pastos_existentes = []
@@ -512,7 +513,7 @@ def get_cidade_coordenadas(request):
 
 @login_required
 def raca_list(request):
-    racas = Raca.objects.filter(usuario=request.user)
+    racas = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     return render(request, 'configuracoes/racas/raca_list.html', {'racas': racas})
 
 @login_required
@@ -546,7 +547,7 @@ def raca_delete(request, pk):
 
 @login_required
 def finalidade_lote_list(request):
-    finalidades = FinalidadeLote.objects.filter(usuario=request.user)
+    finalidades = FinalidadeLote.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     return render(request, 'configuracoes/finalidades_lote/finalidade_lote_list.html', {'finalidades': finalidades})
 
 @login_required
@@ -588,7 +589,7 @@ def finalidade_lote_delete(request, pk):
 
 @login_required
 def categoria_animal_list(request):
-    categorias = CategoriaAnimal.objects.filter(usuario=request.user)
+    categorias = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     return render(request, 'configuracoes/categorias_animal/categoria_animal_list.html', {'categorias': categorias})
 
 @login_required
@@ -690,7 +691,7 @@ def configuracoes(request):
 
 @login_required
 def motivo_morte_list(request):
-    motivos = MotivoMorte.objects.filter(usuario=request.user)
+    motivos = MotivoMorte.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     return render(request, 'configuracoes/motivo_morte_list.html', {'motivos': motivos})
 
 @login_required
@@ -721,7 +722,7 @@ def motivo_morte_delete(request, pk):
 
 @login_required
 def variedade_capim_list(request):
-    variedades = VariedadeCapim.objects.filter(usuario=request.user)
+    variedades = VariedadeCapim.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     return render(request, 'configuracoes/variedade_capim_list.html', {'variedades': variedades})
 
 @login_required
@@ -758,7 +759,7 @@ def variedade_capim_delete(request, pk):
 
 @login_required
 def categoria_custo_list(request):
-    categorias = CategoriaCusto.objects.filter(usuario=request.user)
+    categorias = CategoriaCusto.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     return render(request, 'configuracoes/categoria_custo_list.html', {'categorias': categorias})
 
 @login_required
@@ -798,7 +799,7 @@ def categoria_custo_delete(request, pk):
 
 @login_required
 def subcategoria_custo_list(request):
-    subcategorias = SubcategoriaCusto.objects.filter(usuario=request.user)
+    subcategorias = SubcategoriaCusto.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     return render(request, 'configuracoes/subcategoria_custo_list.html', {'subcategorias': subcategorias})
 
 @login_required
@@ -846,14 +847,14 @@ def lote_create(request):
         lote = Lote(usuario=request.user)
         lote.id_lote = request.POST.get('id_lote')
         lote.data_criacao = request.POST.get('data_criacao')
-        lote.finalidade_id = request.POST.get('finalidade')
-        lote.fazenda_id = request.POST.get('fazenda')
+        lote.finalidade = FinalidadeLote.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).get(id=request.POST.get('finalidade'))
+        lote.fazenda = get_object_or_404(Fazenda, id=request.POST.get('fazenda'), usuario=request.user)
         lote.save()
         
         messages.success(request, 'Lote criado com sucesso!')
         return redirect('lote_list')
     
-    finalidades = FinalidadeLote.objects.filter(usuario=request.user)
+    finalidades = FinalidadeLote.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     fazendas = Fazenda.objects.filter(usuario=request.user)
     
     return render(request, 'lotes/lote_form.html', {
@@ -869,14 +870,14 @@ def lote_edit(request, pk):
     if request.method == 'POST':
         lote.id_lote = request.POST.get('id_lote')
         lote.data_criacao = request.POST.get('data_criacao')
-        lote.finalidade_id = request.POST.get('finalidade')
-        lote.fazenda_id = request.POST.get('fazenda')
+        lote.finalidade = FinalidadeLote.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).get(id=request.POST.get('finalidade'))
+        lote.fazenda = get_object_or_404(Fazenda, id=request.POST.get('fazenda'), usuario=request.user)
         lote.save()
         
         messages.success(request, 'Lote atualizado com sucesso!')
         return redirect('lote_list')
     
-    finalidades = FinalidadeLote.objects.filter(usuario=request.user)
+    finalidades = FinalidadeLote.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     fazendas = Fazenda.objects.filter(usuario=request.user)
     
     return render(request, 'lotes/lote_form.html', {
@@ -1041,9 +1042,9 @@ def animal_list(request):
         pastos = Pasto.objects.filter(fazenda_id=fazenda_id, fazenda__usuario=request.user)
     else:
         pastos = Pasto.objects.filter(fazenda__in=fazendas)
-    categorias = CategoriaAnimal.objects.filter(usuario=request.user)
-    racas = Raca.objects.filter(usuario=request.user)
-
+    categorias = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
+    racas = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
+    
     # Preparar dados dos animais com a última pesagem
     animais_com_pesagem = []
     for animal in animais:
@@ -1080,11 +1081,11 @@ def animal_create(request):
             # Dados básicos
             brinco_visual = request.POST.get('brinco_visual')
             brinco_eletronico = request.POST.get('brinco_eletronico')
-            raca = get_object_or_404(Raca, id=request.POST.get('raca'), usuario=request.user)
+            raca = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).get(id=request.POST.get('raca'))
             data_nascimento = request.POST.get('data_nascimento')
             data_entrada = request.POST.get('data_entrada')
             lote = get_object_or_404(Lote, id=request.POST.get('lote'), usuario=request.user)
-            categoria_animal = get_object_or_404(CategoriaAnimal, id=request.POST.get('categoria_animal'), usuario=request.user)
+            categoria_animal = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).get(id=request.POST.get('categoria_animal'))
             pasto_atual = get_object_or_404(Pasto, id=request.POST.get('pasto_atual'), fazenda=lote.fazenda)
             
             # Campos opcionais
@@ -1127,10 +1128,13 @@ def animal_create(request):
     lotes = Lote.objects.filter(usuario=request.user)
     pastos = []  # Inicialmente vazio, será preenchido via AJAX quando um lote for selecionado
     
+    racas = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
+    categorias = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
+    
     return render(request, 'animais/animal_form.html', {
-        'racas': Raca.objects.filter(usuario=request.user),
+        'racas': racas,
+        'categorias': categorias,
         'lotes': lotes,
-        'categorias': CategoriaAnimal.objects.filter(usuario=request.user),
         'pastos': pastos,
         'active_tab': 'animais'
     })
@@ -1144,11 +1148,11 @@ def animal_edit(request, pk):
             # Atualizando dados básicos
             animal.brinco_visual = request.POST.get('brinco_visual')
             animal.brinco_eletronico = request.POST.get('brinco_eletronico')
-            animal.raca = get_object_or_404(Raca, id=request.POST.get('raca'), usuario=request.user)
+            animal.raca = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).get(id=request.POST.get('raca'))
             animal.data_nascimento = request.POST.get('data_nascimento')
             animal.data_entrada = request.POST.get('data_entrada')
             animal.lote = get_object_or_404(Lote, id=request.POST.get('lote'), usuario=request.user)
-            animal.categoria_animal = get_object_or_404(CategoriaAnimal, id=request.POST.get('categoria_animal'), usuario=request.user)
+            animal.categoria_animal = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).get(id=request.POST.get('categoria_animal'))
             animal.pasto_atual = get_object_or_404(Pasto, id=request.POST.get('pasto_atual'), fazenda=animal.fazenda_atual)
             
             # Campos opcionais com valores decimais
@@ -1177,16 +1181,16 @@ def animal_edit(request, pk):
             messages.error(request, f'Erro ao atualizar animal: {str(e)}')
     
     # GET request
-    racas = Raca.objects.filter(usuario=request.user)
+    racas = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     lotes = Lote.objects.filter(usuario=request.user)
-    categorias = CategoriaAnimal.objects.filter(usuario=request.user)
+    categorias = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
     pastos = Pasto.objects.filter(fazenda=animal.fazenda_atual)
     
     context = {
         'animal': animal,
         'racas': racas,
-        'lotes': lotes,
         'categorias': categorias,
+        'lotes': lotes,
         'pastos': pastos,
         'active_tab': 'animais'
     }
@@ -1571,7 +1575,7 @@ def bulk_edit(request):
                 )
             
             if categoria_animal:
-                categoria_obj = get_object_or_404(CategoriaAnimal, id=categoria_animal, usuario=request.user)
+                categoria_obj = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).get(id=categoria_animal)
                 animals.update(categoria_animal=categoria_obj)
             
             messages.success(request, f'{len(animals)} animais atualizados com sucesso!')
@@ -1585,7 +1589,7 @@ def bulk_edit(request):
     context = {
         'animals': animals,
         'lotes': Lote.objects.filter(usuario=request.user),
-        'categorias': CategoriaAnimal.objects.filter(usuario=request.user),
+        'categorias': CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)),
         'active_tab': 'animais'
     }
     return render(request, 'animais/bulk_edit.html', context)
@@ -1772,14 +1776,14 @@ def animal_import(request):
                     
                     # Validar raça
                     try:
-                        raca = Raca.objects.get(nome=row['Raça*'], usuario=request.user)
+                        raca = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).get(nome=row['Raça*'])
                     except Raca.DoesNotExist:
                         errors.append(f'Linha {index + 2}: Raça não encontrada')
                         continue
-                    
+                        
                     # Validar categoria
                     try:
-                        categoria = CategoriaAnimal.objects.get(nome=row['Categoria*'], usuario=request.user)
+                        categoria = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).get(nome=row['Categoria*'])
                     except CategoriaAnimal.DoesNotExist:
                         errors.append(f'Linha {index + 2}: Categoria não encontrada')
                         continue
@@ -2395,87 +2399,6 @@ def benfeitoria_detail(request, pk):
     return render(request, 'fazendas/benfeitoria_detail.html', context)
 
 @login_required
-def despesas_list(request):
-    hoje = timezone.localdate()
-    
-    # Query base
-    despesas = Despesa.objects.filter(usuario=request.user)
-    
-    # Filtros
-    contato = request.GET.get('contato')
-    fazenda = request.GET.get('fazenda')
-    status = request.GET.get('status')
-    data_inicio = request.GET.get('data_inicio')
-    data_fim = request.GET.get('data_final')
-    
-    # Aplicar filtros
-    if contato:
-        despesas = despesas.filter(contato_id=contato)
-    if status:
-        despesas = despesas.filter(status=status)
-    if data_inicio:
-        despesas = despesas.filter(data_emissao__gte=data_inicio)
-    if data_fim:
-        despesas = despesas.filter(data_emissao__lte=data_fim)
-    if fazenda:
-        despesas = despesas.filter(itens__fazenda_destino_id=fazenda).distinct()
-    
-    # Ordenação
-    despesas = despesas.order_by('-data_emissao')
-    
-    # Dados para os filtros
-    contatos = Contato.objects.filter(usuario=request.user).order_by('nome')
-    fazendas = Fazenda.objects.filter(usuario=request.user).order_by('nome')
-    
-    # Calcular totais por status
-    totais_status = {
-        'PAGO': {'valor': 0, 'cor': 'success', 'icone': 'bi-check-circle'},
-        'PENDENTE': {'valor': 0, 'cor': 'warning', 'icone': 'bi-clock'},
-        'VENCIDO': {'valor': 0, 'cor': 'danger', 'icone': 'bi-exclamation-circle'},
-        'VENCE_HOJE': {'valor': 0, 'cor': 'info', 'icone': 'bi-calendar-check'},
-        'CANCELADO': {'valor': 0, 'cor': 'secondary', 'icone': 'bi-x-circle'}
-    }
-
-    # Dicionário para armazenar os valores totais
-    valores_totais = {}
-    
-    # Calcular totais
-    for despesa in despesas:
-        valor_total = sum(item.valor_total for item in despesa.itens.all())
-        valores_totais[despesa.id] = valor_total
-        
-        # Verificar status real da despesa
-        status_real = despesa.status
-        if status_real == 'PENDENTE' and despesa.data_vencimento == hoje:
-            status_real = 'VENCE_HOJE'
-        elif status_real == 'PENDENTE' and despesa.data_vencimento < hoje:
-            status_real = 'VENCIDO'
-        
-        # Adicionar ao total do status
-        if status_real in totais_status:
-            totais_status[status_real]['valor'] += valor_total
-
-    # Formatar valores para exibição
-    for status_info in totais_status.values():
-        status_info['valor_formatado'] = f"R$ {status_info['valor']:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
-
-    # Contexto
-    context = {
-        'despesas': despesas,
-        'valores_totais': valores_totais,
-        'totais_status': totais_status,
-        'filtros': {
-            'contato': Contato.objects.filter(id=contato).first() if contato else None,
-            'fazenda': Fazenda.objects.filter(id=fazenda).first() if fazenda else None,
-            'status': status,
-            'data_inicio': data_inicio,
-            'data_fim': data_fim
-        }
-    }
-    
-    return render(request, 'financeiro/despesas_list.html', context)
-
-@login_required
 def compras_list(request):
     return render(request, 'financeiro/compras_list.html', {
         'active_tab': 'financeiro'
@@ -2691,11 +2614,11 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
     model = Despesa
     template_name = 'financeiro/despesa_form.html'
     success_url = reverse_lazy('despesas_list')
-    fields = ['forma_pagamento', 'numero_nf', 'data_emissao', 'data_vencimento', 'contato', 'arquivo', 'conta_bancaria']
+    fields = ['forma_pagamento', 'numero_nf', 'data_emissao', 'data_vencimento', 'data_pagamento', 'contato', 'arquivo', 'conta_bancaria']
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['categorias'] = CategoriaCusto.objects.filter(usuario=self.request.user)
+        context['categorias'] = CategoriaCusto.objects.filter(Q(usuario=self.request.user) | Q(usuario__isnull=True))
         context['unidades'] = UnidadeMedida.objects.filter(Q(usuario=self.request.user) | Q(usuario__isnull=True))
         context['contatos'] = Contato.objects.filter(usuario=self.request.user, tipo='FO')
         context['contas_bancarias'] = ContaBancaria.objects.filter(usuario=self.request.user, ativa=True)
@@ -2707,13 +2630,22 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
                 # Salva a despesa
                 self.object = form.save(commit=False)
                 self.object.usuario = self.request.user
+                
+                # Define o status baseado na data de pagamento
+                if self.object.data_pagamento:
+                    self.object.status = 'PAGO'
+                
                 self.object.save()
 
                 # Processa os itens da despesa
                 itens_data = json.loads(self.request.POST.get('itens_despesa', '[]'))
                 for item_data in itens_data:
-                    categoria = CategoriaCusto.objects.get(id=item_data['categoria_id'], usuario=self.request.user)
-                    subcategoria = SubcategoriaCusto.objects.get(id=item_data['subcategoria_id'])
+                    categoria = CategoriaCusto.objects.get(
+                        Q(id=item_data['categoria_id']) & (Q(usuario=self.request.user) | Q(usuario__isnull=True))
+                    )
+                    subcategoria = SubcategoriaCusto.objects.get(
+                        Q(id=item_data['subcategoria_id']) & (Q(usuario=self.request.user) | Q(usuario__isnull=True))
+                    )
                     
                     # Cria o item da despesa
                     item_despesa = ItemDespesa(
@@ -2790,44 +2722,58 @@ def pagar_parcela(request, pk):
     parcela = get_object_or_404(ParcelaDespesa, id=pk)
     
     if request.method == 'POST':
-        data_pagamento = request.POST.get('data_pagamento')
-        multa_juros = request.POST.get('multa_juros', 0)
-        desconto = request.POST.get('desconto', 0)
-        observacao = request.POST.get('observacao', '')
-        
-        parcela.data_pagamento = data_pagamento
-        parcela.multa_juros = multa_juros
-        parcela.desconto = desconto
-        parcela.observacao = observacao
-        parcela.status = 'PAGO'
-        parcela.save()
-        
-        messages.success(request, f'Parcela {parcela.numero} paga com sucesso!')
-        return redirect('despesa_detail', pk=parcela.despesa.id)
+        try:
+            data_pagamento = request.POST.get('data_pagamento')
+            multa_juros = Decimal(request.POST.get('multa_juros', '0'))
+            desconto = Decimal(request.POST.get('desconto', '0'))
+            
+            # Atualiza a parcela
+            parcela.data_pagamento = data_pagamento
+            parcela.multa_juros = multa_juros
+            parcela.desconto = desconto
+            parcela.status = 'PAGO'  # Define explicitamente o status como PAGO
+            parcela.save()  # O método save da parcela irá atualizar o status da despesa se necessário
+            
+            messages.success(request, 'Parcela paga com sucesso!')
+            return redirect('despesa_detail', pk=parcela.despesa.id)
+                
+        except Exception as e:
+            messages.error(request, f'Erro ao pagar parcela: {str(e)}')
+            return redirect('despesa_detail', pk=parcela.despesa.id)
     
-    return HttpResponseBadRequest('Método não permitido')
+    return render(request, 'financeiro/pagar_parcela.html', {
+        'parcela': parcela,
+        'active_tab': 'financeiro'
+    })
 
 @login_required
 def pagar_despesa(request, pk):
-    despesa = get_object_or_404(Despesa, id=pk)
+    despesa = get_object_or_404(Despesa, pk=pk, usuario=request.user)
     
     if request.method == 'POST':
         data_pagamento = request.POST.get('data_pagamento')
-        multa_juros = request.POST.get('multa_juros', 0)
-        desconto = request.POST.get('desconto', 0)
+        multa_juros = Decimal(request.POST.get('multa_juros', '0'))
+        desconto = Decimal(request.POST.get('desconto', '0'))
         observacao = request.POST.get('observacao', '')
         
-        despesa.data_pagamento = data_pagamento
-        despesa.multa_juros = multa_juros
-        despesa.desconto = desconto
-        despesa.observacao = observacao
-        despesa.status = 'PAGO'
-        despesa.save()
-        
-        messages.success(request, 'Despesa paga com sucesso!')
-        return redirect('despesa_detail', pk=despesa.id)
-    
-    return HttpResponseBadRequest('Método não permitido')
+        with transaction.atomic():
+            despesa.data_pagamento = data_pagamento
+            despesa.multa_juros = multa_juros
+            despesa.desconto = desconto
+            despesa.observacao = observacao
+            despesa.status = 'PAGO'
+            despesa.save()
+            
+            # Atualiza o status das parcelas
+            parcelas = ParcelaDespesa.objects.filter(despesa=despesa)
+            parcelas.update(status='PAGO')
+            
+            messages.success(request, 'Despesa paga com sucesso!')
+            return redirect('despesa_detail', pk=despesa.id)
+    return render(request, 'financeiro/pagar_despesa.html', {
+        'despesa': despesa,
+        'active_tab': 'financeiro'
+    })
 
 @login_required
 def pasto_detail(request, pk):
@@ -2883,8 +2829,7 @@ def pasto_detail(request, pk):
             'fazenda_id': pasto.fazenda.id,
             'area': float(pasto.area),
             'capacidade_ua': float(pasto.capacidade_ua),
-            'ua_ha': soma_pesos,
-            'coordenadas': json.loads(pasto.coordenadas) if isinstance(pasto.coordenadas, str) else pasto.coordenadas,
+            'coordenadas': pasto.coordenadas,
             'cor': '#2196F3'  # Azul
         }
     
@@ -2962,11 +2907,11 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
     model = Despesa
     template_name = 'financeiro/despesa_form.html'
     success_url = reverse_lazy('despesas_list')
-    fields = ['forma_pagamento', 'numero_nf', 'data_emissao', 'data_vencimento', 'contato', 'arquivo', 'conta_bancaria']
+    fields = ['forma_pagamento', 'numero_nf', 'data_emissao', 'data_vencimento', 'data_pagamento', 'contato', 'arquivo', 'conta_bancaria']
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['categorias'] = CategoriaCusto.objects.filter(usuario=self.request.user)
+        context['categorias'] = CategoriaCusto.objects.filter(Q(usuario=self.request.user) | Q(usuario__isnull=True))
         context['unidades'] = UnidadeMedida.objects.filter(Q(usuario=self.request.user) | Q(usuario__isnull=True))
         context['contatos'] = Contato.objects.filter(usuario=self.request.user, tipo='FO')
         context['contas_bancarias'] = ContaBancaria.objects.filter(usuario=self.request.user, ativa=True)
@@ -2978,13 +2923,22 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
                 # Salva a despesa
                 self.object = form.save(commit=False)
                 self.object.usuario = self.request.user
+                
+                # Define o status baseado na data de pagamento
+                if self.object.data_pagamento:
+                    self.object.status = 'PAGO'
+                
                 self.object.save()
 
                 # Processa os itens da despesa
                 itens_data = json.loads(self.request.POST.get('itens_despesa', '[]'))
                 for item_data in itens_data:
-                    categoria = CategoriaCusto.objects.get(id=item_data['categoria_id'], usuario=self.request.user)
-                    subcategoria = SubcategoriaCusto.objects.get(id=item_data['subcategoria_id'])
+                    categoria = CategoriaCusto.objects.get(
+                        Q(id=item_data['categoria_id']) & (Q(usuario=self.request.user) | Q(usuario__isnull=True))
+                    )
+                    subcategoria = SubcategoriaCusto.objects.get(
+                        Q(id=item_data['subcategoria_id']) & (Q(usuario=self.request.user) | Q(usuario__isnull=True))
+                    )
                     
                     # Cria o item da despesa
                     item_despesa = ItemDespesa(
@@ -3074,7 +3028,7 @@ def fazenda_detail(request, pk):
                 'area': float(pasto.area),
                 'capacidade_ua': float(pasto.capacidade_ua),
                 'coordenadas': pasto.coordenadas,
-                'cor': '#3388ff'  # Cor padrão para todos os pastos da fazenda
+                'cor': '#3388ff'  # Azul
             })
 
         context = {
@@ -3253,8 +3207,12 @@ class DespesaDeleteView(LoginRequiredMixin, DeleteView):
 def get_subcategorias(request, categoria_id):
     try:
         # Primeiro verifica se a categoria pertence ao usuário
-        categoria = CategoriaCusto.objects.get(id=categoria_id, usuario=request.user)
-        subcategorias = SubcategoriaCusto.objects.filter(categoria=categoria)
+        categoria = CategoriaCusto.objects.get(
+            Q(id=categoria_id) & (Q(usuario=request.user) | Q(usuario__isnull=True))
+        )
+        subcategorias = SubcategoriaCusto.objects.filter(
+            Q(categoria=categoria) & (Q(usuario=request.user) | Q(usuario__isnull=True))
+        )
         data = [{'id': sub.id, 'nome': sub.nome} for sub in subcategorias]
         return JsonResponse(data, safe=False)
     except CategoriaCusto.DoesNotExist:
@@ -3267,22 +3225,22 @@ def get_destinos(request):
     tipo_alocacao = request.GET.get('tipo_alocacao', '').lower()
     usuario = request.user
     
-    if tipo_alocacao == 'fazenda':
+    if tipo_alocacao in ['fazenda', 'FAZENDA']:
         items = Fazenda.objects.filter(usuario=usuario)
         data = [{'id': item.id, 'nome': item.nome} for item in items]
-    elif tipo_alocacao == 'lote':
+    elif tipo_alocacao in ['lote', 'LOTE']:
         items = Lote.objects.filter(fazenda__usuario=usuario)
         data = [{'id': item.id, 'nome': str(item)} for item in items]
-    elif tipo_alocacao == 'maquina':
+    elif tipo_alocacao in ['maquina', 'MAQUINA']:
         items = Maquina.objects.filter(fazenda__usuario=usuario)
         data = [{'id': item.id, 'nome': f"{item.id_maquina} - {item.nome}"} for item in items]
-    elif tipo_alocacao == 'benfeitoria':
+    elif tipo_alocacao in ['benfeitoria', 'BENFEITORIA']:
         items = Benfeitoria.objects.filter(usuario=usuario)
         data = [{'id': item.id, 'nome': f"{item.id_benfeitoria} - {item.nome}"} for item in items]
-    elif tipo_alocacao == 'pastagem':
+    elif tipo_alocacao in ['pastagem', 'PASTAGEM']:
         items = Pasto.objects.filter(fazenda__usuario=usuario)
         data = [{'id': item.id, 'nome': str(item)} for item in items]
-    elif tipo_alocacao == 'estoque':
+    elif tipo_alocacao in ['estoque', 'ESTOQUE']:
         items = Fazenda.objects.filter(usuario=usuario)
         data = [{'id': item.id, 'nome': item.nome} for item in items]
     else:
@@ -3350,119 +3308,52 @@ class ExtratoBancarioListView(LoginRequiredMixin, ListView):
             # Busca despesas pagas
             despesas = Despesa.objects.filter(
                 usuario=self.request.user,
-                conta_bancaria_id=conta_id,
+                conta_bancaria=conta,
                 status='PAGO',
                 data_pagamento__isnull=False
-            ).select_related('conta_bancaria', 'contato')
+            )
+            saldo -= sum(despesa.valor_final() for despesa in despesas)
             
-            if data_inicio:
-                despesas = despesas.filter(data_pagamento__gte=data_inicio)
-            if data_fim:
-                despesas = despesas.filter(data_pagamento__lte=data_fim)
-
-            for despesa in despesas:
-                queryset.append({
-                    'data': despesa.data_pagamento,
-                    'tipo': 'SAIDA',
-                    'get_tipo_display': 'SAÍDA',
-                    'descricao': f"Despesa - {despesa.contato.nome}",
-                    'valor': -despesa.valor_final(),
-                    'conta': despesa.conta_bancaria
-                })
-
             # Busca vendas pagas
             vendas = Venda.objects.filter(
                 usuario=self.request.user,
-                conta_bancaria_id=conta_id,
+                conta_bancaria=conta,
                 status='PAGO',
                 data_pagamento__isnull=False
-            ).select_related('conta_bancaria', 'comprador')
+            )
+            saldo += sum(venda.valor_total for venda in vendas)
             
-            if data_inicio:
-                vendas = vendas.filter(data_pagamento__gte=data_inicio)
-            if data_fim:
-                vendas = vendas.filter(data_pagamento__lte=data_fim)
-
-            for venda in vendas:
-                queryset.append({
-                    'data': venda.data_pagamento,
-                    'tipo': 'ENTRADA',
-                    'get_tipo_display': 'ENTRADA',
-                    'descricao': f"Venda - {venda.comprador.nome}",
-                    'valor': venda.valor_total,
-                    'conta': venda.conta_bancaria
-                })
-
             # Busca compras pagas
             compras = Compra.objects.filter(
                 usuario=self.request.user,
-                conta_bancaria_id=conta_id,
+                conta_bancaria=conta,
                 status='PAGO',
                 data_pagamento__isnull=False
-            ).select_related('conta_bancaria', 'vendedor')
+            )
+            saldo -= sum(compra.valor_total for compra in compras)
             
-            if data_inicio:
-                compras = compras.filter(data_pagamento__gte=data_inicio)
-            if data_fim:
-                compras = compras.filter(data_pagamento__lte=data_fim)
-
-            for compra in compras:
-                queryset.append({
-                    'data': compra.data_pagamento,
-                    'tipo': 'SAIDA',
-                    'get_tipo_display': 'SAÍDA',
-                    'descricao': f"Compra - {compra.vendedor.nome}",
-                    'valor': -compra.valor_total,
-                    'conta': compra.conta_bancaria
-                })
-
             # Busca abates com pagamentos
             abates = Abate.objects.filter(
                 usuario=self.request.user,
-                conta_bancaria_id=conta_id,
+                conta_bancaria=conta,
                 status='PAGO',
                 data_pagamento__isnull=False
-            ).select_related('conta_bancaria', 'comprador')
+            )
+            saldo += sum(abate.valor_total for abate in abates)
             
-            if data_inicio:
-                abates = abates.filter(data_pagamento__gte=data_inicio)
-            if data_fim:
-                abates = abates.filter(data_pagamento__lte=data_fim)
-
-            for abate in abates:
-                queryset.append({
-                    'data': abate.data_pagamento,
-                    'tipo': 'ENTRADA',
-                    'get_tipo_display': 'ENTRADA',
-                    'descricao': f"Abate - {abate.comprador.nome}",
-                    'valor': abate.valor_total,
-                    'conta': abate.conta_bancaria
-                })
-
             # Busca movimentações não operacionais
             nao_operacionais = MovimentacaoNaoOperacional.objects.filter(
                 usuario=self.request.user,
-                conta_bancaria_id=conta_id,
+                conta_bancaria=conta,
                 status='PAGO',
                 data_pagamento__isnull=False
-            ).select_related('conta_bancaria')
-            
-            if data_inicio:
-                nao_operacionais = nao_operacionais.filter(data_pagamento__gte=data_inicio)
-            if data_fim:
-                nao_operacionais = nao_operacionais.filter(data_pagamento__lte=data_fim)
-
+            )
             for mov in nao_operacionais:
-                valor = mov.valor if mov.tipo == 'entrada' else -mov.valor
-                queryset.append({
-                    'data': mov.data_pagamento,
-                    'tipo': mov.tipo.upper(),
-                    'get_tipo_display': 'ENTRADA' if mov.tipo == 'entrada' else 'SAÍDA',
-                    'descricao': f"Não Operacional - {mov.observacoes}",
-                    'valor': valor,
-                    'conta': mov.conta_bancaria
-                })
-
+                if mov.tipo == 'entrada':
+                    saldo += mov.valor
+                else:
+                    saldo -= mov.valor
+            
             # Ordena por data
             queryset.sort(key=lambda x: x['data'])
 
@@ -3507,5 +3398,255 @@ class ExtratoBancarioListView(LoginRequiredMixin, ListView):
             context['saldo_inicial'] = context['conta_selecionada'].saldo if context.get('conta_selecionada') else Decimal('0.00')
             context['saldo_final_periodo'] = context['saldo_inicial']
             context['saldo_periodo'] = Decimal('0.00')
+        
+        return context
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Sum, Q, Case, When, Value, CharField
+from django.utils import timezone
+from django.views.generic import ListView
+from decimal import Decimal
+from .models import Despesa, ItemDespesa, Fazenda, Contato
+
+class DespesasListView(LoginRequiredMixin, ListView):
+    model = Despesa
+    template_name = 'financeiro/despesas_list.html'
+    context_object_name = 'despesas'
+    
+    def get_queryset(self):
+        hoje = timezone.localdate()
+        queryset = (Despesa.objects
+            .filter(usuario=self.request.user)
+            .select_related('contato', 'conta_bancaria')
+            .prefetch_related('itens')
+            .annotate(
+                valor_total=Sum('itens__valor_total'),
+                status_real=Case(
+                    When(status='PENDENTE', data_vencimento=hoje, then=Value('VENCE_HOJE')),
+                    When(status='PENDENTE', data_vencimento__lt=hoje, then=Value('VENCIDO')),
+                    default='status',
+                    output_field=CharField(),
+                )
+            ))
+        
+        # Filtro de fazenda
+        fazenda = self.request.GET.get('fazenda')
+        if fazenda:
+            itens_fazenda = ItemDespesa.objects.filter(
+                Q(categoria__alocacao='fazenda', fazenda_destino_id=fazenda) |
+                Q(categoria__alocacao='lote', lote_destino__fazenda_id=fazenda) |
+                Q(categoria__alocacao='maquina', maquina_destino__fazenda_id=fazenda) |
+                Q(categoria__alocacao='benfeitoria', benfeitoria_destino__fazenda_id=fazenda) |
+                Q(categoria__alocacao='pastagem', pastagem_destino__fazenda_id=fazenda)
+            ).values_list('despesa_id', flat=True)
+            
+            queryset = queryset.filter(id__in=itens_fazenda)
+            
+        # Filtro de fornecedor
+        contato_id = self.request.GET.get('contato')
+        if contato_id:
+            queryset = queryset.filter(contato_id=contato_id)
+            
+        # Filtro de status
+        status = self.request.GET.get('status')
+        if status:
+            if status == 'VENCE_HOJE':
+                queryset = queryset.filter(status='PENDENTE', data_vencimento=hoje)
+            elif status == 'VENCIDO':
+                queryset = queryset.filter(status='PENDENTE', data_vencimento__lt=hoje)
+            elif status == 'PENDENTE':
+                queryset = queryset.filter(
+                    status='PENDENTE',
+                    data_vencimento__gt=hoje
+                )
+            elif status == 'PAGO':
+                queryset = queryset.filter(status='PAGO')
+            
+        # Filtro de data
+        data_inicio = self.request.GET.get('data_inicio')
+        data_fim = self.request.GET.get('data_fim')
+        
+        if data_inicio and data_inicio.strip():
+            try:
+                queryset = queryset.filter(data_emissao__gte=data_inicio)
+            except (ValueError, TypeError):
+                print(f"Data início inválida: {data_inicio}")
+                
+        if data_fim and data_fim.strip():
+            try:
+                queryset = queryset.filter(data_emissao__lte=data_fim)
+            except (ValueError, TypeError):
+                print(f"Data fim inválida: {data_fim}")
+            
+        return queryset.order_by('-data_emissao')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Adiciona fazendas ao contexto
+        context['fazendas'] = Fazenda.objects.filter(usuario=self.request.user).order_by('nome')
+        
+        # Adiciona fornecedores ao contexto (tipo FO = Fornecedor)
+        context['fornecedores'] = Contato.objects.filter(
+            usuario=self.request.user,
+            tipo='FO'
+        ).order_by('nome')
+        
+        # Adiciona filtros atuais ao contexto
+        context['filtros'] = {
+            'fazenda': self.request.GET.get('fazenda', ''),
+            'contato': self.request.GET.get('contato', ''),
+            'status': self.request.GET.get('status', ''),
+            'data_inicio': self.request.GET.get('data_inicio', ''),
+            'data_fim': self.request.GET.get('data_fim', '')
+        }
+        
+        # Inicializa todos os status possíveis com zero
+        totais_status = {
+            'PAGO': {'valor': Decimal('0.00'), 'cor': 'success', 'icone': 'bi-check-circle'},
+            'PENDENTE': {'valor': Decimal('0.00'), 'cor': 'warning', 'icone': 'bi-clock'},
+            'VENCIDO': {'valor': Decimal('0.00'), 'cor': 'danger', 'icone': 'bi-exclamation-circle'},
+            'VENCE_HOJE': {'valor': Decimal('0.00'), 'cor': 'info', 'icone': 'bi-calendar-check'}
+        }
+        
+        # Calcular totais por status usando o status_real anotado
+        for despesa in self.get_queryset():
+            if despesa.status_real in totais_status:
+                totais_status[despesa.status_real]['valor'] += despesa.valor_total or Decimal('0.00')
+
+        # Formata os valores para exibição
+        for status_info in totais_status.values():
+            status_info['valor_formatado'] = f"R$ {'{:,.2f}'.format(status_info['valor']).replace(',', '#').replace('.', ',').replace('#', '.')}"
+      
+        context['totais_status'] = totais_status
+        context['active_tab'] = 'financeiro'
+        
+        return context
+
+class DespesasListView(LoginRequiredMixin, ListView):
+    model = Despesa
+    template_name = 'financeiro/despesas_list.html'
+    context_object_name = 'despesas'
+    
+    def get_queryset(self):
+        # Pega a fazenda selecionada no filtro
+        fazenda_id = self.request.GET.get('fazenda')
+        
+        # Se tiver fazenda selecionada, usa o timezone dela
+        if fazenda_id:
+            try:
+                fazenda = Fazenda.objects.get(id=fazenda_id, usuario=self.request.user)
+                timezone.activate(fazenda.timezone)
+            except Fazenda.DoesNotExist:
+                timezone.activate('America/Sao_Paulo')  # fallback para São Paulo
+        else:
+            timezone.activate('America/Sao_Paulo')  # fallback para São Paulo
+            
+        hoje = timezone.localdate()
+        queryset = (Despesa.objects
+            .filter(usuario=self.request.user)
+            .select_related('contato', 'conta_bancaria')
+            .prefetch_related('itens')
+            .annotate(
+                valor_total=Sum('itens__valor_total'),
+                status_real=Case(
+                    When(status='PENDENTE', data_vencimento=hoje, then=Value('VENCE_HOJE')),
+                    When(status='PENDENTE', data_vencimento__lt=hoje, then=Value('VENCIDO')),
+                    default='status',
+                    output_field=CharField(),
+                )
+            ))
+        
+        # Filtro de fazenda
+        fazenda = self.request.GET.get('fazenda')
+        if fazenda:
+            itens_fazenda = ItemDespesa.objects.filter(
+                Q(categoria__alocacao='fazenda', fazenda_destino_id=fazenda) |
+                Q(categoria__alocacao='lote', lote_destino__fazenda_id=fazenda) |
+                Q(categoria__alocacao='maquina', maquina_destino__fazenda_id=fazenda) |
+                Q(categoria__alocacao='benfeitoria', benfeitoria_destino__fazenda_id=fazenda) |
+                Q(categoria__alocacao='pastagem', pastagem_destino__fazenda_id=fazenda)
+            ).values_list('despesa_id', flat=True)
+            
+            queryset = queryset.filter(id__in=itens_fazenda)
+            
+        # Filtro de fornecedor
+        contato_id = self.request.GET.get('contato')
+        if contato_id:
+            queryset = queryset.filter(contato_id=contato_id)
+            
+        # Filtro de status
+        status = self.request.GET.get('status')
+        if status:
+            if status == 'VENCE_HOJE':
+                queryset = queryset.filter(status='PENDENTE', data_vencimento=hoje)
+            elif status == 'VENCIDO':
+                queryset = queryset.filter(status='PENDENTE', data_vencimento__lt=hoje)
+            elif status == 'PENDENTE':
+                queryset = queryset.filter(
+                    status='PENDENTE',
+                    data_vencimento__gt=hoje
+                )
+            elif status == 'PAGO':
+                queryset = queryset.filter(status='PAGO')
+            
+        # Filtro de data
+        data_inicio = self.request.GET.get('data_inicio')
+        data_fim = self.request.GET.get('data_fim')
+        
+        if data_inicio and data_inicio.strip():
+            try:
+                queryset = queryset.filter(data_emissao__gte=data_inicio)
+            except (ValueError, TypeError):
+                print(f"Data início inválida: {data_inicio}")
+                
+        if data_fim and data_fim.strip():
+            try:
+                queryset = queryset.filter(data_emissao__lte=data_fim)
+            except (ValueError, TypeError):
+                print(f"Data fim inválida: {data_fim}")
+            
+        return queryset.order_by('-data_emissao')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Adiciona fazendas ao contexto
+        context['fazendas'] = Fazenda.objects.filter(usuario=self.request.user).order_by('nome')
+        
+        # Adiciona fornecedores ao contexto (tipo FO = Fornecedor)
+        context['fornecedores'] = Contato.objects.filter(
+            usuario=self.request.user,
+            tipo='FO'
+        ).order_by('nome')
+        
+        # Adiciona filtros atuais ao contexto
+        context['filtros'] = {
+            'fazenda': self.request.GET.get('fazenda', ''),
+            'contato': self.request.GET.get('contato', ''),
+            'status': self.request.GET.get('status', ''),
+            'data_inicio': self.request.GET.get('data_inicio', ''),
+            'data_fim': self.request.GET.get('data_fim', '')
+        }
+        
+        # Inicializa todos os status possíveis com zero
+        totais_status = {
+            'PAGO': {'valor': Decimal('0.00'), 'cor': 'success', 'icone': 'bi-check-circle'},
+            'PENDENTE': {'valor': Decimal('0.00'), 'cor': 'warning', 'icone': 'bi-clock'},
+            'VENCIDO': {'valor': Decimal('0.00'), 'cor': 'danger', 'icone': 'bi-exclamation-circle'},
+            'VENCE_HOJE': {'valor': Decimal('0.00'), 'cor': 'info', 'icone': 'bi-calendar-check'}
+        }
+        
+        # Calcular totais por status usando o status_real anotado
+        for despesa in self.get_queryset():
+            if despesa.status_real in totais_status:
+                totais_status[despesa.status_real]['valor'] += despesa.valor_total or Decimal('0.00')
+
+        # Formata os valores para exibição
+        for status_info in totais_status.values():
+            status_info['valor_formatado'] = f"R$ {'{:,.2f}'.format(status_info['valor']).replace(',', '#').replace('.', ',').replace('#', '.')}"
+      
+        context['totais_status'] = totais_status
+        context['active_tab'] = 'financeiro'
         
         return context

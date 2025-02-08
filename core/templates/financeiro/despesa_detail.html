@@ -5,21 +5,23 @@
     <div class="row">
         <div class="col-md-12">
             <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Detalhes da Despesa</h5>
-                    <div>
-                        {% if despesa.forma_pagamento == 'AV' and despesa.status != 'PAGO' %}
-                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalPagamentoDespesa">
-                                <i class="bi bi-cash"></i> Pagar
-                            </button>
-                        {% elif not despesa.forma_pagamento == 'PR' and despesa.status == 'PENDENTE' %}
-                            <button type="button" class="btn btn-success" onclick="registrarPagamentoDespesa()">
-                                <i class="fas fa-check"></i> Pagar
-                            </button>
-                        {% endif %}
-                        <a href="{% url 'despesas_list' %}" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left"></i> Voltar
-                        </a>
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Detalhes da Despesa</h5>
+                        <div class="ms-auto">
+                            <a href="{% url 'despesas_list' %}" class="btn btn-secondary me-2">
+                                <i class="fas fa-arrow-left"></i> Voltar
+                            </a>
+                            {% if despesa.forma_pagamento == 'AV' and despesa.status != 'PAGO' %}
+                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalPagamentoDespesa">
+                                    <i class="bi bi-cash"></i> Pagar
+                                </button>
+                            {% elif not despesa.forma_pagamento == 'PR' and despesa.status == 'PENDENTE' %}
+                                <button type="button" class="btn btn-success" onclick="registrarPagamentoDespesa()">
+                                    <i class="fas fa-check"></i> Pagar
+                                </button>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
@@ -71,50 +73,56 @@
             </div>
 
             <div class="card mt-4">
-                <div class="card-header">
+                <div class="card-header bg-light">
                     <h5 class="mb-0">Itens da Despesa</h5>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-striped">
+                        <table class="table table-striped table-hover">
                             <thead>
                                 <tr>
                                     <th>Categoria</th>
                                     <th>Subcategoria</th>
                                     <th>Tipo Alocação</th>
                                     <th>Destino</th>
-                                    <th>Quantidade</th>
-                                    <th>Valor Unitário</th>
-                                    <th>Valor Total</th>
+                                    <th class="text-end">Quantidade</th>
+                                    <th class="text-end">Valor Unitário</th>
+                                    <th class="text-end">Valor Total</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for item in itens %}
                                 <tr>
-                                    <td>{{ item.categoria }}</td>
-                                    <td>{{ item.subcategoria|default:"-" }}</td>
-                                    <td>{{ item.categoria.get_tipo_alocacao_display }}</td>
+                                    <td>{{ item.categoria.nome }}</td>
+                                    <td>{{ item.subcategoria.nome|default:"-" }}</td>
+                                    <td><span class="badge bg-secondary">{{ item.categoria.get_alocacao_display }}</span></td>
                                     <td>
                                         {% if item.categoria.alocacao == 'fazenda' %}
-                                            {{ item.fazenda_destino|default:"-" }}
+                                            {{ item.fazenda_destino.nome|default:"-" }}
                                         {% elif item.categoria.alocacao == 'lote' %}
-                                            {{ item.lote_destino|default:"-" }}
+                                            {{ item.lote_destino.id_lote|default:"-" }}
                                         {% elif item.categoria.alocacao == 'maquina' %}
-                                            {{ item.maquina_destino|default:"-" }}
+                                            {{ item.maquina_destino.nome|default:"-" }}
                                         {% elif item.categoria.alocacao == 'benfeitoria' %}
-                                            {{ item.benfeitoria_destino.id_benfeitoria }} - {{ item.benfeitoria_destino.nome }}
+                                            {{ item.benfeitoria_destino.nome|default:"-" }}
                                         {% elif item.categoria.alocacao == 'pastagem' %}
-                                            {{ item.pastagem_destino|default:"-" }}
+                                            {{ item.pastagem_destino.id_pasto|default:"-" }}
                                         {% else %}
                                             -
                                         {% endif %}
                                     </td>
-                                    <td>{{ item.quantidade }}</td>
-                                    <td>R$ {{ item.valor_unitario|floatformat:2 }}</td>
-                                    <td>R$ {{ item.valor_total|floatformat:2 }}</td>
+                                    <td class="text-end">{{ item.quantidade }}</td>
+                                    <td class="text-end">R$ {{ item.valor_unitario|floatformat:2 }}</td>
+                                    <td class="text-end">R$ {{ item.valor_total|floatformat:2 }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="6" class="text-end"><strong>Total:</strong></td>
+                                    <td class="text-end"><strong>R$ {{ despesa.valor_total|floatformat:2 }}</strong></td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 </div>
