@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title float-start">Manejos Reprodutivos</h3>
+                    <div class="float-end">
+                        <a href="{% url 'concepcao_form' %}" class="btn btn-success">
+                            <i class="bi bi-plus-lg"></i> Nova Concepção
+                        </a>
+                        <a href="{% url 'diagnostico_form' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-lg"></i> Novo Diagnóstico
+                        </a>
+                        <a href="{% url 'resultado_form' %}" class="btn btn-info">
+                            <i class="bi bi-plus-lg"></i> Novo Resultado
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Estação de Monta</th>
+                                    <th>Lote</th>
+                                    <th>Animal</th>
+                                    <th>Data Concepção</th>
+                                    <th>Previsão Parto</th>
+                                    <th>Data DG</th>
+                                    <th>Resultado DG</th>
+                                    <th>Data Resultado</th>
+                                    <th>Tipo Resultado</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for manejo in manejos %}
+                                <tr>
+                                    <td>{{ manejo.id }}</td>
+                                    <td>{{ manejo.estacao_monta }}</td>
+                                    <td>{{ manejo.lote.id_lote }}</td>
+                                    <td>{{ manejo.animal.brinco_visual }}</td>
+                                    <td>{{ manejo.data_concepcao|date:"d/m/Y"|default:"-" }}</td>
+                                    <td>
+                                        {% if manejo.data_concepcao and manejo.diagnostico != 'VAZIA' %}
+                                            {% if manejo.diagnostico == 'PRENHE' %}
+                                                {{ manejo.previsao_parto|date:"d/m/Y" }}
+                                            {% else %}
+                                                Possível: {{ manejo.previsao_parto|date:"d/m/Y" }}
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ manejo.data_diagnostico|date:"d/m/Y"|default:"-" }}</td>
+                                    <td>
+                                        {% if manejo.data_diagnostico %}
+                                            <span class="badge {% if manejo.diagnostico == 'PRENHE' %}bg-success{% else %}bg-danger{% endif %}">
+                                                {{ manejo.get_diagnostico_display }}
+                                            </span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ manejo.data_resultado|date:"d/m/Y"|default:"-" }}</td>
+                                    <td>
+                                        {% if manejo.data_resultado %}
+                                            <span class="badge {% if manejo.resultado == 'NASCIMENTO' %}bg-success{% else %}bg-danger{% endif %}">
+                                                {{ manejo.get_resultado_display }}
+                                            </span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="#" class="btn btn-sm btn-primary" title="Editar">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="#" class="btn btn-sm btn-danger" title="Excluir">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="11" class="text-center">Nenhum manejo reprodutivo encontrado.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -2255,7 +2255,7 @@ def maquina_detail(request, pk):
 
 @login_required
 def benfeitorias_list(request):
-    benfeitorias = Benfeitoria.objects.filter(usuario=request.user)
+    benfeitorias = Benfeitoria.objects.filter(fazenda__usuario=request.user)
     return render(request, 'fazendas/benfeitorias_list.html', {
         'benfeitorias': benfeitorias,
         'active_tab': 'fazendas'
@@ -2282,8 +2282,7 @@ def benfeitoria_create(request):
                 'valor_residual': converter_moeda_para_decimal(request.POST.get('valor_residual')),
                 'vida_util': int(request.POST.get('vida_util')),
                 'data_aquisicao': request.POST.get('data_aquisicao'),
-                'fazenda_id': request.POST.get('fazenda'),
-                'usuario': request.user
+                'fazenda_id': request.POST.get('fazenda')
             }
             
             benfeitoria = Benfeitoria.objects.create(**data)
@@ -2301,7 +2300,7 @@ def benfeitoria_create(request):
 
 @login_required
 def benfeitoria_edit(request, pk):
-    benfeitoria = get_object_or_404(Benfeitoria, pk=pk, usuario=request.user)
+    benfeitoria = get_object_or_404(Benfeitoria, pk=pk, fazenda__usuario=request.user)
     
     if request.method == 'POST':
         try:
@@ -2339,7 +2338,7 @@ def benfeitoria_edit(request, pk):
 
 @login_required
 def benfeitoria_delete(request, pk):
-    benfeitoria = get_object_or_404(Benfeitoria, pk=pk, usuario=request.user)
+    benfeitoria = get_object_or_404(Benfeitoria, pk=pk, fazenda__usuario=request.user)
     
     if request.method == 'POST':
         benfeitoria.delete()
@@ -2350,7 +2349,7 @@ def benfeitoria_delete(request, pk):
 
 @login_required
 def benfeitoria_detail(request, pk):
-    benfeitoria = get_object_or_404(Benfeitoria, pk=pk, usuario=request.user)
+    benfeitoria = get_object_or_404(Benfeitoria, pk=pk, fazenda__usuario=request.user)
     
     # Filtros
     data_inicio = request.GET.get('data_inicio')
@@ -3650,4 +3649,4 @@ class DespesasListView(LoginRequiredMixin, ListView):
         context['active_tab'] = 'financeiro'
         
         return context
-
+        

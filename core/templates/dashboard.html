@@ -1,7 +1,224 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #map {
+        height: 500px;
+        width: 100%;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .map-container {
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    .map-header {
+        margin-bottom: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .map-title {
+        margin: 0;
+        color: #333;
+    }
+    .card {
+        transition: all 0.3s ease;
+    }
+    .card:hover {
+        transform: translateY(-5px);
+    }
+    .custom-div-icon {
+        background: none;
+        border: none;
+    }
+    .custom-div-icon i {
+        display: block;
+        text-align: center;
+        color: #2d3748;
+        text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+    }
+    .custom-div-icon i:hover {
+        color: #4a5568;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-{% include "dashboard_new.html" %}
-{% include "dashboard_graficos.html" %}
+<div class="container-fluid mt-4">
+    <!-- Mapa no topo -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="map-container">
+                <div class="map-header">
+                    <h4 class="map-title">Mapa da Fazenda</h4>
+                    <div class="d-flex align-items-center">
+                        <select id="fazendaFilter" class="form-select me-2" style="width: 250px;">
+                            {% for fazenda in fazendas %}
+                            <option value="{{ fazenda.id }}" {% if fazenda.id == primeira_fazenda.id %}selected{% endif %}>
+                                {{ fazenda.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards do Dashboard -->
+    {% include "dashboard_new.html" %}
+
+    <!-- Gráficos -->
+    {% include "dashboard_graficos.html" %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+$(document).ready(function() {
+    // Inicializa o mapa
+    var map = L.map('map').setView([-15.7801, -47.9292], 4);
+    
+    // Adiciona camada de satélite com ruas
+    var googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+        attribution: 'Google Maps'
+    }).addTo(map);
+
+    // Camadas para pastos e benfeitorias
+    var pastosLayer = L.layerGroup().addTo(map);
+    var benfeitoriasLayer = L.layerGroup().addTo(map);
+
+    // Cores mais neutras para os pastos
+    var pastosStyle = {
+        color: '#2d3748',
+        fillColor: '#4a5568',
+        fillOpacity: 0.15,
+        weight: 1.5
+    };
+
+    // Função para formatar valor em R$
+    function formatarValor(valor) {
+        if (typeof valor === 'string') {
+            valor = parseFloat(valor.replace(/[^0-9.-]+/g, ''));
+        }
+        return isNaN(valor) ? '0,00' : valor.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    // Função para carregar dados da fazenda
+    function carregarDadosFazenda(fazendaId) {
+        // Limpa as camadas
+        pastosLayer.clearLayers();
+        benfeitoriasLayer.clearLayers();
+
+        // Carrega os pastos da fazenda selecionada
+        var url = '/fazenda/' + fazendaId + '/pastos/';
+        
+        // Carrega os pastos
+        $.get(url, function(data) {
+            if (data.success && data.pastos) {
+                var bounds = L.latLngBounds();
+                var hasValidCoords = false;
+
+                data.pastos.forEach(function(pasto) {
+                    if (pasto.coordenadas && Array.isArray(pasto.coordenadas)) {
+                        pasto.coordenadas.forEach(function(coord) {
+                            if (Array.isArray(coord) && coord.length === 2) {
+                                bounds.extend([coord[0], coord[1]]);
+                                hasValidCoords = true;
+                            }
+                        });
+                        
+                        var polygon = L.polygon(pasto.coordenadas, pastosStyle).bindPopup(`
+                            <strong>${pasto.nome || 'Pasto sem nome'}</strong><br>
+                            Área: ${pasto.area} ha<br>
+                            <a href="/pasto/${pasto.id}/detail/" class="btn btn-sm btn-primary mt-2">Ver Detalhes</a>
+                        `);
+                        
+                        pastosLayer.addLayer(polygon);
+                    }
+                });
+
+                if (hasValidCoords) {
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
+            }
+        });
+
+        // Carrega as benfeitorias da fazenda selecionada
+        var benfUrl = '/fazenda/get_benfeitorias/' + fazendaId + '/';
+        $.get(benfUrl, function(data) {
+            if (data.success && data.benfeitorias) {
+                data.benfeitorias.forEach(function(b) {
+                    try {
+                        var coords = b.coordenadas;
+                        if (typeof coords === 'string') {
+                            coords = JSON.parse(coords);
+                        }
+                        
+                        if (coords && coords.lat && coords.lng) {
+                            var marker = L.marker([coords.lat, coords.lng], {
+                                icon: L.divIcon({
+                                    className: 'custom-div-icon',
+                                    html: '<i class="fas fa-home" style="font-size: 18px;"></i>',
+                                    iconSize: [30, 30],
+                                    iconAnchor: [15, 15]
+                                })
+                            }).bindPopup(`
+                                <strong>${b.nome}</strong><br>
+                                Valor: R$ ${formatarValor(b.valor_compra)}<br>
+                                Data: ${b.data_aquisicao || 'Não informada'}<br>
+                                <a href="/benfeitoria/${b.id}/detail/" class="btn btn-sm btn-primary mt-2">Ver Detalhes</a>
+                            `);
+                            benfeitoriasLayer.addLayer(marker);
+                        }
+                    } catch (e) {
+                        console.error('Erro ao processar benfeitoria:', e, b);
+                    }
+                });
+            }
+        });
+
+        // Atualiza os indicadores
+        $.get('/dashboard/atualizar/', { fazenda: fazendaId }, function(data) {
+            if (data.success) {
+                // Atualiza os valores nos cards usando formatarValor
+                $('.despesas-valor').text('R$ ' + formatarValor(data.indicadores.despesas));
+                $('.receitas-valor').text('R$ ' + formatarValor(data.indicadores.receitas));
+                $('.resultado-valor').text('R$ ' + formatarValor(data.indicadores.resultado));
+            }
+        });
+    }
+
+    // Evento de mudança do filtro de fazenda
+    $('#fazendaFilter').change(function() {
+        var fazendaId = $(this).val();
+        carregarDadosFazenda(fazendaId);
+        
+        // Atualiza a URL com o novo filtro
+        var url = new URL(window.location);
+        url.searchParams.set('fazenda', fazendaId);
+        window.history.pushState({}, '', url);
+    });
+
+    // Carrega dados da primeira fazenda
+    var primeiraFazendaId = $('#fazendaFilter').val();
+    if (primeiraFazendaId) {
+        carregarDadosFazenda(primeiraFazendaId);
+    }
+});
+</script>
 {% endblock %}

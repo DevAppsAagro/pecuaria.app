@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Estações de Monta</h4>
+            <a href="{% url 'estacao_monta_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Nova Estação
+            </a>
+        </div>
+        <div class="card-body">
+            {% if estacoes %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Data Início</th>
+                            <th>Lotes</th>
+                            <th>Observação</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for estacao in estacoes %}
+                        <tr>
+                            <td>{{ estacao.id }}</td>
+                            <td>{{ estacao.data_inicio|date:"d/m/Y" }}</td>
+                            <td>
+                                {% for lote in estacao.lotes.all %}
+                                <span class="badge bg-info">{{ lote }}</span>
+                                {% endfor %}
+                            </td>
+                            <td>{{ estacao.observacao|default:"-" }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'estacao_monta_update' estacao.pk %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'estacao_monta_delete' estacao.pk %}" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <p class="text-muted mb-0">Nenhuma estação de monta cadastrada.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

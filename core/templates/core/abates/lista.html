@@ -3,10 +3,10 @@
 
 {% block extra_head %}
 <!-- DataTables -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.24/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css">
+<script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.24/js/dataTables.bootstrap5.min.js"></script>
 <style>
     /* Estilos para os botões */
     .btn-group .btn {
@@ -73,6 +73,14 @@
 
     .table-hover tbody tr:hover {
         background-color: rgba(0,0,0,.075);
+    }
+
+    /* Ajustes para responsividade */
+    .dtr-details {
+        width: 100%;
+    }
+    .dtr-data {
+        word-break: break-word;
     }
 </style>
 {% endblock %}
@@ -150,116 +158,46 @@
                 </div>
             </div>
 
-            <!-- Filtros -->
-            <div class="row mb-4">
-                <div class="col-md-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">Filtros</h3>
-                        </div>
-                        <div class="card-body">
-                            <form method="get" class="row g-3">
-                                <div class="col-md-3">
-                                    <input type="text" name="search" class="form-control" placeholder="Buscar por brinco ou comprador..." value="{{ search_query }}">
-                                </div>
-                                <div class="col-md-3">
-                                    <select name="status" class="form-select">
-                                        <option value="">Status</option>
-                                        <option value="PAGO" {% if status == 'PAGO' %}selected{% endif %}>Pago</option>
-                                        <option value="PENDENTE" {% if status == 'PENDENTE' %}selected{% endif %}>Pendente</option>
-                                        <option value="VENCIDO" {% if status == 'VENCIDO' %}selected{% endif %}>Vencido</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2">
-                                    <input type="date" name="data_inicio" class="form-control" value="{{ data_inicio }}" placeholder="Data Inicial">
-                                </div>
-                                <div class="col-md-2">
-                                    <input type="date" name="data_fim" class="form-control" value="{{ data_fim }}" placeholder="Data Final">
-                                </div>
-                                <div class="col-md-2">
-                                    <button type="submit" class="btn btn-primary w-100">
-                                        <i class="fas fa-search"></i> Filtrar
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div class="card card-primary card-outline">
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fas fa-list mr-1"></i>
                         Lista de Abates
                     </h3>
-                    <div class="card-tools">
-                        <a href="{% url 'abates_criar' %}" class="btn btn-success">
-                            <i class="fa-solid fa-plus"></i> Novo Abate
-                        </a>
-                    </div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table id="tabela-abates" class="table table-bordered table-striped">
                             <thead>
                                 <tr>
-                                    <th>Data</th>
-                                    <th>Data Vencimento</th>
-                                    <th>Comprador</th>
-                                    <th>Valor/@</th>
-                                    <th>Rendimento</th>
-                                    <th>Status</th>
-                                    <th>Ações</th>
+                                    <th scope="col">Data</th>
+                                    <th scope="col">Data Vencimento</th>
+                                    <th scope="col">Comprador</th>
+                                    <th scope="col">Valor/@</th>
+                                    <th scope="col">Rendimento</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col">Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for abate in abates %}
                                 <tr>
-                                    <td>{{ abate.data|date:"d/m/Y" }}</td>
-                                    <td>{{ abate.data_vencimento|date:"d/m/Y" }}</td>
-                                    <td>{{ abate.comprador.nome }}</td>
+                                    <td data-order="{{ abate.data|date:'Y-m-d' }}">{{ abate.data|date:"d/m/Y" }}</td>
+                                    <td data-order="{{ abate.data_vencimento|date:'Y-m-d' }}">{{ abate.data_vencimento|date:"d/m/Y" }}</td>
+                                    <td>{{ abate.comprador.nome|default:'' }}</td>
+                                    <td data-order="{{ abate.valor_arroba }}">R$ {{ abate.valor_arroba|floatformat:2 }}</td>
+                                    <td data-order="{{ abate.rendimento_padrao }}">{{ abate.rendimento_padrao|floatformat:2 }}%</td>
+                                    <td>{{ abate.status }}</td>
                                     <td>
-                                        <span class="badge bg-success">R$ {{ abate.valor_arroba|floatformat:2 }}</span>
-                                    </td>
-                                    <td>{{ abate.rendimento_padrao|floatformat:2 }}%</td>
-                                    <td>
-                                        {% if abate.status == 'PAGO' %}
-                                            <span class="badge bg-success">Pago</span>
-                                        {% elif abate.status == 'VENCIDO' %}
-                                            <span class="badge bg-danger">Vencido</span>
-                                        {% elif abate.status == 'CANCELADO' %}
-                                            <span class="badge bg-secondary">Cancelado</span>
-                                        {% else %}
-                                            <span class="badge bg-warning">Pendente</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="btn-group">
-                                            <button type="button" class="btn btn-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                                                Ações
-                                            </button>
-                                            <ul class="dropdown-menu">
-                                                <li>
-                                                    <a class="dropdown-item" href="{% url 'abates_detalhe' abate.pk %}">
-                                                        <i class="fas fa-eye"></i> Detalhes
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <a class="dropdown-item" href="{% url 'abates_editar' abate.pk %}">
-                                                        <i class="fas fa-pencil-alt"></i> Editar
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <hr class="dropdown-divider">
-                                                </li>
-                                                <li>
-                                                    <a class="dropdown-item text-danger" href="{% url 'abates_excluir' abate.pk %}">
-                                                        <i class="fas fa-trash"></i> Excluir
-                                                    </a>
-                                                </li>
-                                            </ul>
-                                        </div>
+                                        <a href="{% url 'abates_detalhe' abate.pk %}" class="btn btn-info btn-sm">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'abates_editar' abate.pk %}" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-pencil-alt"></i>
+                                        </a>
+                                        <a href="{% url 'abates_excluir' abate.pk %}" class="btn btn-danger btn-sm">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
                                     </td>
                                 </tr>
                                 {% empty %}
@@ -278,51 +216,33 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- DataTables & Plugins -->
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
-
 <script>
-    $(document).ready(function() {
-        $('#tabela-abates').DataTable({
-            language: {
-                url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json',
+$(document).ready(function() {
+    var table = $('#tabela-abates').DataTable({
+        "ordering": true,
+        "order": [[0, "desc"]],
+        "columnDefs": [
+            { "orderable": false, "targets": 6 }
+        ],
+        "language": {
+            "emptyTable": "Nenhum registro encontrado",
+            "info": "Mostrando _START_ até _END_ de _TOTAL_ registros",
+            "infoEmpty": "Mostrando 0 até 0 de 0 registros",
+            "infoFiltered": "(Filtrados de _MAX_ registros)",
+            "infoThousands": ".",
+            "loadingRecords": "Carregando...",
+            "processing": "Processando...",
+            "zeroRecords": "Nenhum registro encontrado",
+            "search": "Pesquisar:",
+            "paginate": {
+                "next": "Próximo",
+                "previous": "Anterior",
+                "first": "Primeiro",
+                "last": "Último"
             },
-            responsive: true,
-            dom: 'Bfrtip',
-            buttons: [
-                {
-                    extend: 'excel',
-                    text: '<i class="fas fa-file-excel"></i> Excel',
-                    className: 'btn btn-success',
-                    exportOptions: {
-                        columns: [0, 1, 2, 3]
-                    }
-                },
-                {
-                    extend: 'pdf',
-                    text: '<i class="fas fa-file-pdf"></i> PDF',
-                    className: 'btn btn-danger',
-                    exportOptions: {
-                        columns: [0, 1, 2, 3]
-                    }
-                },
-                {
-                    extend: 'print',
-                    text: '<i class="fas fa-print"></i> Imprimir',
-                    className: 'btn btn-info',
-                    exportOptions: {
-                        columns: [0, 1, 2, 3]
-                    }
-                }
-            ]
-        });
+            "lengthMenu": "Exibir _MENU_ resultados por página"
+        }
     });
+});
 </script>
 {% endblock %}

@@ -1,108 +1,262 @@
 {% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #map {
+        height: 400px;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">{{ titulo }}</h5>
-            <a href="{% url 'benfeitorias_list' %}" class="btn btn-secondary btn-sm">
-                <i class="bi bi-arrow-left"></i> Voltar
-            </a>
-        </div>
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="id_benfeitoria" class="form-label">ID da Benfeitoria</label>
-                            <input type="text" class="form-control" id="id_benfeitoria" name="id_benfeitoria" value="{{ benfeitoria.id_benfeitoria|default:'' }}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="nome" class="form-label">Nome</label>
-                            <input type="text" class="form-control" id="nome" name="nome" value="{{ benfeitoria.nome|default:'' }}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="fazenda" class="form-label">Fazenda</label>
-                            <select class="form-select" id="fazenda" name="fazenda" required>
-                                <option value="">Selecione uma fazenda</option>
-                                {% for fazenda in fazendas %}
-                                <option value="{{ fazenda.id }}" {% if benfeitoria.fazenda.id == fazenda.id %}selected{% endif %}>
-                                    {{ fazenda.nome }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="data_aquisicao" class="form-label">Data de Aquisição</label>
-                            <input type="date" class="form-control" id="data_aquisicao" name="data_aquisicao" value="{{ benfeitoria.data_aquisicao|date:'Y-m-d'|default:'' }}" required>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="valor_compra" class="form-label">Valor de Compra</label>
-                            <div class="input-group">
-                                <span class="input-group-text">R$</span>
-                                <input type="text" class="form-control valor-monetario" id="valor_compra" name="valor_compra" value="{{ benfeitoria.valor_compra|default:'' }}" required>
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">{% if object %}Editar{% else %}Nova{% endif %} Benfeitoria</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="benfeitoriaForm">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="id_benfeitoria" class="form-label">ID da Benfeitoria *</label>
+                                    <input type="text" class="form-control" id="id_benfeitoria" name="id_benfeitoria" 
+                                           value="{{ object.id_benfeitoria|default:'' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="nome" class="form-label">Nome *</label>
+                                    <input type="text" class="form-control" id="nome" name="nome" 
+                                           value="{{ object.nome|default:'' }}" required>
+                                </div>
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <label for="valor_residual" class="form-label">Valor Residual</label>
-                            <div class="input-group">
-                                <span class="input-group-text">R$</span>
-                                <input type="text" class="form-control valor-monetario" id="valor_residual" name="valor_residual" value="{{ benfeitoria.valor_residual|default:'' }}" required>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="valor_compra" class="form-label">Valor de Compra (R$) *</label>
+                                    <input type="number" step="0.01" class="form-control" id="valor_compra" name="valor_compra" 
+                                           value="{{ object.valor_compra|default:'' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="valor_residual" class="form-label">Valor Residual (R$) *</label>
+                                    <input type="number" step="0.01" class="form-control" id="valor_residual" name="valor_residual" 
+                                           value="{{ object.valor_residual|default:'' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="vida_util" class="form-label">Vida Útil (anos) *</label>
+                                    <input type="number" class="form-control" id="vida_util" name="vida_util" 
+                                           value="{{ object.vida_util|default:'' }}" required>
+                                </div>
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <label for="vida_util" class="form-label">Vida Útil (anos)</label>
-                            <input type="number" class="form-control" id="vida_util" name="vida_util" value="{{ benfeitoria.vida_util|default:'' }}" required>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="data_aquisicao" class="form-label">Data de Aquisição *</label>
+                                    <input type="date" class="form-control" id="data_aquisicao" name="data_aquisicao" 
+                                           value="{{ object.data_aquisicao|date:'Y-m-d'|default:'' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="fazenda" class="form-label">Fazenda *</label>
+                                    <select class="form-select" id="fazenda" name="fazenda" required>
+                                        <option value="">Selecione uma fazenda</option>
+                                        {% for fazenda in fazendas %}
+                                        <option value="{{ fazenda.id }}" {% if object.fazenda_id == fazenda.id %}selected{% endif %}>
+                                            {{ fazenda.nome }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+
+                        <!-- Mapa para seleção do ponto -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">Localização da Benfeitoria (Opcional)</h5>
+                                        <small class="text-muted">Clique no mapa para marcar a localização</small>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="map"></div>
+                                        <input type="hidden" id="coordenadas" name="coordenadas">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">Salvar</button>
+                                <a href="{% url 'benfeitorias_list' %}" class="btn btn-secondary">Cancelar</a>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-                <div class="text-end">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Salvar
-                    </button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Função para formatar valor no padrão brasileiro
-        function formatarMoeda(valor) {
-            if (!valor) return '';
-            
-            // Se o valor já estiver formatado, converte para número
-            if (typeof valor === 'string') {
-                valor = valor.replace('R$', '')
-                           .replace(/\./g, '')
-                           .replace(',', '.')
-                           .trim();
+$(document).ready(function() {
+    // Inicializa o mapa
+    var map = L.map('map').setView([-15.7801, -47.9292], 4);  // Centro do Brasil
+    
+    // Adiciona camada de satélite com ruas
+    var googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+        attribution: ' Google Maps'
+    }).addTo(map);
+
+    // Variáveis para controlar o marcador e coordenadas
+    var marker;
+    var coordenadasInput = $('#coordenadas');
+    var pastosLayer = L.layerGroup().addTo(map);
+    var benfeitoriasLayer = L.layerGroup().addTo(map);
+
+    // Se já existirem coordenadas, mostra o marcador
+    {% if object and object.coordenadas %}
+        var coords = {{ object.coordenadas|safe }};
+        marker = L.marker([coords.lat, coords.lng]).addTo(map);
+        map.setView([coords.lat, coords.lng], 15);
+        coordenadasInput.val(JSON.stringify(coords));
+    {% endif %}
+
+    // Adiciona marcador ao clicar no mapa
+    map.on('click', function(e) {
+        // Remove marcador anterior se existir
+        if (marker) {
+            map.removeLayer(marker);
+        }
+        
+        // Adiciona novo marcador
+        marker = L.marker(e.latlng).addTo(map);
+        
+        // Salva as coordenadas no input hidden
+        var coords = {
+            lat: e.latlng.lat,
+            lng: e.latlng.lng
+        };
+        coordenadasInput.val(JSON.stringify(coords));
+    });
+
+    // Função para buscar e centralizar na cidade da fazenda
+    function buscarCidadeFazenda(fazendaId) {
+        $.get('/fazenda/' + fazendaId + '/cidade/', function(data) {
+            if (data.success && data.cidade) {
+                $.get('https://nominatim.openstreetmap.org/search', {
+                    q: data.cidade + ', Brasil',
+                    format: 'json',
+                    limit: 1
+                }, function(result) {
+                    if (result && result.length > 0) {
+                        map.setView([result[0].lat, result[0].lon], 13);
+                    }
+                });
             }
-            
-            valor = parseFloat(valor);
-            return valor.toLocaleString('pt-BR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
+        });
+    }
+
+    // Quando selecionar uma fazenda, busca os pastos e benfeitorias
+    $('#fazenda').change(function() {
+        var fazendaId = $(this).val();
+        if (fazendaId) {
+            // Limpa as camadas anteriores
+            pastosLayer.clearLayers();
+            benfeitoriasLayer.clearLayers();
+
+            // Primeiro tenta buscar os pastos
+            $.get('/fazenda/' + fazendaId + '/pastos/', function(data) {
+                console.log('Dados dos pastos:', data);
+                if (data.success && data.pastos && data.pastos.length > 0) {
+                    var bounds = L.latLngBounds();
+                    var hasValidCoords = false;
+
+                    data.pastos.forEach(function(pasto) {
+                        console.log('Processando pasto:', pasto);
+                        if (pasto.coordenadas && Array.isArray(pasto.coordenadas)) {
+                            pasto.coordenadas.forEach(function(coord) {
+                                if (Array.isArray(coord) && coord.length === 2) {
+                                    bounds.extend([coord[0], coord[1]]);
+                                    hasValidCoords = true;
+                                }
+                            });
+                            
+                            // Desenha o polígono do pasto
+                            var polygon = L.polygon(pasto.coordenadas, {
+                                color: 'blue',
+                                fillColor: '#3388ff',
+                                fillOpacity: 0.2
+                            }).bindPopup(pasto.nome || 'Pasto sem nome');
+                            
+                            pastosLayer.addLayer(polygon);
+                        }
+                    });
+
+                    if (hasValidCoords) {
+                        console.log('Ajustando visualização para os bounds:', bounds.toBBoxString());
+                        map.fitBounds(bounds, { 
+                            padding: [50, 50],
+                            maxZoom: 18
+                        });
+                    } else {
+                        console.log('Nenhuma coordenada válida encontrada, buscando cidade...');
+                        buscarCidadeFazenda(fazendaId);
+                    }
+                } else {
+                    buscarCidadeFazenda(fazendaId);
+                }
+            }).fail(function(error) {
+                console.error('Erro ao buscar pastos:', error);
+                buscarCidadeFazenda(fazendaId);
+            });
+
+            // Busca e mostra as benfeitorias existentes
+            $.get('/fazenda/get_benfeitorias/' + fazendaId + '/', function(data) {
+                if (data.success && data.benfeitorias.length > 0) {
+                    data.benfeitorias.forEach(function(b) {
+                        if (b.coordenadas) {
+                            var coords = b.coordenadas;
+                            if (coords.lat && coords.lng) {
+                                var marker = L.marker([coords.lat, coords.lng])
+                                    .bindPopup(b.nome || 'Benfeitoria sem nome');
+                                benfeitoriasLayer.addLayer(marker);
+                            }
+                        }
+                    });
+                }
             });
         }
-
-        // Formata os campos de valor monetário ao carregar
-        document.querySelectorAll('input.valor-monetario').forEach(input => {
-            input.value = formatarMoeda(input.value);
-
-            // Adiciona evento para formatar enquanto digita
-            input.addEventListener('input', function(e) {
-                let valor = e.target.value.replace(/\D/g, '');
-                valor = (parseFloat(valor) / 100).toString();
-                e.target.value = formatarMoeda(valor);
-            });
-        });
     });
+
+    // Dispara o evento change se já houver uma fazenda selecionada
+    if ($('#fazenda').val()) {
+        $('#fazenda').trigger('change');
+    }
+});
 </script>
 {% endblock %}

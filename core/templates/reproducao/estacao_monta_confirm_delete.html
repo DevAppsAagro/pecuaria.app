@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Confirmar Exclusão</h4>
+                </div>
+                <div class="card-body">
+                    <p class="mb-4">
+                        Tem certeza que deseja excluir a Estação de Monta #{{ estacao.id }}?
+                        Esta ação não poderá ser desfeita.
+                    </p>
+                    
+                    <div class="alert alert-info">
+                        <strong>Data de Início:</strong> {{ estacao.data_inicio|date:"d/m/Y" }}<br>
+                        <strong>Lotes:</strong>
+                        {% for lote in estacao.lotes.all %}
+                            <span class="badge bg-info">{{ lote }}</span>
+                        {% endfor %}
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'estacao_monta_list' %}" class="btn btn-secondary">
+                                <i class="bi bi-x-lg"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> Confirmar Exclusão
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

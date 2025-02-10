@@ -1,15 +1,26 @@
 from django.urls import path, include
 from . import views
+from .views_dashboard import dashboard
 from . import views_relatorios
 from . import views_estoque
 from . import views_nao_operacional
+from . import views_fazenda
 from . import views_compras
 from . import views_vendas
 from . import views_parcelas
 from . import views_abates
 from . import views_dashboard
 from . import views_impressao
+from . import views_reproducao
+from . import views_config
 from django.contrib.auth import views as auth_views
+from .views_fazenda import (
+    salvar_coordenadas_benfeitoria,
+    get_coordenadas_benfeitoria,
+    get_benfeitorias_fazenda,
+    get_pastos_fazenda,
+    get_cidade_fazenda,
+)
 
 urlpatterns = [
     # Dashboard
@@ -91,6 +102,15 @@ urlpatterns = [
     path('benfeitorias/<int:pk>/', views.benfeitoria_detail, name='benfeitoria_detail'),
     path('benfeitorias/<int:pk>/editar/', views.benfeitoria_edit, name='benfeitoria_edit'),
     path('benfeitorias/<int:pk>/excluir/', views.benfeitoria_delete, name='benfeitoria_delete'),
+    
+    # URLs para o mapa de benfeitorias
+    path('fazenda/all/pastos/', views_fazenda.get_all_pastos, name='get_all_pastos'),
+    path('fazenda/all/benfeitorias/', views_fazenda.get_all_benfeitorias, name='get_all_benfeitorias'),
+    path('fazenda/<int:fazenda_id>/pastos/', views_fazenda.get_pastos_fazenda, name='get_pastos_fazenda'),
+    path('fazenda/<int:fazenda_id>/cidade/', views_fazenda.get_cidade_fazenda, name='get_cidade_fazenda'),
+    path('fazenda/get_benfeitorias/<int:fazenda_id>/', views_fazenda.get_benfeitorias_fazenda, name='get_benfeitorias_fazenda'),
+    path('fazenda/benfeitoria/coordenadas/salvar/', salvar_coordenadas_benfeitoria, name='salvar_coordenadas_benfeitoria'),
+    path('fazenda/benfeitoria/coordenadas/<int:benfeitoria_id>/', get_coordenadas_benfeitoria, name='get_coordenadas_benfeitoria'),
     
     # Estoque
     path('estoque/', views_estoque.estoque_list, name='estoque_list'),
@@ -181,6 +201,25 @@ urlpatterns = [
     path('financeiro/contas-bancarias/<int:pk>/excluir/', views.ContaBancariaDeleteView.as_view(), name='contas_bancarias_delete'),
     path('financeiro/extrato-bancario/', views.ExtratoBancarioListView.as_view(), name='extrato_bancario_list'),
 
+    # URLs de Reprodução
+    path('reproducao/estacao-monta/', views_reproducao.estacao_monta_list, name='estacao_monta_list'),
+    path('reproducao/estacao-monta/criar/', views_reproducao.estacao_monta_create, name='estacao_monta_create'),
+    path('reproducao/estacao-monta/<int:pk>/editar/', views_reproducao.estacao_monta_update, name='estacao_monta_update'),
+    path('reproducao/estacao-monta/<int:pk>/excluir/', views_reproducao.estacao_monta_delete, name='estacao_monta_delete'),
+    
+    # Reprodução - Diagnósticos
+    path('reproducao/diagnosticos/', views_reproducao.diagnostico_list, name='diagnostico_list'),
+    path('reproducao/concepcao/', views_reproducao.concepcao_form, name='concepcao_form'),
+    path('reproducao/diagnostico/', views_reproducao.diagnostico_form, name='diagnostico_form'),
+    path('reproducao/resultado/', views_reproducao.resultado_form, name='resultado_form'),
+    
+    path('reproducao/get_lotes_estacao/', views_reproducao.get_lotes_estacao, name='get_lotes_estacao'),
+    path('reproducao/buscar_animal/', views_reproducao.buscar_animal, name='buscar_animal_reproducao'),
+    path('reproducao/salvar_manejo/', views_reproducao.salvar_manejo, name='salvar_manejo_reproducao'),
+    
+    # Configurações
+    path('config/selecionar-fazenda/', views_config.selecionar_fazenda, name='selecionar_fazenda'),
+    
     # APIs
     path('api/get-cidade-coordenadas/', views.get_cidade_coordenadas, name='get_cidade_coordenadas'),
     path('api/buscar_animal/<str:brinco>/', views.buscar_animal, name='buscar_animal'),
@@ -189,6 +228,8 @@ urlpatterns = [
     path('api/financeiro/destinos/', views.get_destinos, name='get_destinos'),
     path('api/financeiro/unidades-medida/', views.get_unidades_medida, name='get_unidades_medida'),
     path('api/animais/<int:pk>/peso/', views_abates.get_peso_atual_json, name='api_peso_animal'),
+    path('api/lotes-por-fazenda/<int:fazenda_id>/', views_reproducao.get_lotes_por_fazenda, name='get_lotes_por_fazenda'),
+    path('api/lotes/<int:lote_id>/', views.lote_detail, name='lote_detail'),
     
     # Configurações - Raças
     path('configuracoes/racas/', views.raca_list, name='raca_list'),

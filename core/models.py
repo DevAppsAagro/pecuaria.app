@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from decimal import Decimal
 from django.db.models import Sum
+from .models_reproducao import EstacaoMonta, ManejoReproducao
 
 class Fazenda(models.Model):
     ESTADOS_CHOICES = [
@@ -309,7 +310,7 @@ class Lote(models.Model):
     def quantidade_atual(self):
         """Retorna a quantidade atual de animais ativos no lote"""
         return self.animal_set.filter(situacao='ATIVO').count()
-    
+
     class Meta:
         verbose_name = 'Lote'
         verbose_name_plural = 'Lotes'
@@ -402,28 +403,31 @@ class Benfeitoria(models.Model):
     id_benfeitoria = models.CharField('ID da Benfeitoria', max_length=50)
     nome = models.CharField('Nome', max_length=100)
     valor_compra = models.DecimalField('Valor de Compra', max_digits=10, decimal_places=2)
-    valor_residual = models.DecimalField('Valor Residual', max_digits=10, decimal_places=2)
-    vida_util = models.IntegerField('Vida Útil (anos)')
-    data_aquisicao = models.DateField('Data de Aquisição')
+    valor_residual = models.DecimalField('Valor Residual', max_digits=10, decimal_places=2, null=True, blank=True)
+    vida_util = models.IntegerField('Vida Útil (anos)', null=True, blank=True)
+    data_aquisicao = models.DateField('Data de Aquisição', null=True, blank=True)
     fazenda = models.ForeignKey(Fazenda, on_delete=models.CASCADE)
-    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-
+    coordenadas = models.JSONField('Coordenadas', null=True, blank=True)
+    
+    def __str__(self):
+        return f"{self.nome} - {self.fazenda.nome}"
+    
     class Meta:
         verbose_name = 'Benfeitoria'
         verbose_name_plural = 'Benfeitorias'
         ordering = ['nome']
 
     def depreciacao_anual(self):
+        """Calcula a depreciação anual da benfeitoria"""
         return (self.valor_compra - self.valor_residual) / self.vida_util
 
     def depreciacao_mensal(self):
+        """Calcula a depreciação mensal da benfeitoria"""
         return self.depreciacao_anual() / 12
 
     def depreciacao_diaria(self):
+        """Calcula a depreciação diária da benfeitoria"""
         return self.depreciacao_anual() / 365
-
-    def __str__(self):
-        return f"{self.id_benfeitoria} - {self.nome}"
 
 class EduzzTransaction(models.Model):
     STATUS_CHOICES = [

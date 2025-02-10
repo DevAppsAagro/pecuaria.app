@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .lotes-table {
+        margin-top: 10px;
+    }
+    .lotes-table th {
+        background-color: #f4f6f9;
+    }
+    .lotes-table td, .lotes-table th {
+        vertical-align: middle;
+    }
+    .total-animais {
+        font-size: 16px;
+        font-weight: bold;
+        margin-top: 15px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+    .custom-control-input:checked ~ .custom-control-label::before {
+        background-color: #28a745;
+        border-color: #28a745;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{% if object %}Editar{% else %}Nova{% endif %} Estação de Monta</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="estacaoMontaForm">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="fazenda">Fazenda</label>
+                                    <select name="fazenda" id="fazenda" class="form-select" required>
+                                        <option value="">Selecione uma fazenda</option>
+                                        {% for fazenda in fazendas %}
+                                            <option value="{{ fazenda.id }}" {% if object and object.fazenda.id == fazenda.id %}selected{% endif %}>
+                                                {{ fazenda.nome }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="data_inicio">Data de Início</label>
+                                    <input type="date" name="data_inicio" id="data_inicio" class="form-control" required 
+                                           {% if object %}value="{{ object.data_inicio|date:'Y-m-d' }}"{% endif %}>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="form-group">
+                                    <label>Lotes</label>
+                                    <div id="lotesContainer">
+                                        <div class="alert alert-info">
+                                            Selecione uma fazenda para ver os lotes disponíveis
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="form-group mb-3">
+                                    <label for="observacao">Observações</label>
+                                    <textarea name="observacao" id="observacao" class="form-control" rows="3">{% if object %}{{ object.observacao }}{% endif %}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">Salvar</button>
+                                <a href="{% url 'estacao_monta_list' %}" class="btn btn-secondary">Cancelar</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    function carregarLotes() {
+        var fazendaId = $('#fazenda').val();
+        var $container = $('#lotesContainer');
+        
+        if (!fazendaId) {
+            $container.html('<div class="alert alert-info">Selecione uma fazenda para ver os lotes disponíveis</div>');
+            return;
+        }
+        
+        $container.html('<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Carregando lotes...</div>');
+        
+        $.get(`/api/lotes-por-fazenda/${fazendaId}/`)
+            .done(function(data) {
+                if (data.length === 0) {
+                    $container.html('<div class="alert alert-warning">Nenhum lote encontrado nesta fazenda</div>');
+                    return;
+                }
+                
+                var html = `
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover lotes-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px">
+                                        <div class="custom-control custom-checkbox">
+                                            <input type="checkbox" class="custom-control-input" id="checkAll">
+                                            <label class="custom-control-label" for="checkAll"></label>
+                                        </div>
+                                    </th>
+                                    <th>Lote</th>
+                                    <th>Quantidade de Animais</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                data.forEach(function(lote) {
+                    html += `
+                        <tr>
+                            <td>
+                                <div class="custom-control custom-checkbox">
+                                    <input type="checkbox" class="custom-control-input lote-checkbox" 
+                                           id="lote_${lote.id}" name="lotes" value="${lote.id}"
+                                           data-quantidade="${lote.quantidade_animais}">
+                                    <label class="custom-control-label" for="lote_${lote.id}"></label>
+                                </div>
+                            </td>
+                            <td><label for="lote_${lote.id}" style="cursor: pointer">${lote.id_lote}</label></td>
+                            <td>${lote.quantidade_animais} animais</td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="total-animais" id="totalAnimais">
+                        Total de animais selecionados: 0
+                    </div>
+                `;
+                
+                $container.html(html);
+                
+                // Se estiver editando, marca os lotes já selecionados
+                {% if object and object.lotes.all %}
+                    var lotesIds = [{% for lote in object.lotes.all %}{{ lote.id }}{% if not forloop.last %},{% endif %}{% endfor %}];
+                    lotesIds.forEach(function(id) {
+                        $(`#lote_${id}`).prop('checked', true);
+                    });
+                    atualizarTotal();
+                {% endif %}
+                
+                // Event listeners
+                $('#checkAll').change(function() {
+                    $('.lote-checkbox').prop('checked', $(this).is(':checked'));
+                    atualizarTotal();
+                });
+                
+                $('.lote-checkbox').change(function() {
+                    atualizarTotal();
+                    verificarTodos();
+                });
+            })
+            .fail(function(jqXHR, textStatus, errorThrown) {
+                console.error('Erro ao carregar lotes:', errorThrown);
+                $container.html(`
+                    <div class="alert alert-danger">
+                        Erro ao carregar lotes. Por favor, tente novamente.
+                    </div>
+                `);
+            });
+    }
+    
+    function atualizarTotal() {
+        var total = 0;
+        $('.lote-checkbox:checked').each(function() {
+            total += parseInt($(this).data('quantidade')) || 0;
+        });
+        $('#totalAnimais').text(`Total de animais selecionados: ${total}`);
+    }
+    
+    function verificarTodos() {
+        var total = $('.lote-checkbox').length;
+        var selecionados = $('.lote-checkbox:checked').length;
+        $('#checkAll').prop('checked', total === selecionados);
+    }
+    
+    // Event listeners
+    $('#fazenda').change(carregarLotes);
+    
+    // Validação do formulário
+    $('#estacaoMontaForm').submit(function(e) {
+        e.preventDefault();
+        
+        if ($('.lote-checkbox:checked').length === 0) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Selecione pelo menos um lote.'
+            });
+            return false;
+        }
+        
+        this.submit();
+    });
+    
+    // Carrega lotes se houver fazenda selecionada
+    if ($('#fazenda').val()) {
+        carregarLotes();
+    }
+});
+</script>
+{% endblock %}

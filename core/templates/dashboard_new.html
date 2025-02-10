@@ -1,3 +1,5 @@
+{% load custom_filters %}
+
 <!-- Filtros -->
 <div class="container-fluid mt-4">
     <div class="card">
@@ -28,128 +30,70 @@
     </div>
 </div>
 
-<!-- Cards de Indicadores -->
-<div class="container-fluid mt-4">
-    <div class="row">
-        <!-- Produção -->
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">Produção</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>@ Totais:</span>
-                        <strong>{{ indicadores.producao.arrobas_totais }}</strong>
+<!-- Cards de Resumo -->
+<div class="row">
+    <!-- Card de Fazendas -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total de Fazendas</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_fazendas }}</div>
                     </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>@/ha/ano:</span>
-                        <strong>{{ indicadores.producao.arrobas_ha_ano }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Peso Vivo Total:</span>
-                        <strong>{{ indicadores.producao.peso_vivo_total }} kg</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>GMD Global:</span>
-                        <strong>{{ indicadores.producao.gmd_global }} kg</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Taxa de Venda:</span>
-                        <strong>{{ indicadores.producao.taxa_venda }}%</strong>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span>Taxa de Desfrute:</span>
-                        <strong>{{ indicadores.producao.taxa_desfrute }}%</strong>
+                    <div class="col-auto">
+                        <i class="fas fa-home fa-2x text-gray-300"></i>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Financeiro -->
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header bg-success text-white">
-                    <h5 class="card-title mb-0">Financeiro</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Valor @:</span>
-                        <strong>R$ {{ indicadores.financeiro.valor_arroba }}</strong>
+    <!-- Card de Pastos -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Total de Pastos</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_pastos }}</div>
                     </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Desembolso/Boi:</span>
-                        <strong>R$ {{ indicadores.financeiro.desembolso_boi }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Resultado/Boi:</span>
-                        <strong>R$ {{ indicadores.financeiro.resultado_boi }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Margem Venda:</span>
-                        <strong>{{ indicadores.financeiro.margem_venda }}%</strong>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span>ROI:</span>
-                        <strong>{{ indicadores.financeiro.roi }}%</strong>
+                    <div class="col-auto">
+                        <i class="fas fa-tree fa-2x text-gray-300"></i>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Reprodução -->
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header bg-info text-white">
-                    <h5 class="card-title mb-0">Reprodução</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Total Cobertura:</span>
-                        <strong>{{ indicadores.reproducao.total_cobertura }}</strong>
+    <!-- Card de Benfeitorias -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Total de Benfeitorias</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_benfeitorias }}</div>
                     </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Total Prenhes:</span>
-                        <strong>{{ indicadores.reproducao.total_prenhes }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Fertilidade:</span>
-                        <strong>{{ indicadores.reproducao.fertilidade }}%</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Índice Serviço:</span>
-                        <strong>{{ indicadores.reproducao.indice_servico }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span>Taxa Desmame:</span>
-                        <strong>{{ indicadores.reproducao.taxa_desmame }}%</strong>
+                    <div class="col-auto">
+                        <i class="fas fa-building fa-2x text-gray-300"></i>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Confinamento -->
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header bg-warning">
-                    <h5 class="card-title mb-0">Confinamento</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>GMD:</span>
-                        <strong>{{ indicadores.confinamento.gmd }} kg</strong>
+    <!-- Card de Área Total -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Área Total de Pastos</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_area_pastos }} ha</div>
                     </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Ganho Carcaça:</span>
-                        <strong>{{ indicadores.confinamento.ganho_carcaca }}%</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Rendimento:</span>
-                        <strong>{{ indicadores.confinamento.rendimento }}%</strong>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span>Valor Diária:</span>
-                        <strong>R$ {{ indicadores.confinamento.valor_diaria }}</strong>
+                    <div class="col-auto">
+                        <i class="fas fa-ruler fa-2x text-gray-300"></i>
                     </div>
                 </div>
             </div>
@@ -157,81 +101,53 @@
     </div>
 </div>
 
-<!-- Mais Cards de Indicadores -->
-<div class="container-fluid mt-4">
-    <div class="row">
-        <!-- Indicadores de Desmame -->
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header bg-secondary text-white">
-                    <h5 class="card-title mb-0">Indicadores de Desmame</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Peso Desmame Machos:</span>
-                        <strong>{{ indicadores.producao.peso_desmame_machos }} kg</strong>
+<!-- Cards Financeiros -->
+<div class="row">
+    <!-- Despesas do Mês -->
+    <div class="col-xl-4 col-md-6 mb-4">
+        <div class="card border-left-danger shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Despesas do Mês</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800 despesas-valor">R$ {{ despesas_mes|floatformat:2 }}</div>
                     </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Peso Desmame Fêmeas:</span>
-                        <strong>{{ indicadores.producao.peso_desmame_femeas }} kg</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Quilos Desmamados:</span>
-                        <strong>{{ indicadores.producao.quilos_desmamados }} kg</strong>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span>Relação Desmame:</span>
-                        <strong>{{ indicadores.reproducao.relacao_desmame }}</strong>
+                    <div class="col-auto">
+                        <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Indicadores de Perdas -->
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="card-title mb-0">Indicadores de Perdas</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Perda Pré-parto:</span>
-                        <strong>{{ indicadores.reproducao.perda_pre_parto }}%</strong>
+    <!-- Receitas do Mês -->
+    <div class="col-xl-4 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Receitas do Mês</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800 receitas-valor">R$ {{ receitas_mes|floatformat:2 }}</div>
                     </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Mortalidade Bezerros:</span>
-                        <strong>{{ indicadores.reproducao.mortalidade_bezerros }}%</strong>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span>Perda Pré-desmame:</span>
-                        <strong>{{ indicadores.reproducao.perda_pre_desmame }}%</strong>
+                    <div class="col-auto">
+                        <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Resultados Financeiros -->
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header bg-success text-white">
-                    <h5 class="card-title mb-0">Resultados Financeiros</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Receita Total:</span>
-                        <strong>R$ {{ indicadores.financeiro.receita_total }}</strong>
+    <!-- Resultado do Mês -->
+    <div class="col-xl-4 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Resultado do Mês</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800 resultado-valor">R$ {{ receitas_mes|subtract:despesas_mes|floatformat:2 }}</div>
                     </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Despesas Totais:</span>
-                        <strong>R$ {{ indicadores.financeiro.despesas_total }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Resultado Final:</span>
-                        <strong>R$ {{ indicadores.financeiro.resultado_final }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span>Resultado/ha:</span>
-                        <strong>R$ {{ indicadores.financeiro.resultado_ha }}</strong>
+                    <div class="col-auto">
+                        <i class="fas fa-balance-scale fa-2x text-gray-300"></i>
                     </div>
                 </div>
             </div>

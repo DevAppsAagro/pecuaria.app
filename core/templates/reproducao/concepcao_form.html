@@ -1,0 +1,303 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <!-- Formulário Principal -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Registro de Concepção</h4>
+                </div>
+                <div class="card-body">
+                    <form id="concepcaoForm">
+                        {% csrf_token %}
+                        
+                        <!-- Estação de Monta -->
+                        <div class="mb-3">
+                            <label for="estacao_monta" class="form-label h5">Estação de Monta *</label>
+                            <select class="form-select form-select-lg" id="estacao_monta" name="estacao_monta" required>
+                                <option value="">Selecione uma estação</option>
+                                {% for estacao in estacoes %}
+                                <option value="{{ estacao.id }}">{{ estacao }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Lote -->
+                        <div class="mb-3">
+                            <label for="lote" class="form-label h5">Lote *</label>
+                            <select class="form-select form-select-lg" id="lote" name="lote" required disabled>
+                                <option value="">Selecione primeiro a estação</option>
+                            </select>
+                        </div>
+
+                        <!-- Data de Concepção -->
+                        <div class="mb-3">
+                            <label for="data_concepcao" class="form-label h5">Data da Concepção *</label>
+                            <input type="date" class="form-control form-control-lg" id="data_concepcao" 
+                                   name="data_concepcao" required value="{% now 'Y-m-d' %}">
+                        </div>
+
+                        <!-- Brinco do Animal -->
+                        <div class="mb-3">
+                            <label for="brinco" class="form-label h5">Brinco do Animal *</label>
+                            <input type="text" class="form-control form-control-lg" id="brinco" name="brinco" 
+                                   placeholder="Digite o brinco visual ou eletrônico" required>
+                        </div>
+
+                        <!-- Informações do Animal -->
+                        <div id="animalInfo" class="card mb-4" style="display: none;">
+                            <div class="card-body">
+                                <h5 class="card-title">Informações do Animal</h5>
+                                <div id="animalDetails" class="h6"></div>
+                            </div>
+                        </div>
+
+                        <!-- Apartação -->
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="fazer_movimentacao" name="fazer_movimentacao">
+                            <label class="form-check-label h5 ms-2" for="fazer_movimentacao">
+                                Fazer Movimentação do Animal?
+                            </label>
+                        </div>
+
+                        <!-- Campos de Movimentação -->
+                        <div id="movimentacao_campos" style="display: none;">
+                            <div class="mb-4">
+                                <label for="tipo_movimentacao" class="form-label h5">Tipo de Movimentação *</label>
+                                <select class="form-select form-select-lg" id="tipo_movimentacao" name="tipo_movimentacao">
+                                    <option value="">Selecione o tipo</option>
+                                    <option value="LOTE">Mudança de Lote</option>
+                                    <option value="PASTO">Mudança de Pasto</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-4" id="novo_lote_div" style="display: none;">
+                                <label for="novo_lote" class="form-label h5">Novo Lote *</label>
+                                <select class="form-select form-select-lg" id="novo_lote" name="novo_lote">
+                                    <option value="">Selecione o lote</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-4" id="novo_pasto_div" style="display: none;">
+                                <label for="novo_pasto" class="form-label h5">Novo Pasto *</label>
+                                <select class="form-select form-select-lg" id="novo_pasto" name="novo_pasto">
+                                    <option value="">Selecione o pasto</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">Registrar Concepção</button>
+                            <button type="reset" class="btn btn-secondary btn-lg">Limpar Formulário</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista de Animais Processados -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Animais Processados</h4>
+                </div>
+                <div class="card-body">
+                    <div id="animaisProcessados" class="list-group">
+                        <!-- Lista será preenchida via JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    const estacaoSelect = $('#estacao_monta');
+    const loteSelect = $('#lote');
+    const brincoInput = $('#brinco');
+    const animalInfo = $('#animalInfo');
+    const animalDetails = $('#animalDetails');
+    const fazerMovimentacao = $('#fazer_movimentacao');
+    const movimentacaoCampos = $('#movimentacao_campos');
+    const tipoMovimentacao = $('#tipo_movimentacao');
+    const novoLoteDiv = $('#novo_lote_div');
+    const novoPastoDiv = $('#novo_pasto_div');
+    const form = $('#concepcaoForm');
+    const animaisProcessados = $('#animaisProcessados');
+
+    // Carregar lotes quando selecionar estação
+    estacaoSelect.change(function() {
+        const estacaoId = $(this).val();
+        if (estacaoId) {
+            $.get('/reproducao/get_lotes_estacao/', {estacao_id: estacaoId})
+                .done(function(data) {
+                    loteSelect.empty().append('<option value="">Selecione um lote</option>');
+                    data.lotes.forEach(function(lote) {
+                        loteSelect.append(`<option value="${lote.id}">${lote.nome}</option>`);
+                    });
+                    loteSelect.prop('disabled', false);
+                });
+        } else {
+            loteSelect.empty().append('<option value="">Selecione primeiro a estação</option>');
+            loteSelect.prop('disabled', true);
+        }
+    });
+
+    // Buscar animal quando digitar brinco
+    brincoInput.on('change', function() {
+        const brinco = $(this).val();
+        const loteId = loteSelect.val();
+        const estacaoId = estacaoSelect.val();
+
+        if (brinco && loteId) {
+            $.get('/reproducao/buscar_animal/', {
+                brinco: brinco,
+                lote_id: loteId,
+                estacao_id: estacaoId
+            })
+            .done(function(data) {
+                if (data.success) {
+                    const animal = data.animal;
+                    animalDetails.html(`
+                        <p>Brinco Visual: ${animal.brinco_visual}</p>
+                        <p>Brinco Eletrônico: ${animal.brinco_eletronico || '-'}</p>
+                        <p>Categoria: ${animal.categoria}</p>
+                        <p>Data Nascimento: ${animal.data_nascimento || '-'}</p>
+                    `);
+                    animalInfo.show();
+                    // Armazena o ID do animal para uso posterior
+                    animalInfo.data('animal-id', animal.id);
+
+                    if (data.manejo_existente) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Atenção',
+                            text: 'Este animal já possui registro nesta estação!'
+                        });
+                        brincoInput.val('').focus();
+                        animalInfo.hide();
+                    }
+                }
+            })
+            .fail(function(jqXHR) {
+                const errorMsg = jqXHR.responseJSON?.error || 'Animal não encontrado!';
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: errorMsg
+                });
+                animalInfo.hide();
+            });
+        }
+    });
+
+    // Controlar campos de movimentação
+    fazerMovimentacao.change(function() {
+        movimentacaoCampos.toggle(this.checked);
+    });
+
+    tipoMovimentacao.change(function() {
+        const tipo = $(this).val();
+        novoLoteDiv.toggle(tipo === 'LOTE');
+        novoPastoDiv.toggle(tipo === 'PASTO');
+    });
+
+    // Processar formulário
+    form.on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        formData.append('tipo_manejo', 'concepcao');
+        
+        // Adiciona o ID do animal que foi buscado
+        const animalId = $('#animalInfo').data('animal-id');
+        if (!animalId) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Animal não encontrado. Por favor, busque o animal novamente.'
+            });
+            return;
+        }
+        formData.append('animal_id', animalId);
+        
+        // Adiciona o ID da estação
+        const estacaoId = $('#estacao_monta').val();
+        if (!estacaoId) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Selecione uma estação de monta.'
+            });
+            return;
+        }
+        formData.append('estacao_monta', estacaoId);
+        
+        // Adiciona o ID do lote
+        const loteId = $('#lote').val();
+        if (!loteId) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Selecione um lote.'
+            });
+            return;
+        }
+        formData.append('lote', loteId);
+
+        $.ajax({
+            url: '/reproducao/salvar_manejo/',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    // Adicionar animal à lista de processados
+                    const brinco = brincoInput.val();
+                    const item = $(`<div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Brinco: ${brinco}</h6>
+                            <small class="text-success">
+                                <i class="bi bi-check-circle"></i>
+                            </small>
+                        </div>
+                        <small>Concepção registrada com sucesso</small>
+                    </div>`);
+                    animaisProcessados.prepend(item);
+
+                    // Limpar campos do animal
+                    brincoInput.val('').focus();
+                    animalInfo.hide();
+                    
+                    // Se fez movimentação, atualizar lotes
+                    if (fazerMovimentacao.is(':checked')) {
+                        estacaoSelect.trigger('change');
+                    }
+                    
+                    // Mostra mensagem de sucesso
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso',
+                        text: response.message
+                    });
+                }
+            },
+            error: function(xhr) {
+                const errorMsg = xhr.responseJSON?.error || 'Erro desconhecido ao salvar manejo';
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: errorMsg
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
