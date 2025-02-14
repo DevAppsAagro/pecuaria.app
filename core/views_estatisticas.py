@@ -1,9 +1,10 @@
 from datetime import date, timedelta
-from django.db.models import Sum, Count, F, Q, FloatField
+from django.db.models import Sum, Count, F, Q, FloatField, DecimalField, Avg, Value
 from django.db.models.functions import Coalesce
 from decimal import Decimal
 from .models import Animal, Pesagem
 from .models_abates import Abate, AbateAnimal
+from django.db.models import OuterRef, Subquery
 
 def get_estatisticas_animais(request, queryset=None):
     """
@@ -21,19 +22,38 @@ def get_estatisticas_animais(request, queryset=None):
 
     # Inicializar dicionário de estatísticas com dados fictícios para mortos
     stats = {
-        'ATIVO': {'quantidade': 0, 'variacao': 0, 'peso_total': Decimal('0.00'), 'peso_arroba': Decimal('0.00'), 'peso_carcaca': Decimal('0.00'), 'peso_carcaca_arroba': Decimal('0.00')},
+        'ATIVO': {'quantidade': 0, 'variacao': 0, 'peso_total': Decimal('0.00'), 'peso_arroba': Decimal('0.00')},
         'VENDIDO': {'quantidade': 0, 'variacao': 0, 'peso_total': Decimal('0.00'), 'peso_arroba': Decimal('0.00')},
-        'MORTO': {'quantidade': 2, 'variacao': -50, 'peso_total': Decimal('800.00'), 'peso_arroba': Decimal('53.33')},  # Dados fictícios
-        'ABATIDO': {'quantidade': 0, 'variacao': 0, 'peso_total': Decimal('0.00'), 'peso_arroba': Decimal('0.00'), 'peso_carcaca': Decimal('0.00'), 'peso_carcaca_arroba': Decimal('0.00')}
+        'MORTO': {'quantidade': 2, 'variacao': -50, 'peso_total': Decimal('800.00'), 'peso_arroba': Decimal('53.33')},
+        'ABATIDO': {'quantidade': 0, 'variacao': 0, 'peso_total': Decimal('0.00'), 'peso_arroba': Decimal('0.00')}
     }
+
+    # Subconsulta para última pesagem
+    ultima_pesagem = Pesagem.objects.filter(
+        animal=OuterRef('pk')
+    ).order_by('-data').values('peso')[:1]
 
     # Calcular estatísticas para cada status (exceto MORTO que já tem dados fictícios)
     for status in ['ATIVO', 'VENDIDO', 'ABATIDO']:
-        # Contagem atual
-        animais_status = queryset.filter(situacao=status)
-        stats[status]['quantidade'] = animais_status.count()
+        # Contagem atual e peso total em uma única query
+        stats_atuais = queryset.filter(situacao=status).aggregate(
+            quantidade=Count('id'),
+            peso_total=Coalesce(
+                Sum(
+                    Coalesce(
+                        Subquery(ultima_pesagem, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                        F('peso_entrada')
+                    )
+                ),
+                Decimal('0.00'),
+                output_field=DecimalField(max_digits=10, decimal_places=2)
+            )
+        )
+        
+        stats[status]['quantidade'] = stats_atuais['quantidade']
+        stats[status]['peso_total'] = Decimal(str(stats_atuais['peso_total']))
 
-        # Contagem do ano anterior para cálculo de variação
+        # Contagem do ano anterior em uma única query
         qtd_ano_anterior = Animal.objects.filter(
             usuario=request.user,
             situacao=status,
@@ -47,49 +67,18 @@ def get_estatisticas_animais(request, queryset=None):
             variacao = 100 if stats[status]['quantidade'] > 0 else 0
         stats[status]['variacao'] = round(variacao, 1)
 
-        # Calcular peso total usando subquery para última pesagem
-        peso_total = Decimal('0.00')
-        for animal in animais_status:
-            ultima_pesagem = Pesagem.objects.filter(animal=animal).order_by('-data').first()
-            peso = ultima_pesagem.peso if ultima_pesagem else animal.peso_entrada
-            if peso:
-                peso_total += Decimal(str(peso))
-        
-        stats[status]['peso_total'] = peso_total
-
         # Cálculo de arrobas baseado no status
         if status == 'ATIVO':
-            # Para animais ativos, usar 50% de rendimento (peso_vivo/30)
-            stats[status]['peso_arroba'] = peso_total / Decimal('30.0') if peso_total > 0 else Decimal('0.00')
+            # Para animais ativos, usar peso vivo/30
+            stats[status]['peso_arroba'] = stats[status]['peso_total'] / Decimal('30.0')
         elif status == 'ABATIDO':
-            # Para animais abatidos, usar o rendimento real do abate
-            peso_arroba = Decimal('0.00')
-            for animal in animais_status:
-                ultima_pesagem = Pesagem.objects.filter(animal=animal).order_by('-data').first()
-                peso = ultima_pesagem.peso if ultima_pesagem else animal.peso_entrada
-                if peso:
-                    # Buscar o rendimento do abate através do AbateAnimal
-                    abate_animal = AbateAnimal.objects.filter(
-                        animal=animal
-                    ).select_related('abate').first()
-                    
-                    if abate_animal and abate_animal.rendimento:
-                        rendimento = Decimal(str(abate_animal.rendimento)) / Decimal('100.0')
-                        peso_arroba += (Decimal(str(peso)) * rendimento) / Decimal('15.0')
-                    else:
-                        # Se não tiver rendimento registrado, usar 50%
-                        peso_arroba += Decimal(str(peso)) / Decimal('30.0')
-            stats[status]['peso_arroba'] = peso_arroba
+            # Para animais abatidos, usar peso vivo/30 (simplificado para performance)
+            stats[status]['peso_arroba'] = stats[status]['peso_total'] / Decimal('30.0')
         else:
             # Para outros status (VENDIDO, MORTO), usar peso vivo/30
-            stats[status]['peso_arroba'] = peso_total / Decimal('30.0') if peso_total > 0 else Decimal('0.00')
+            stats[status]['peso_arroba'] = stats[status]['peso_total'] / Decimal('30.0')
 
-        # Calcular peso de carcaça (50% do peso vivo) para animais ativos e abatidos
-        if status in ['ATIVO', 'ABATIDO']:
-            stats[status]['peso_carcaca'] = peso_total * Decimal('0.50')
-            stats[status]['peso_carcaca_arroba'] = stats[status]['peso_carcaca'] / Decimal('15.0')
-
-    # Calcular distribuição por categoria
+    # Calcular distribuição por categoria em uma única query
     categorias = []
     for categoria in queryset.values('categoria_animal__nome').annotate(
         quantidade=Count('id')
@@ -103,3 +92,83 @@ def get_estatisticas_animais(request, queryset=None):
         'stats': stats,
         'categorias': categorias
     }
+
+def get_estatisticas_detalhadas(request, queryset=None):
+    from django.db.models import Count, Sum, Q
+    
+    # Se não receber um queryset, usa todos os animais do usuário
+    if queryset is None:
+        queryset = Animal.objects.filter(usuario=request.user)
+    
+    # Inicializa o dicionário com todos os status possíveis
+    stats = {
+        'ATIVO': {'quantidade': 0, 'peso_total': 0, 'peso_arroba': 0},
+        'VENDIDO': {'quantidade': 0, 'peso_total': 0, 'peso_arroba': 0},
+        'MORTO': {'quantidade': 0, 'peso_total': 0, 'peso_arroba': 0},
+        'ABATIDO': {'quantidade': 0, 'peso_total': 0, 'peso_arroba': 0}
+    }
+    
+    # Contagem atual
+    contagem_atual = queryset.values('situacao').annotate(
+        total=Count('id'),
+        peso_total=Coalesce(Sum('peso_atual'), Value(Decimal('0.00')), output_field=DecimalField(max_digits=10, decimal_places=2)),
+        peso_arroba=Coalesce(
+            Sum('peso_atual') / Value(Decimal('15.0')), 
+            Value(Decimal('0.00')), 
+            output_field=DecimalField(max_digits=10, decimal_places=2)
+        )
+    )
+    
+    # Preenche as quantidades atuais
+    for item in contagem_atual:
+        situacao = item['situacao']
+        if situacao in stats:
+            stats[situacao].update({
+                'quantidade': item['total'],
+                'peso_total': item['peso_total'] or Decimal('0.00'),
+                'peso_arroba': item['peso_arroba'] or Decimal('0.00')
+            })
+
+    # Para animais ativos, calcula estimativa de carcaça com 50% rendimento
+    for situacao in ['ATIVO']:
+        if situacao in stats:
+            peso_vivo = Decimal(str(stats[situacao]['peso_total']))
+            rendimento = Decimal('0.50')  # 50% fixo para animais vivos
+            peso_carcaca = peso_vivo * rendimento
+            stats[situacao].update({
+                'peso_carcaca': peso_carcaca,
+                'peso_carcaca_arroba': peso_carcaca / Decimal('15.0'),
+                'rendimento_medio': rendimento * Decimal('100.0')  # Converte para percentual
+            })
+
+    # Para animais abatidos, busca informações detalhadas
+    animais_abatidos = queryset.filter(situacao='ABATIDO')
+    if animais_abatidos.exists():
+        # Buscar dados de abate em uma única query
+        abates_info = (
+            AbateAnimal.objects
+            .filter(animal__in=animais_abatidos)
+            .select_related('abate')
+            .aggregate(
+                peso_vivo_total=Coalesce(Sum('peso_vivo'), Value(Decimal('0.00')), output_field=DecimalField(max_digits=10, decimal_places=2)),
+                rendimento_medio=Coalesce(
+                    Avg('rendimento'), 
+                    Value(Decimal('50.00')), 
+                    output_field=DecimalField(max_digits=5, decimal_places=2)
+                )
+            )
+        )
+
+        peso_vivo = abates_info['peso_vivo_total']
+        rendimento = Decimal(str(abates_info['rendimento_medio'])) / Decimal('100.0')  # Converte de percentual para decimal
+        peso_carcaca = peso_vivo * rendimento
+
+        stats['ABATIDO'].update({
+            'peso_total': peso_vivo,
+            'peso_arroba': peso_vivo / Decimal('15.0'),
+            'peso_carcaca': peso_carcaca,
+            'peso_carcaca_arroba': peso_carcaca / Decimal('15.0'),
+            'rendimento_medio': rendimento * Decimal('100.0')  # Converte para percentual
+        })
+    
+    return stats

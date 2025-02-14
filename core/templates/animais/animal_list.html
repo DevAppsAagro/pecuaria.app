@@ -112,8 +112,13 @@
                         <div class="inner">
                             <h3>{{ estatisticas.stats.ATIVO.quantidade|default:"0" }}</h3>
                             <p>Ativos</p>
-                            <p>Peso Total: {{ estatisticas.stats.ATIVO.peso_total|floatformat:2 }} kg</p>
-                            <p>Arrobas: {{ estatisticas.stats.ATIVO.peso_arroba|floatformat:2 }} @</p>
+                            <div class="text-xs text-gray-600">
+                                Peso Total: {{ estatisticas_detalhadas.ATIVO.peso_total|floatformat:2 }} kg<br>
+                                Peso Carcaça: {{ estatisticas_detalhadas.ATIVO.peso_carcaca|floatformat:2 }} kg<br>
+                                Arrobas: {{ estatisticas_detalhadas.ATIVO.peso_arroba|floatformat:2 }} @<br>
+                                Arrobas Carcaça: {{ estatisticas_detalhadas.ATIVO.peso_carcaca_arroba|floatformat:2 }} @<br>
+                                Rendimento Médio: {{ estatisticas_detalhadas.ATIVO.rendimento_medio|floatformat:2 }}%
+                            </div>
                             {% if estatisticas.stats.ATIVO.variacao != 0 %}
                             <div class="variation">
                                 {% if estatisticas.stats.ATIVO.variacao > 0 %}
@@ -187,8 +192,13 @@
                         <div class="inner">
                             <h3>{{ estatisticas.stats.ABATIDO.quantidade|default:"0" }}</h3>
                             <p>Abatidos</p>
-                            <p>Peso Total: {{ estatisticas.stats.ABATIDO.peso_total|floatformat:2 }} kg</p>
-                            <p>Arrobas: {{ estatisticas.stats.ABATIDO.peso_arroba|floatformat:2 }} @</p>
+                            <div class="text-xs text-gray-600">
+                                Peso Vivo: {{ estatisticas_detalhadas.ABATIDO.peso_total|floatformat:2 }} kg<br>
+                                Peso Carcaça: {{ estatisticas_detalhadas.ABATIDO.peso_carcaca|floatformat:2 }} kg<br>
+                                Arrobas Vivo: {{ estatisticas_detalhadas.ABATIDO.peso_arroba|floatformat:2 }} @<br>
+                                Arrobas Carcaça: {{ estatisticas_detalhadas.ABATIDO.peso_carcaca_arroba|floatformat:2 }} @<br>
+                                Rendimento: {{ estatisticas_detalhadas.ABATIDO.rendimento_medio|floatformat:2 }}%
+                            </div>
                             {% if estatisticas.stats.ABATIDO.variacao != 0 %}
                             <div class="variation">
                                 {% if estatisticas.stats.ABATIDO.variacao > 0 %}
@@ -251,7 +261,7 @@
                                     <option value="">Todos</option>
                                     {% for pasto in pastos %}
                                     <option value="{{ pasto.id }}" {% if filtros.pasto == pasto.id|stringformat:"s" %}selected{% endif %}>
-                                        {{ pasto.id_pasto }}
+                                        {{ pasto.id_pasto }}{% if pasto.nome %} - {{ pasto.nome }}{% endif %}
                                     </option>
                                     {% endfor %}
                                 </select>
@@ -374,7 +384,7 @@
                                         <td>{{ animal.categoria_animal.nome }}</td>
                                         <td>{{ animal.lote.id_lote }}</td>
                                         <td>{{ animal.fazenda_atual.nome }}</td>
-                                        <td>{{ animal.pasto_atual.id_pasto|default:'-' }}</td>
+                                        <td>{{ animal.pasto_atual.id_pasto }}{% if animal.pasto_atual.nome %} - {{ animal.pasto_atual.nome }}{% endif %}</td>
                                         <td>{{ animal.peso_atual|floatformat:2|default_if_none:'-' }} kg</td>
                                         <td>{{ animal.data_entrada|date:"d/m/Y" }}</td>
                                         <td>
@@ -415,6 +425,37 @@
                                     {% endfor %}
                                 </tbody>
                             </table>
+                        </div>
+                        
+                        <!-- Paginação -->
+                        <div class="mt-3">
+                            <nav aria-label="Navegação de página">
+                                <ul class="pagination justify-content-center">
+                                    {% if animais.has_previous %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=1{% if request.GET.fazenda %}&fazenda={{ request.GET.fazenda }}{% endif %}{% if request.GET.lote %}&lote={{ request.GET.lote }}{% endif %}{% if request.GET.pasto %}&pasto={{ request.GET.pasto }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.raca %}&raca={{ request.GET.raca }}{% endif %}{% if request.GET.brinco %}&brinco={{ request.GET.brinco }}{% endif %}">&laquo; Primeira</a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ animais.previous_page_number }}{% if request.GET.fazenda %}&fazenda={{ request.GET.fazenda }}{% endif %}{% if request.GET.lote %}&lote={{ request.GET.lote }}{% endif %}{% if request.GET.pasto %}&pasto={{ request.GET.pasto }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.raca %}&raca={{ request.GET.raca }}{% endif %}{% if request.GET.brinco %}&brinco={{ request.GET.brinco }}{% endif %}">Anterior</a>
+                                        </li>
+                                    {% endif %}
+
+                                    <li class="page-item active">
+                                        <span class="page-link">
+                                            Página {{ animais.number }} de {{ animais.paginator.num_pages }}
+                                        </span>
+                                    </li>
+
+                                    {% if animais.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ animais.next_page_number }}{% if request.GET.fazenda %}&fazenda={{ request.GET.fazenda }}{% endif %}{% if request.GET.lote %}&lote={{ request.GET.lote }}{% endif %}{% if request.GET.pasto %}&pasto={{ request.GET.pasto }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.raca %}&raca={{ request.GET.raca }}{% endif %}{% if request.GET.brinco %}&brinco={{ request.GET.brinco }}{% endif %}">Próxima</a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ animais.paginator.num_pages }}{% if request.GET.fazenda %}&fazenda={{ request.GET.fazenda }}{% endif %}{% if request.GET.lote %}&lote={{ request.GET.lote }}{% endif %}{% if request.GET.pasto %}&pasto={{ request.GET.pasto }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.raca %}&raca={{ request.GET.raca }}{% endif %}{% if request.GET.brinco %}&brinco={{ request.GET.brinco }}{% endif %}">Última &raquo;</a>
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
                         </div>
                     </form>
                 </div>
