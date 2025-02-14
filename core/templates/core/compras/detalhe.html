@@ -3,188 +3,167 @@
 
 {% block content %}
 <div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-10">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h4 class="mb-0">Detalhes da Compra</h4>
-                    <div>
-                        <a href="{% url 'compras_editar' compra.pk %}" class="btn btn-primary">
-                            <i class="bi bi-pencil"></i> Editar
-                        </a>
-                        <a href="{% url 'compras_list' %}" class="btn btn-secondary">
-                            <i class="bi bi-arrow-left"></i> Voltar
-                        </a>
-                    </div>
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>Detalhes da Compra</h2>
+        </div>
+        <div class="col-md-4 text-end">
+            {% if not compra.data_pagamento %}
+            <a href="{% url 'compras_editar' compra.pk %}" class="btn btn-primary">
+                <i class="bi bi-pencil"></i> Editar
+            </a>
+            {% endif %}
+            <a href="{% url 'compras_list' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Informações da Compra</h5>
                 </div>
                 <div class="card-body">
-                    <div class="row mb-4">
+                    <div class="row">
                         <div class="col-md-6">
-                            <h5 class="mb-3">Informações da Compra</h5>
-                            <table class="table table-sm">
+                            <p><strong>Data da Compra:</strong> {{ compra.data|date:"d/m/Y" }}</p>
+                            <p><strong>Data de Vencimento:</strong> {{ compra.data_vencimento|date:"d/m/Y" }}</p>
+                            <p><strong>Data de Pagamento:</strong> {{ compra.data_pagamento|date:"d/m/Y"|default:"-" }}</p>
+                            <p><strong>Tipo de Compra:</strong> {{ compra.get_tipo_compra_display }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Número de Parcelas:</strong> {{ compra.numero_parcelas }}</p>
+                            <p><strong>Status:</strong>
+                                {% if compra.status == 'PAGO' %}
+                                    <span class="badge bg-success">Pago</span>
+                                {% elif compra.status == 'VENCIDO' %}
+                                    <span class="badge bg-danger">Vencido</span>
+                                {% elif compra.status == 'VENCE_HOJE' %}
+                                    <span class="badge bg-warning">Vence Hoje</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Pendente</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Animais da Compra</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
                                 <tr>
-                                    <th width="40%">Data da Compra:</th>
-                                    <td>{{ compra.data|date:"d/m/Y" }}</td>
+                                    <th>Brinco</th>
+                                    <th>Categoria</th>
+                                    <th>Raça</th>
+                                    <th>Peso (kg)</th>
+                                    <th class="text-end">Valor Total</th>
                                 </tr>
+                            </thead>
+                            <tbody>
+                                {% for animal_compra in animais_compra %}
                                 <tr>
-                                    <th>Data de Vencimento:</th>
-                                    <td>{{ compra.data_vencimento|date:"d/m/Y" }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Data de Pagamento:</th>
-                                    <td>{{ compra.data_pagamento|date:"d/m/Y"|default:"-" }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Status:</th>
                                     <td>
-                                        {% if compra.status == 'PAGO' %}
+                                        <a href="{% url 'animal_detail' animal_compra.animal.pk %}" class="text-decoration-none">
+                                            {{ animal_compra.animal.brinco_visual }}
+                                        </a>
+                                    </td>
+                                    <td>{{ animal_compra.animal.categoria_animal }}</td>
+                                    <td>{{ animal_compra.animal.raca }}</td>
+                                    <td>{{ animal_compra.animal.peso_entrada|default:"--" }}</td>
+                                    <td class="text-end">R$ {{ animal_compra.valor_total }}</td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="table-info">
+                                    <td colspan="4" class="text-end"><strong>Total:</strong></td>
+                                    <td class="text-end"><strong>R$ {{ valor_total }}</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Parcelas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Nº</th>
+                                    <th>Vencimento</th>
+                                    <th>Valor Parcela</th>
+                                    <th>Valor Pago</th>
+                                    <th>Valor Restante</th>
+                                    <th>Status</th>
+                                    {% if not compra.data_pagamento %}
+                                    <th>Ações</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for parcela in compra.parcelas.all %}
+                                <tr>
+                                    <td>{{ parcela.numero }}/{{ compra.numero_parcelas }}</td>
+                                    <td>{{ parcela.data_vencimento|date:"d/m/Y" }}</td>
+                                    <td>R$ {{ parcela.valor }}</td>
+                                    <td>R$ {{ parcela.valor_pago }}</td>
+                                    <td>R$ {{ parcela.valor_restante }}</td>
+                                    <td>
+                                        {% if parcela.status == 'PAGO' %}
                                             <span class="badge bg-success">Pago</span>
-                                        {% elif compra.status == 'VENCIDO' %}
+                                        {% elif parcela.status == 'PARCIAL' %}
+                                            <span class="badge bg-info">Parcial</span>
+                                        {% elif parcela.status == 'VENCIDO' %}
                                             <span class="badge bg-danger">Vencido</span>
-                                        {% elif compra.status == 'VENCE_HOJE' %}
-                                            <span class="badge bg-warning">Vence Hoje</span>
                                         {% else %}
-                                            <span class="badge bg-primary">Pendente</span>
+                                            <span class="badge bg-warning">Pendente</span>
                                         {% endif %}
                                     </td>
+                                    {% if not compra.data_pagamento %}
+                                    <td>
+                                        {% if parcela.valor_restante > 0 %}
+                                        <a href="{% url 'registrar_pagamento' parcela.id %}" class="btn btn-sm btn-success">
+                                            <i class="bi bi-cash"></i> Pagar
+                                        </a>
+                                        {% endif %}
+                                        {% if parcela.pagamentos.exists %}
+                                        <a href="{% url 'historico_pagamentos' parcela.id %}" class="btn btn-sm btn-info">
+                                            <i class="bi bi-clock-history"></i> Histórico
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
                                 </tr>
-                                <tr>
-                                    <th>Tipo de Compra:</th>
-                                    <td>{{ compra.get_tipo_compra_display }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Valor Unitário:</th>
-                                    <td>R$ {{ compra.valor_unitario }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Valor Total:</th>
-                                    <td>R$ {{ valor_total }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Conta Bancária:</th>
-                                    <td>{{ compra.conta_bancaria }}</td>
-                                </tr>
-                            </table>
-                        </div>
-                        <div class="col-md-6">
-                            <h5 class="mb-3">Informações do Vendedor</h5>
-                            <table class="table table-sm">
-                                <tr>
-                                    <th width="40%">Nome:</th>
-                                    <td>{{ compra.vendedor.nome }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Telefone:</th>
-                                    <td>{{ compra.vendedor.telefone|default:"-" }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Email:</th>
-                                    <td>{{ compra.vendedor.email|default:"-" }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Cidade:</th>
-                                    <td>{{ compra.vendedor.cidade|default:"-" }}</td>
-                                </tr>
-                                <tr>
-                                    <th>UF:</th>
-                                    <td>{{ compra.vendedor.uf|default:"-" }}</td>
-                                </tr>
-                            </table>
-                        </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
+                </div>
+            </div>
+        </div>
 
-                    <div class="row">
-                        <div class="col-md-12">
-                            <h5 class="mb-3">Animais da Compra</h5>
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Brinco</th>
-                                            <th>Categoria</th>
-                                            <th>Raça</th>
-                                            <th>Peso (kg)</th>
-                                            <th class="text-end">Valor Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for animal_compra in animais_compra %}
-                                        <tr>
-                                            <td>
-                                                <a href="{% url 'animal_detail' animal_compra.animal.pk %}" class="text-decoration-none">
-                                                    {{ animal_compra.animal.brinco_visual }}
-                                                </a>
-                                            </td>
-                                            <td>{{ animal_compra.animal.categoria_animal }}</td>
-                                            <td>{{ animal_compra.animal.raca }}</td>
-                                            <td>{{ animal_compra.animal.peso_entrada|default:"--" }}</td>
-                                            <td class="text-end">R$ {{ animal_compra.valor_total }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                        <tr class="table-info">
-                                            <td colspan="4" class="text-end"><strong>Total:</strong></td>
-                                            <td class="text-end"><strong>R$ {{ valor_total }}</strong></td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row mt-4">
-                        <div class="col-md-12">
-                            <h5 class="mb-3">Parcelas</h5>
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Nº</th>
-                                            <th>Vencimento</th>
-                                            <th>Valor Parcela</th>
-                                            <th>Valor Pago</th>
-                                            <th>Valor Restante</th>
-                                            <th>Status</th>
-                                            <th>Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for parcela in compra.parcelas.all %}
-                                        <tr>
-                                            <td>{{ parcela.numero }}/{{ compra.numero_parcelas }}</td>
-                                            <td>{{ parcela.data_vencimento|date:"d/m/Y" }}</td>
-                                            <td>R$ {{ parcela.valor }}</td>
-                                            <td>R$ {{ parcela.valor_pago }}</td>
-                                            <td>R$ {{ parcela.valor_restante }}</td>
-                                            <td>
-                                                {% if parcela.status == 'PAGO' %}
-                                                    <span class="badge bg-success">Pago</span>
-                                                {% elif parcela.status == 'PARCIAL' %}
-                                                    <span class="badge bg-info">Parcial</span>
-                                                {% elif parcela.status == 'VENCIDO' %}
-                                                    <span class="badge bg-danger">Vencido</span>
-                                                {% else %}
-                                                    <span class="badge bg-warning">Pendente</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if parcela.valor_restante > 0 %}
-                                                <a href="{% url 'registrar_pagamento' parcela.id %}" class="btn btn-primary btn-sm">
-                                                    <i class="bi bi-cash"></i> Pagar
-                                                </a>
-                                                {% endif %}
-                                                {% if parcela.pagamentos.exists %}
-                                                <a href="{% url 'historico_pagamentos' parcela.id %}" class="btn btn-info btn-sm">
-                                                    <i class="bi bi-clock-history"></i> Histórico
-                                                </a>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Informações do Vendedor</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Nome:</strong> {{ compra.vendedor.nome }}</p>
+                    <p><strong>Telefone:</strong> {{ compra.vendedor.telefone|default:"-" }}</p>
+                    <p><strong>Email:</strong> {{ compra.vendedor.email|default:"-" }}</p>
+                    <p><strong>Cidade:</strong> {{ compra.vendedor.cidade|default:"-" }}</p>
+                    <p><strong>UF:</strong> {{ compra.vendedor.uf|default:"-" }}</p>
                 </div>
             </div>
         </div>

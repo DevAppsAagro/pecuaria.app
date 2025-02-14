@@ -141,6 +141,7 @@ $(document).ready(function() {
     // Se já existirem coordenadas, mostra o marcador
     {% if object and object.coordenadas %}
         var coords = {{ object.coordenadas|safe }};
+        console.log('Coordenadas existentes:', coords);
         marker = L.marker([coords.lat, coords.lng]).addTo(map);
         map.setView([coords.lat, coords.lng], 15);
         coordenadasInput.val(JSON.stringify(coords));
@@ -161,7 +162,30 @@ $(document).ready(function() {
             lat: e.latlng.lat,
             lng: e.latlng.lng
         };
+        console.log('Novas coordenadas selecionadas:', coords);
         coordenadasInput.val(JSON.stringify(coords));
+    });
+
+    // Antes de enviar o formulário, verifica se as coordenadas estão no formato correto
+    $('#benfeitoriaForm').on('submit', function(e) {
+        var coordsValue = coordenadasInput.val();
+        console.log('Enviando formulário com coordenadas:', coordsValue);
+        
+        if (coordsValue) {
+            try {
+                var coords = JSON.parse(coordsValue);
+                console.log('Coordenadas parseadas:', coords);
+                if (!coords.lat || !coords.lng) {
+                    console.error('Coordenadas inválidas:', coords);
+                    e.preventDefault();
+                    alert('Erro: Coordenadas inválidas. Por favor, selecione um ponto no mapa novamente.');
+                }
+            } catch (error) {
+                console.error('Erro ao processar coordenadas:', error);
+                e.preventDefault();
+                alert('Erro ao processar coordenadas. Por favor, selecione um ponto no mapa novamente.');
+            }
+        }
     });
 
     // Função para buscar e centralizar na cidade da fazenda

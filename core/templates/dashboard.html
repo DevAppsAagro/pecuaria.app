@@ -47,6 +47,11 @@
     .custom-div-icon i:hover {
         color: #4a5568;
     }
+    .map-label {
+        font-size: 14px;
+        font-weight: bold;
+        color: #333;
+    }
 </style>
 {% endblock %}
 
@@ -86,26 +91,26 @@
 <script>
 $(document).ready(function() {
     // Inicializa o mapa
-    var map = L.map('map').setView([-15.7801, -47.9292], 4);
+    var map = L.map('map').setView([-15.7801, -47.9292], 5);  // Centraliza no Brasil inicialmente
     
-    // Adiciona camada de satélite com ruas
-    var googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+    // Adiciona camada de satélite com ruas do Google
+    L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
         maxZoom: 20,
         subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
         attribution: 'Google Maps'
     }).addTo(map);
-
-    // Camadas para pastos e benfeitorias
-    var pastosLayer = L.layerGroup().addTo(map);
-    var benfeitoriasLayer = L.layerGroup().addTo(map);
-
-    // Cores mais neutras para os pastos
+    
+    // Estilos para os pastos
     var pastosStyle = {
-        color: '#2d3748',
-        fillColor: '#4a5568',
-        fillOpacity: 0.15,
-        weight: 1.5
+        color: '#3a6604',
+        fillColor: '#65b307',
+        fillOpacity: 0.3,
+        weight: 4
     };
+    
+    // Camadas para pastos e benfeitorias
+    var pastosLayer = L.featureGroup().addTo(map);
+    var benfeitoriasLayer = L.featureGroup().addTo(map);
 
     // Função para formatar valor em R$
     function formatarValor(valor) {
@@ -120,76 +125,115 @@ $(document).ready(function() {
 
     // Função para carregar dados da fazenda
     function carregarDadosFazenda(fazendaId) {
+        console.log('Carregando dados da fazenda:', fazendaId);  // Debug
+        
         // Limpa as camadas
         pastosLayer.clearLayers();
         benfeitoriasLayer.clearLayers();
+        
+        var bounds = L.latLngBounds();  // Cria um bounds vazio
+        var hasValidBounds = false;
 
         // Carrega os pastos da fazenda selecionada
-        var url = '/fazenda/' + fazendaId + '/pastos/';
+        var url = `/api/get_pastos/${fazendaId}/`;
+        console.log('Buscando pastos em:', url);  // Debug
         
         // Carrega os pastos
         $.get(url, function(data) {
+            console.log('Resposta dos pastos:', data);  // Debug
+            
             if (data.success && data.pastos) {
-                var bounds = L.latLngBounds();
-                var hasValidCoords = false;
-
                 data.pastos.forEach(function(pasto) {
+                    console.log('Processando pasto:', pasto);  // Debug
+                    
                     if (pasto.coordenadas && Array.isArray(pasto.coordenadas)) {
-                        pasto.coordenadas.forEach(function(coord) {
-                            if (Array.isArray(coord) && coord.length === 2) {
-                                bounds.extend([coord[0], coord[1]]);
-                                hasValidCoords = true;
-                            }
-                        });
-                        
-                        var polygon = L.polygon(pasto.coordenadas, pastosStyle).bindPopup(`
-                            <strong>${pasto.nome || 'Pasto sem nome'}</strong><br>
-                            Área: ${pasto.area} ha<br>
-                            <a href="/pasto/${pasto.id}/detail/" class="btn btn-sm btn-primary mt-2">Ver Detalhes</a>
-                        `);
-                        
-                        pastosLayer.addLayer(polygon);
-                    }
-                });
-
-                if (hasValidCoords) {
-                    map.fitBounds(bounds, { padding: [50, 50] });
-                }
-            }
-        });
-
-        // Carrega as benfeitorias da fazenda selecionada
-        var benfUrl = '/fazenda/get_benfeitorias/' + fazendaId + '/';
-        $.get(benfUrl, function(data) {
-            if (data.success && data.benfeitorias) {
-                data.benfeitorias.forEach(function(b) {
-                    try {
-                        var coords = b.coordenadas;
-                        if (typeof coords === 'string') {
-                            coords = JSON.parse(coords);
-                        }
-                        
-                        if (coords && coords.lat && coords.lng) {
-                            var marker = L.marker([coords.lat, coords.lng], {
-                                icon: L.divIcon({
-                                    className: 'custom-div-icon',
-                                    html: '<i class="fas fa-home" style="font-size: 18px;"></i>',
-                                    iconSize: [30, 30],
-                                    iconAnchor: [15, 15]
-                                })
-                            }).bindPopup(`
-                                <strong>${b.nome}</strong><br>
-                                Valor: R$ ${formatarValor(b.valor_compra)}<br>
-                                Data: ${b.data_aquisicao || 'Não informada'}<br>
-                                <a href="/benfeitoria/${b.id}/detail/" class="btn btn-sm btn-primary mt-2">Ver Detalhes</a>
+                        try {
+                            // Cria o polígono do pasto
+                            var polygon = L.polygon(pasto.coordenadas, pastosStyle);
+                            
+                            // Adiciona o popup com informações detalhadas
+                            polygon.bindPopup(`
+                                <div class="p-2">
+                                    <h5 class="font-bold mb-2">${pasto.nome || 'Pasto ' + pasto.id_pasto}</h5>
+                                    <div class="text-sm">
+                                        <p><strong>ID:</strong> ${pasto.id_pasto}</p>
+                                        <p><strong>Área:</strong> ${pasto.area} ha</p>
+                                        <p><strong>Animais:</strong> ${pasto.qtd_animais}</p>
+                                    </div>
+                                    <div class="mt-3">
+                                        <a href="/pastos/${pasto.id}/" class="btn btn-sm btn-primary">Ver Detalhes</a>
+                                    </div>
+                                </div>
                             `);
-                            benfeitoriasLayer.addLayer(marker);
+                            
+                            // Adiciona o polígono à camada
+                            pastosLayer.addLayer(polygon);
+                            
+                            // Adiciona as coordenadas ao bounds
+                            var polygonBounds = polygon.getBounds();
+                            bounds.extend(polygonBounds);
+                            hasValidBounds = true;
+                            
+                            console.log('Polígono criado com sucesso para o pasto:', pasto.id);  // Debug
+                        } catch (e) {
+                            console.error('Erro ao criar polígono para o pasto:', pasto.id, e);
                         }
-                    } catch (e) {
-                        console.error('Erro ao processar benfeitoria:', e, b);
                     }
                 });
             }
+            
+            // Carrega as benfeitorias
+            $.get(`/api/get_benfeitorias/${fazendaId}/`, function(data) {
+                if (data.success && data.benfeitorias) {
+                    data.benfeitorias.forEach(function(benfeitoria) {
+                        try {
+                            var coords = benfeitoria.coordenadas;
+                            if (typeof coords === 'string') {
+                                coords = JSON.parse(coords);
+                            }
+                            
+                            if (coords && coords.lat && coords.lng) {
+                                // Cria o marcador com ícone personalizado
+                                var marker = L.marker([coords.lat, coords.lng], {
+                                    icon: L.divIcon({
+                                        className: 'custom-div-icon',
+                                        html: `<div>
+                                                <i class="fas fa-map-marker-alt" style="font-size: 24px; color: #dc2626; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);"></i>
+                                              </div>`,
+                                        iconSize: [30, 42],
+                                        iconAnchor: [15, 42]
+                                    })
+                                });
+                                
+                                // Adiciona o popup com informações detalhadas
+                                marker.bindPopup(`
+                                    <div class="p-2">
+                                        <h5 class="font-bold mb-2">${benfeitoria.nome}</h5>
+                                        <div class="text-sm">
+                                            <p><strong>Valor:</strong> R$ ${benfeitoria.valor_compra}</p>
+                                            <p><strong>Data:</strong> ${benfeitoria.data_aquisicao || 'Não informada'}</p>
+                                        </div>
+                                        <div class="mt-3">
+                                            <a href="/benfeitorias/${benfeitoria.id}/" class="btn btn-sm btn-primary">Ver Detalhes</a>
+                                        </div>
+                                    </div>
+                                `);
+                                
+                                benfeitoriasLayer.addLayer(marker);
+                                bounds.extend([coords.lat, coords.lng]);
+                                hasValidBounds = true;
+                            }
+                        } catch (e) {
+                            console.error('Erro ao processar benfeitoria:', e, benfeitoria);
+                        }
+                    });
+                    
+                    // Ajusta o zoom do mapa para mostrar todos os elementos
+                    if (hasValidBounds) {
+                        map.fitBounds(bounds, { padding: [50, 50] });
+                    }
+                }
+            });
         });
 
         // Atualiza os indicadores

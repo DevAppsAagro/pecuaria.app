@@ -348,6 +348,78 @@ def historico_pagamentos_abate(request, parcela_id):
     return render(request, 'core/abates/historico_pagamentos.html', context)
 
 @login_required
+def imprimir_abates(request):
+    # Filtros
+    search_query = request.GET.get('search', '')
+    status = request.GET.get('status', '')
+    data_inicio = request.GET.get('data_inicio', '')
+    data_fim = request.GET.get('data_fim', '')
+    
+    # Query base
+    abates = Abate.objects.filter(usuario=request.user)
+    
+    # Aplicar filtros
+    if search_query:
+        abates = abates.filter(
+            Q(comprador__nome__icontains=search_query) |
+            Q(animais__animal__brinco_visual__icontains=search_query)
+        ).distinct()
+    
+    if status:
+        abates = abates.filter(status=status)
+    
+    if data_inicio:
+        abates = abates.filter(data__gte=data_inicio)
+    
+    if data_fim:
+        abates = abates.filter(data__lte=data_fim)
+    
+    # Ordenação
+    abates = abates.order_by('-data', '-id')
+    
+    # Calcula os totais por status
+    totais_status = abates.annotate(
+        total_valor=Sum('animais__valor_total')
+    ).aggregate(
+        total_pago=Sum(Case(
+            When(status='PAGO', then=F('total_valor')),
+            default=0,
+            output_field=DecimalField()
+        )),
+        total_pendente=Sum(Case(
+            When(status='PENDENTE', then=F('total_valor')),
+            default=0,
+            output_field=DecimalField()
+        )),
+        total_vencido=Sum(Case(
+            When(status='VENCIDO', then=F('total_valor')),
+            default=0,
+            output_field=DecimalField()
+        )),
+        total_geral=Sum('total_valor'),
+        count_pago=Count(Case(When(status='PAGO', then=1))),
+        count_pendente=Count(Case(When(status='PENDENTE', then=1))),
+        count_vencido=Count(Case(When(status='VENCIDO', then=1))),
+    )
+    
+    context = {
+        'abates': abates,
+        'total_abates': abates.count(),
+        'abates_pagos': totais_status['count_pago'],
+        'abates_pendentes': totais_status['count_pendente'],
+        'abates_vencidos': totais_status['count_vencido'],
+        'valor_total_pago': totais_status['total_pago'] or 0,
+        'valor_total_pendente': totais_status['total_pendente'] or 0,
+        'valor_total_vencido': totais_status['total_vencido'] or 0,
+        'valor_total_geral': totais_status['total_geral'] or 0,
+        'search_query': search_query,
+        'status': status,
+        'data_inicio': data_inicio,
+        'data_fim': data_fim,
+    }
+    return render(request, 'core/abates/imprimir.html', context)
+
+@login_required
 def get_peso_atual_json(request):
     """Retorna o peso atual do animal em formato JSON"""
     try:

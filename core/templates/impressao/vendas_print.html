@@ -1,0 +1,251 @@
+{% extends 'impressao/base_print.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h2>Relatório de Vendas</h2>
+            <p class="text-muted">
+                Gerado em {{ data_impressao|date:"d/m/Y H:i" }} por {{ usuario.get_full_name|default:usuario.username }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Totais -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Totais por Status</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 col-sm-6">
+                            <div class="info-box bg-success">
+                                <span class="info-box-icon"><i class="fas fa-check-circle"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Total Pago</span>
+                                    <span class="info-box-number">{{ totais_status.PAGO.valor_formatado }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="info-box bg-warning">
+                                <span class="info-box-icon"><i class="fas fa-clock"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Pendente</span>
+                                    <span class="info-box-number">{{ totais_status.PENDENTE.valor_formatado }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="info-box bg-info">
+                                <span class="info-box-icon"><i class="fas fa-calendar-check"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Vence Hoje</span>
+                                    <span class="info-box-number">{{ totais_status.VENCE_HOJE.valor_formatado }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="info-box bg-danger">
+                                <span class="info-box-icon"><i class="fas fa-exclamation-circle"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Vencido</span>
+                                    <span class="info-box-number">{{ totais_status.VENCIDO.valor_formatado }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros Aplicados -->
+    {% if filtros.contato or filtros.fazenda or filtros.status or filtros.data_inicio or filtros.data_fim %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Filtros Aplicados</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        {% if filtros.contato %}
+                            <li><strong>Comprador:</strong> {{ filtros.contato }}</li>
+                        {% endif %}
+                        {% if filtros.fazenda %}
+                            <li><strong>Fazenda:</strong> {{ filtros.fazenda }}</li>
+                        {% endif %}
+                        {% if filtros.status %}
+                            <li><strong>Status:</strong> {{ filtros.status }}</li>
+                        {% endif %}
+                        {% if filtros.data_inicio %}
+                            <li><strong>Data Inicial:</strong> {{ filtros.data_inicio|date:"d/m/Y" }}</li>
+                        {% endif %}
+                        {% if filtros.data_fim %}
+                            <li><strong>Data Final:</strong> {{ filtros.data_fim|date:"d/m/Y" }}</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Lista de Vendas -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Lista de Vendas</h4>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Comprador</th>
+                                <th>Fazenda</th>
+                                <th>Valor Total</th>
+                                <th>Status</th>
+                                <th>Data Vencimento</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for venda in vendas %}
+                            <tr>
+                                <td>{{ venda.data|date:"d/m/Y" }}</td>
+                                <td>{{ venda.contato }}</td>
+                                <td>{{ venda.fazenda }}</td>
+                                <td>{{ venda.valor_total_formatado }}</td>
+                                <td>
+                                    <span class="badge badge-{{ venda.status_class }}">
+                                        {{ venda.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>{{ venda.data_vencimento|date:"d/m/Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card {
+        margin-bottom: 1rem;
+        box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
+        border: 0;
+    }
+    .card-header {
+        background-color: transparent;
+        border-bottom: 1px solid rgba(0,0,0,.125);
+        padding: .75rem 1.25rem;
+        position: relative;
+        border-top-left-radius: .25rem;
+        border-top-right-radius: .25rem;
+    }
+    .card-title {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 400;
+    }
+    .info-box {
+        border-radius: .25rem;
+        background-color: #fff;
+        display: -webkit-flex;
+        display: -ms-flexbox;
+        display: flex;
+        margin-bottom: 1rem;
+        min-height: 80px;
+        padding: .5rem;
+        position: relative;
+        width: 100%;
+    }
+    .info-box .info-box-icon {
+        border-radius: .25rem;
+        -webkit-align-items: center;
+        -ms-flex-align: center;
+        align-items: center;
+        display: -webkit-flex;
+        display: -ms-flexbox;
+        display: flex;
+        font-size: 1.875rem;
+        -webkit-justify-content: center;
+        -ms-flex-pack: center;
+        justify-content: center;
+        text-align: center;
+        width: 70px;
+        color: #fff;
+    }
+    .info-box .info-box-content {
+        display: -webkit-flex;
+        display: -ms-flexbox;
+        display: flex;
+        -webkit-flex-direction: column;
+        -ms-flex-direction: column;
+        flex-direction: column;
+        -webkit-justify-content: center;
+        -ms-flex-pack: center;
+        justify-content: center;
+        line-height: 1.8;
+        -webkit-flex: 1;
+        -ms-flex: 1;
+        flex: 1;
+        padding: 0 10px;
+    }
+    .info-box .info-box-number {
+        display: block;
+        font-weight: 700;
+    }
+    .bg-success .info-box-content {
+        color: #fff;
+    }
+    .bg-warning .info-box-content {
+        color: #1f2d3d;
+    }
+    .bg-info .info-box-content {
+        color: #fff;
+    }
+    .bg-danger .info-box-content {
+        color: #fff;
+    }
+    .table {
+        width: 100%;
+        margin-bottom: 1rem;
+        color: #212529;
+        background-color: transparent;
+    }
+    .table th,
+    .table td {
+        padding: .75rem;
+        vertical-align: top;
+        border-top: 1px solid #dee2e6;
+    }
+    .table thead th {
+        vertical-align: bottom;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .table-striped tbody tr:nth-of-type(odd) {
+        background-color: rgba(0,0,0,.05);
+    }
+    .badge {
+        display: inline-block;
+        padding: .25em .4em;
+        font-size: 75%;
+        font-weight: 700;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: .25rem;
+    }
+</style>
+{% endblock %}

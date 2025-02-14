@@ -220,7 +220,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="card-body collapse" id="filtros">
+                <div class="card-body collapse show" id="filtros">
                     <form method="get">
                         <div class="row">
                             <div class="col-md-3 mb-3">
@@ -321,16 +321,9 @@
                                         <li><a class="dropdown-item" href="#" data-action="move_lot">Movimentar para Lote</a></li>
                                     </ul>
                                 </div>
-                                <div class="btn-group">
-                                    <button type="button" class="btn btn-info dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="fas fa-file-export"></i> Exportar
-                                    </button>
-                                    <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item" href="#" onclick="exportDT('excel')"><i class="fas fa-file-excel"></i> Excel</a></li>
-                                        <li><a class="dropdown-item" href="#" onclick="exportDT('pdf')"><i class="fas fa-file-pdf"></i> PDF</a></li>
-                                        <li><a class="dropdown-item" href="#" onclick="exportDT('print')"><i class="fas fa-print"></i> Imprimir</a></li>
-                                    </ul>
-                                </div>
+                                <button type="button" class="btn btn-info dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-file-export"></i> Exportar
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -368,14 +361,14 @@
                                 <tbody>
                                     {% for animal in animais %}
                                     <tr>
-                                        <td><a href="{% url 'animal_detail' animal.pk %}">{{ animal.brinco_visual }}</a></td>
+                                        <td>{{ animal.brinco_visual }}</td>
                                         <td>{{ animal.brinco_eletronico|default:'-' }}</td>
                                         <td>{{ animal.raca.nome }}</td>
                                         <td>{{ animal.categoria_animal.nome }}</td>
                                         <td>{{ animal.lote.id_lote }}</td>
                                         <td>{{ animal.fazenda_atual.nome }}</td>
                                         <td>{{ animal.pasto_atual.id_pasto|default:'-' }}</td>
-                                        <td>{{ animal.peso_atual|floatformat:2|default_if_none:'-' }} kg</td>
+                                        <td>{{ item.peso_atual|default_if_none:"-"|floatformat:2 }} kg</td>
                                         <td>{{ animal.data_entrada|date:"d/m/Y" }}</td>
                                         <td>
                                             {% if animal.situacao == 'ATIVO' %}
@@ -392,15 +385,18 @@
                                         </td>
                                         <td>
                                             <div class="btn-group">
-                                                <button type="button" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                                                    Ações
-                                                </button>
-                                                <ul class="dropdown-menu">
-                                                    <li><a class="dropdown-item" href="{% url 'animal_detail' animal.pk %}"><i class="bi bi-eye"></i> Visualizar</a></li>
-                                                    <li><a class="dropdown-item" href="{% url 'animal_edit' animal.pk %}"><i class="bi bi-pencil"></i> Editar</a></li>
-                                                    <li><hr class="dropdown-divider"></li>
-                                                    <li><a class="dropdown-item text-danger" href="{% url 'animal_delete' animal.pk %}"><i class="bi bi-trash"></i> Excluir</a></li>
-                                                </ul>
+                                                <a href="{% url 'animal_detail' animal.pk %}" 
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                <a href="{% url 'animal_edit' animal.pk %}" 
+                                                   class="btn btn-sm btn-outline-secondary">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                                <a href="{% url 'animal_delete' animal.pk %}" 
+                                                   class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </a>
                                             </div>
                                         </td>
                                         <td>
@@ -456,32 +452,6 @@
             pageLength: 25,
             lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
             order: [[0, 'asc']], // Ordenar pela coluna do brinco visual
-            buttons: [
-                {
-                    extend: 'excel',
-                    text: '<i class="fas fa-file-excel"></i> Excel',
-                    className: 'btn btn-success',
-                    exportOptions: {
-                        columns: ':not(:last-child)' // Excluir última coluna
-                    }
-                },
-                {
-                    extend: 'pdf',
-                    text: '<i class="fas fa-file-pdf"></i> PDF',
-                    className: 'btn btn-danger',
-                    exportOptions: {
-                        columns: ':not(:last-child)'
-                    }
-                },
-                {
-                    extend: 'print',
-                    text: '<i class="fas fa-print"></i> Imprimir',
-                    className: 'btn btn-info',
-                    exportOptions: {
-                        columns: ':not(:last-child)'
-                    }
-                }
-            ],
             columnDefs: [
                 {
                     targets: -1, // Última coluna (checkbox)
@@ -494,17 +464,6 @@
                 }
             ]
         });
-
-        // Função para exportação
-        window.exportDT = function(type) {
-            if (type === 'excel') {
-                table.button('.buttons-excel').trigger();
-            } else if (type === 'pdf') {
-                table.button('.buttons-pdf').trigger();
-            } else if (type === 'print') {
-                table.button('.buttons-print').trigger();
-            }
-        };
 
         // Handler para ações em massa
         $('.dropdown-item[data-action]').click(function(e) {

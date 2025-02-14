@@ -226,6 +226,49 @@
                                 </select>
                             </div>
                             <div class="col-md-2">
+                                <label for="categoria" class="form-label">Categoria</label>
+                                <select name="categoria" id="categoria" class="form-select">
+                                    <option value="">Todas</option>
+                                    {% for categoria in categorias %}
+                                        <option value="{{ categoria.id }}" {% if filtros.categoria|stringformat:"s" == categoria.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ categoria.nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="subcategoria" class="form-label">Subcategoria</label>
+                                <select name="subcategoria" id="subcategoria" class="form-select">
+                                    <option value="">Todas</option>
+                                    {% for subcategoria in subcategorias %}
+                                        <option value="{{ subcategoria.id }}" {% if filtros.subcategoria|stringformat:"s" == subcategoria.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ subcategoria.nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="destino" class="form-label">Destino</label>
+                                <select name="destino" id="destino" class="form-select">
+                                    <option value="">Todos</option>
+                                    {% regroup destinos by tipo as destinos_por_tipo %}
+                                    {% for tipo in destinos_por_tipo %}
+                                        <optgroup label="{% if tipo.grouper == 'fazenda' %}Fazendas
+                                                      {% elif tipo.grouper == 'lote' %}Lotes
+                                                      {% elif tipo.grouper == 'maquina' %}Máquinas
+                                                      {% elif tipo.grouper == 'benfeitoria' %}Benfeitorias
+                                                      {% elif tipo.grouper == 'pastagem' %}Pastagens
+                                                      {% endif %}">
+                                            {% for destino in tipo.list %}
+                                                <option value="{{ destino.id }}" {% if filtros.destino == destino.id %}selected{% endif %}>
+                                                    {{ destino.nome }}
+                                                </option>
+                                            {% endfor %}
+                                        </optgroup>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
                                 <label for="status" class="form-label">Status</label>
                                 <select name="status" id="status" class="form-select">
                                     <option value="">Todos</option>
@@ -295,6 +338,9 @@
                                     <th>Data Emissão</th>
                                     <th>Vencimento</th>
                                     <th>Fornecedor</th>
+                                    <th>Categoria</th>
+                                    <th>Subcategoria</th>
+                                    <th>Destino</th>
                                     <th>Valor</th>
                                     <th>Status</th>
                                     <th>Ações</th>
@@ -303,29 +349,44 @@
                             <tbody>
                                 {% for despesa in despesas %}
                                 <tr>
-                                    <td><a href="{% url 'despesa_detail' pk=despesa.id %}">{{ despesa.numero_nf }}</a></td>
+                                    <td>{{ despesa.numero_nf }}</td>
                                     <td>{{ despesa.data_emissao|date:"d/m/Y" }}</td>
                                     <td>{{ despesa.data_vencimento|date:"d/m/Y" }}</td>
                                     <td>{{ despesa.contato.nome }}</td>
+                                    <td>{{ despesa.itens.first.categoria.nome }}</td>
+                                    <td>{{ despesa.itens.first.subcategoria.nome }}</td>
                                     <td>
-                                        <span class="badge bg-success">R$ {{ despesa.valor_total|floatformat:2 }}</span>
-                                        {% if despesa.forma_pagamento == 'PR' %}
-                                            {% with info=despesa.info_parcelas %}
-                                                <br>
-                                                <small class="text-muted">{{ info.parcelas_pagas }}/{{ info.total_parcelas }} parcelas</small>
-                                            {% endwith %}
-                                        {% endif %}
+                                        {% for item in despesa.itens.all %}
+                                            {% if item.fazenda_destino %}
+                                                <i class="fas fa-home"></i> {{ item.fazenda_destino.nome }}
+                                                {% if item.categoria.alocacao == 'estoque' %}
+                                                    (ESTOQUE)
+                                                {% endif %}
+                                            {% elif item.lote_destino %}
+                                                <i class="fas fa-layer-group"></i> Lote {{ item.lote_destino.id_lote }} ({{ item.lote_destino.fazenda.nome }})
+                                            {% elif item.maquina_destino %}
+                                                <i class="fas fa-truck"></i> {{ item.maquina_destino.nome }} ({{ item.maquina_destino.fazenda.nome }})
+                                            {% elif item.benfeitoria_destino %}
+                                                <i class="fas fa-warehouse"></i> {{ item.benfeitoria_destino.nome }} ({{ item.benfeitoria_destino.fazenda.nome }})
+                                            {% elif item.pastagem_destino %}
+                                                <i class="fas fa-seedling"></i> {{ item.pastagem_destino.nome }} ({{ item.pastagem_destino.fazenda.nome }})
+                                            {% else %}
+                                                <i class="fas fa-question-circle"></i> Sem destino
+                                            {% endif %}
+                                            {% if not forloop.last %}<br>{% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">R$ {{ despesa.valor_final|floatformat:2 }}</span>
                                     </td>
                                     <td>
                                         {% with status_info=totais_status|get:despesa.status_real %}
                                         <span class="badge bg-{{ status_info.cor }}">
-                                            <i class="fas {{ status_info.icone }}"></i>
+                                            <i class="bi {{ status_info.icone }}"></i>
                                             {% if despesa.status_real == 'PAGO' %}Pago
                                             {% elif despesa.status_real == 'PENDENTE' %}Pendente
-                                            {% elif despesa.status_real == 'VENCIDO' %}Atrasado
-                                            {% elif despesa.status_real == 'VENCE_HOJE' %}Vence Hoje{% endif %}
-                                            {% if despesa.status_real == 'VENCIDO' and despesa.dias_atraso > 0 %}
-                                                <br><small>{{ despesa.dias_atraso }} dias</small>
+                                            {% elif despesa.status_real == 'VENCIDO' %}Vencido
+                                            {% elif despesa.status_real == 'VENCE_HOJE' %}Vence Hoje
                                             {% endif %}
                                         </span>
                                         {% endwith %}
@@ -357,46 +418,69 @@
 
 {% block extra_js %}
 <!-- DataTables & Plugins -->
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js" defer></script>
-<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js" defer></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js" defer></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js" defer></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js" defer></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js" defer></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicializa DataTables com configurações otimizadas
-    $('#despesas-table').DataTable({
-        "responsive": true,
-        "autoWidth": false,
-        "processing": true,
-        "deferRender": true,
-        "pageLength": 25,
-        "order": [[1, "desc"]],
-        "columnDefs": [
-            {"orderable": false, "targets": 6}
-        ],
-        "language": {
-            "emptyTable": "Nenhum registro encontrado",
-            "info": "Mostrando _START_ até _END_ de _TOTAL_ registros",
-            "infoEmpty": "Mostrando 0 até 0 de 0 registros",
-            "infoFiltered": "(Filtrados de _MAX_ registros)",
-            "infoThousands": ".",
-            "loadingRecords": "Carregando...",
-            "processing": "Processando...",
-            "zeroRecords": "Nenhum registro encontrado",
-            "search": "Pesquisar:",
-            "paginate": {
-                "next": "Próximo",
-                "previous": "Anterior",
-                "first": "Primeiro",
-                "last": "Último"
+    $(document).ready(function() {
+        // Inicializa a tabela
+        $('#despesas-table').DataTable({
+            responsive: true,
+            lengthChange: true,
+            autoWidth: false,
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
             },
-            "lengthMenu": "Exibir _MENU_ resultados por página",
-            "decimal": ",",
-            "thousands": "."
+            order: [[1, 'desc']], // Ordena por data de emissão decrescente
+            columnDefs: [
+                {
+                    targets: -1,
+                    orderable: false,
+                    searchable: false
+                }
+            ]
+        });
+
+        // Função para carregar subcategorias
+        function carregarSubcategorias(categoriaId) {
+            if (!categoriaId) {
+                // Se não houver categoria selecionada, limpa as subcategorias
+                $('#subcategoria').html('<option value="">Todas</option>');
+                return;
+            }
+
+            $.ajax({
+                url: '/core/get_subcategorias_por_categoria/' + categoriaId + '/',
+                type: 'GET',
+                success: function(data) {
+                    var options = '<option value="">Todas</option>';
+                    data.forEach(function(subcategoria) {
+                        var selected = subcategoria.id == '{{ filtros.subcategoria }}' ? 'selected' : '';
+                        options += `<option value="${subcategoria.id}" ${selected}>${subcategoria.nome}</option>`;
+                    });
+                    $('#subcategoria').html(options);
+                },
+                error: function(xhr, status, error) {
+                    console.error('Erro ao carregar subcategorias:', error);
+                }
+            });
+        }
+
+        // Evento de mudança da categoria
+        $('#categoria').change(function() {
+            var categoriaId = $(this).val();
+            carregarSubcategorias(categoriaId);
+        });
+
+        // Carrega subcategorias ao iniciar se houver categoria selecionada
+        var categoriaInicial = $('#categoria').val();
+        if (categoriaInicial) {
+            carregarSubcategorias(categoriaInicial);
         }
     });
-});
 </script>
 {% endblock %}

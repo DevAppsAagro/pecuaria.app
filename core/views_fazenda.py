@@ -1,8 +1,10 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from .models import Fazenda, Pasto, Benfeitoria
+from .models import Fazenda, Pasto, Benfeitoria, Animal
 import json
+from django.utils import timezone
+from django.db.models import OuterRef, Subquery, Max
 
 @login_required
 def get_all_pastos(request):
@@ -44,23 +46,47 @@ def get_all_benfeitorias(request):
         return JsonResponse({'success': False, 'error': str(e)})
 
 @login_required
-def get_pastos_fazenda(request, fazenda_id):
-    """Retorna os pastos de uma fazenda específica"""
+def get_pastos(request, fazenda_id):
     try:
-        fazenda = get_object_or_404(Fazenda, id=fazenda_id)
+        print(f"Buscando pastos para fazenda {fazenda_id}")  # Debug
+        fazenda = get_object_or_404(Fazenda, id=fazenda_id, usuario=request.user)
         pastos = Pasto.objects.filter(fazenda=fazenda)
+        print(f"Encontrados {pastos.count()} pastos")  # Debug
+        
         pastos_data = []
         for pasto in pastos:
-            if pasto.coordenadas:
-                pastos_data.append({
-                    'id': pasto.id,
-                    'nome': pasto.nome,
-                    'area': pasto.area,
-                    'coordenadas': pasto.coordenadas
-                })
-        return JsonResponse({'success': True, 'pastos': pastos_data})
+            if not pasto.coordenadas:  # Pula pastos sem coordenadas
+                continue
+                
+            # Conta os animais ativos neste pasto
+            qtd_animais = Animal.objects.filter(
+                pasto_atual=pasto,
+                situacao='ATIVO'
+            ).count()
+            
+            pasto_info = {
+                'id': pasto.id,
+                'nome': pasto.nome or f'Pasto {pasto.id_pasto}',
+                'id_pasto': pasto.id_pasto,
+                'area': float(pasto.area),  # Convertendo Decimal para float
+                'coordenadas': json.loads(pasto.coordenadas) if isinstance(pasto.coordenadas, str) else pasto.coordenadas,
+                'qtd_animais': qtd_animais
+            }
+            print(f"Dados do pasto {pasto.id}: {pasto_info}")  # Debug
+            pastos_data.append(pasto_info)
+        
+        response_data = {
+            'success': True,
+            'pastos': pastos_data
+        }
+        print(f"Resposta: {response_data}")  # Debug
+        return JsonResponse(response_data)
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+        print(f"Erro ao buscar pastos: {str(e)}")  # Debug
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
 
 @login_required
 def get_cidade_fazenda(request, fazenda_id):

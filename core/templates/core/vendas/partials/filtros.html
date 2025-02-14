@@ -1,0 +1,21 @@
+<!-- Filtros -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <label class="form-label">Filtrar por Fazenda</label>
+        <select class="form-select" id="filtro-fazenda">
+            <option value="">Todas as Fazendas</option>
+            {% for fazenda in fazendas %}
+                <option value="{{ fazenda.id }}" {% if fazenda.id|stringformat:"s" == fazenda_selecionada %}selected{% endif %}>{{ fazenda.nome }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Filtrar por Lote</label>
+        <select class="form-select" id="filtro-lote">
+            <option value="">Todos os Lotes</option>
+            {% for lote in lotes %}
+                <option value="{{ lote.id }}" {% if lote.id|stringformat:"s" == lote_selecionado %}selected{% endif %}>{{ lote.id_lote }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>

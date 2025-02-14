@@ -18,7 +18,7 @@ from .views_fazenda import (
     salvar_coordenadas_benfeitoria,
     get_coordenadas_benfeitoria,
     get_benfeitorias_fazenda,
-    get_pastos_fazenda,
+    get_pastos,
     get_cidade_fazenda,
 )
 
@@ -55,6 +55,12 @@ urlpatterns = [
     path('animal/<int:animal_pk>/movimentacao/criar/', views.movimentacao_create, name='movimentacao_create'),
     path('animal/<int:animal_pk>/movimentacao/historico/', views.movimentacao_list, name='movimentacao_list'),
     path('animais/<int:pk>/imprimir/', views_impressao.imprimir_animal, name='imprimir_animal'),
+    
+    # Movimentação em Massa
+    path('animais/bulk-action/', views.bulk_action, name='bulk_action'),
+    path('animais/bulk-edit/', views.bulk_edit, name='bulk_edit'),
+    path('animais/bulk-move/', views.bulk_move, name='bulk_move'),
+    path('animais/bulk-move-lot/', views.bulk_move_lot, name='bulk_move_lot'),
     
     # Fazendas URLs
     path('fazendas/', views.fazenda_list, name='fazenda_list'),
@@ -106,7 +112,6 @@ urlpatterns = [
     # URLs para o mapa de benfeitorias
     path('fazenda/all/pastos/', views_fazenda.get_all_pastos, name='get_all_pastos'),
     path('fazenda/all/benfeitorias/', views_fazenda.get_all_benfeitorias, name='get_all_benfeitorias'),
-    path('fazenda/<int:fazenda_id>/pastos/', views_fazenda.get_pastos_fazenda, name='get_pastos_fazenda'),
     path('fazenda/<int:fazenda_id>/cidade/', views_fazenda.get_cidade_fazenda, name='get_cidade_fazenda'),
     path('fazenda/get_benfeitorias/<int:fazenda_id>/', views_fazenda.get_benfeitorias_fazenda, name='get_benfeitorias_fazenda'),
     path('fazenda/benfeitoria/coordenadas/salvar/', salvar_coordenadas_benfeitoria, name='salvar_coordenadas_benfeitoria'),
@@ -150,24 +155,26 @@ urlpatterns = [
     path('api/financeiro/despesas/get_subcategorias/', views.get_subcategorias, name='get_subcategorias'),
     path('api/financeiro/despesas/get_unidades_medida/', views.get_unidades_medida, name='get_unidades_medida'),
     
-    # Vendas URLs
-    path('financeiro/vendas/', views_vendas.lista_vendas, name='vendas_list'),
-    path('financeiro/vendas/nova/', views_vendas.criar_venda, name='vendas_criar'),
-    path('financeiro/vendas/<int:pk>/', views_vendas.detalhe_venda, name='vendas_detalhe'),
-    path('financeiro/vendas/<int:pk>/editar/', views_vendas.editar_venda, name='vendas_editar'),
-    path('financeiro/vendas/<int:pk>/excluir/', views_vendas.excluir_venda, name='vendas_excluir'),
-    path('api/animais/<int:pk>/peso/', views_vendas.get_peso_atual, name='get_peso_atual'),
-    path('financeiro/vendas/parcelas/<int:parcela_id>/pagar/', views_vendas.registrar_pagamento_venda, name='registrar_pagamento_venda'),
-    path('financeiro/vendas/parcelas/<int:parcela_id>/historico/', views_vendas.historico_pagamentos_venda, name='historico_pagamentos_venda'),
+    # Vendas
+    path('financeiro/vendas/', views_vendas.lista_vendas, name='lista_vendas'),
+    path('financeiro/vendas/criar/', views_vendas.criar_venda, name='criar_venda'),
+    path('financeiro/vendas/<int:pk>/', views_vendas.detalhe_venda, name='detalhe_venda'),
+    path('financeiro/vendas/<int:pk>/editar/', views_vendas.editar_venda, name='editar_venda'),
+    path('financeiro/vendas/<int:pk>/excluir/', views_vendas.excluir_venda, name='excluir_venda'),
+    path('financeiro/vendas/imprimir/', views_impressao.vendas_print, name='vendas_print'),
+    path('api/financeiro/vendas/get_peso_atual/<int:pk>/', views_vendas.get_peso_atual_json, name='get_peso_atual_json'),
+    path('api/financeiro/vendas/registrar_pagamento/<int:parcela_id>/', views_vendas.registrar_pagamento_venda, name='registrar_pagamento_venda'),
+    path('api/financeiro/vendas/historico_pagamentos/<int:parcela_id>/', views_vendas.historico_pagamentos_venda, name='historico_pagamentos_venda'),
     
-    # Abates URLs
+    # Abates
     path('financeiro/abates/', views_abates.lista_abates, name='abates_list'),
-    path('financeiro/abates/novo/', views_abates.criar_abate, name='abates_criar'),
+    path('financeiro/abates/criar/', views_abates.criar_abate, name='abates_criar'),
     path('financeiro/abates/<int:pk>/', views_abates.detalhe_abate, name='abates_detalhe'),
     path('financeiro/abates/<int:pk>/editar/', views_abates.editar_abate, name='abates_editar'),
     path('financeiro/abates/<int:pk>/excluir/', views_abates.excluir_abate, name='abates_excluir'),
-    path('financeiro/abates/parcelas/<int:parcela_id>/pagar/', views_abates.registrar_pagamento_abate, name='registrar_pagamento_abate'),
-    path('financeiro/abates/parcelas/<int:parcela_id>/historico/', views_abates.historico_pagamentos_abate, name='historico_pagamentos_abate'),
+    path('financeiro/abates/imprimir/', views_abates.imprimir_abates, name='abates_imprimir'),
+    path('financeiro/abates/parcela/<int:parcela_id>/pagamento/', views_abates.registrar_pagamento_abate, name='registrar_pagamento_abate'),
+    path('financeiro/abates/parcela/<int:parcela_id>/historico/', views_abates.historico_pagamentos_abate, name='historico_pagamentos_abate'),
     path('api/animal/peso/', views_abates.get_peso_atual_json, name='animal_peso_api'),
     
     # Compras
@@ -178,7 +185,7 @@ urlpatterns = [
     path('financeiro/compras/<int:pk>/detalhe/', views_compras.detalhe_compra, name='compras_detalhe'),
     path('financeiro/compras/imprimir/', views_impressao.imprimir_compras, name='compras_print'),
     
-    # Parcelas URLs
+    # Parcelas
     path('financeiro/parcelas/<int:parcela_id>/pagar/', views_parcelas.registrar_pagamento, name='registrar_pagamento'),
     path('financeiro/parcelas/<int:parcela_id>/historico/', views_parcelas.historico_pagamentos, name='historico_pagamentos'),
     
@@ -224,12 +231,18 @@ urlpatterns = [
     path('api/get-cidade-coordenadas/', views.get_cidade_coordenadas, name='get_cidade_coordenadas'),
     path('api/buscar_animal/<str:brinco>/', views.buscar_animal, name='buscar_animal'),
     path('api/pastos-por-lote/<int:lote_id>/', views.pastos_por_lote, name='pastos_por_lote'),
+    path('api/get_pastos/<int:fazenda_id>/', views_fazenda.get_pastos, name='get_pastos'),
+    path('api/get_benfeitorias/<int:fazenda_id>/', views_fazenda.get_benfeitorias_fazenda, name='get_benfeitorias'),
     path('api/financeiro/categorias/<int:categoria_id>/subcategorias/', views.get_subcategorias, name='get_subcategorias'),
     path('api/financeiro/destinos/', views.get_destinos, name='get_destinos'),
     path('api/financeiro/unidades-medida/', views.get_unidades_medida, name='get_unidades_medida'),
     path('api/animais/<int:pk>/peso/', views_abates.get_peso_atual_json, name='api_peso_animal'),
     path('api/lotes-por-fazenda/<int:fazenda_id>/', views_reproducao.get_lotes_por_fazenda, name='get_lotes_por_fazenda'),
     path('api/lotes/<int:lote_id>/', views.lote_detail, name='lote_detail'),
+    
+    # APIs para filtros dinâmicos
+    path('api/pastos-por-fazenda/<int:fazenda_id>/', views.get_pastos_por_fazenda, name='api_pastos_por_fazenda'),
+    path('api/lotes-por-fazenda/<int:fazenda_id>/', views.get_lotes_por_fazenda, name='api_lotes_por_fazenda'),
     
     # Configurações - Raças
     path('configuracoes/racas/', views.raca_list, name='raca_list'),
@@ -280,10 +293,7 @@ urlpatterns = [
     path('configuracoes/subcategorias-custo/<int:pk>/excluir/', views.subcategoria_custo_delete, name='subcategoria-custo-delete'),
     
     # Bulk Actions
-    path('animais/bulk-action/', views.bulk_action, name='bulk_action'),
-    path('animais/bulk-edit/', views.bulk_edit, name='bulk_edit'),
-    path('animais/bulk-move/', views.bulk_move, name='bulk_move'),
-    path('animais/bulk-move-lot/', views.bulk_move_lot, name='bulk_move_lot'),
+    path('pastos-por-fazenda/<int:fazenda_id>/', views.pastos_por_fazenda, name='pastos_por_fazenda'),
     
     # Auth URLs
     path('login/', auth_views.LoginView.as_view(), name='login'),
@@ -291,4 +301,14 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('aguardando-pagamento/', views.awaiting_payment, name='awaiting_payment'),
     path('configuracoes/', views.configuracoes, name='configuracoes'),
+    
+    # APIs para o mapa
+    path('fazenda/get_pastos/<int:fazenda_id>/', views_fazenda.get_pastos, name='get_pastos'),
+    path('fazenda/get_benfeitorias/<int:fazenda_id>/', views_fazenda.get_benfeitorias_fazenda, name='get_benfeitorias_fazenda'),
+    path('benfeitoria/coordenadas/salvar/', views_fazenda.salvar_coordenadas_benfeitoria, name='salvar_coordenadas_benfeitoria'),
+    path('benfeitoria/coordenadas/<int:benfeitoria_id>/', views_fazenda.get_coordenadas_benfeitoria, name='get_coordenadas_benfeitoria'),
+    
+    # API para buscar subcategorias por categoria
+    path('core/get_subcategorias_por_categoria/<int:categoria_id>/', views.get_subcategorias_por_categoria, name='get_subcategorias_por_categoria'),
+    
 ]

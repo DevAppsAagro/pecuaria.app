@@ -29,7 +29,7 @@ class Fazenda(models.Model):
     valor_hectare = models.DecimalField('Valor do Hectare (R$)', max_digits=10, decimal_places=2, null=True, blank=True)
     custo_oportunidade = models.DecimalField('Custo de Oportunidade (R$)', max_digits=10, decimal_places=2, null=True, blank=True)
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-    data_cadastro = models.DateTimeField(auto_now_add=True)
+    data_cadastro = models.DateField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
     timezone = models.CharField('Fuso Horário', max_length=50, default='America/Sao_Paulo',
         choices=[
@@ -118,7 +118,7 @@ class Animal(models.Model):
     data_primeiro_peso = models.DateField('Data do Primeiro Peso', null=True, blank=True)
     
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-    data_cadastro = models.DateTimeField(auto_now_add=True)
+    data_cadastro = models.DateField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -153,6 +153,13 @@ class Animal(models.Model):
                 return round(ganho / dias, 2)
         
         return None  # Retorna None se não for possível calcular o GMD
+
+    def get_peso_atual(self):
+        """Retorna o peso atual do animal"""
+        ultimo_peso = Pesagem.objects.filter(animal=self).order_by('-data').values('peso').first()
+        if ultimo_peso:
+            return ultimo_peso['peso']
+        return self.primeiro_peso or 0
 
     def save(self, *args, **kwargs):
         # Se é um novo registro e tem peso_entrada, define como primeiro_peso
@@ -407,6 +414,7 @@ class Benfeitoria(models.Model):
     vida_util = models.IntegerField('Vida Útil (anos)', null=True, blank=True)
     data_aquisicao = models.DateField('Data de Aquisição', null=True, blank=True)
     fazenda = models.ForeignKey(Fazenda, on_delete=models.CASCADE)
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     coordenadas = models.JSONField('Coordenadas', null=True, blank=True)
     
     def __str__(self):
@@ -463,7 +471,7 @@ class ContaBancaria(models.Model):
     ativa = models.BooleanField('Conta Ativa', default=True)
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     fazenda = models.ForeignKey(Fazenda, on_delete=models.SET_NULL, null=True, blank=True)
-    data_cadastro = models.DateTimeField(auto_now_add=True)
+    data_cadastro = models.DateField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -587,7 +595,7 @@ class Contato(models.Model):
     cidade = models.CharField('Cidade', max_length=100)
     uf = models.CharField('UF', max_length=2)
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-    data_cadastro = models.DateTimeField(auto_now_add=True)
+    data_cadastro = models.DateField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -872,8 +880,8 @@ class MovimentacaoNaoOperacional(models.Model):
     valor = models.DecimalField('Valor', max_digits=10, decimal_places=2)
     status = models.CharField('Status', max_length=10, choices=STATUS_CHOICES, default='PENDENTE')
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-    data_cadastro = models.DateTimeField('Data de Cadastro', auto_now_add=True)
-    data_atualizacao = models.DateTimeField('Data de Atualização', auto_now=True)
+    data_cadastro = models.DateField(auto_now_add=True)
+    data_atualizacao = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = 'Movimentação Não Operacional'

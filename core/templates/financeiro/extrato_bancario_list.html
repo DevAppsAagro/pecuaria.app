@@ -123,9 +123,15 @@
                         {% for mov in movimentacoes %}
                         <tr>
                             <td>{{ mov.data|date:"d/m/Y" }}</td>
-                            <td>{{ mov.get_tipo_display }}</td>
+                            <td>
+                                {% if mov.tipo == 'entrada' %}
+                                <span class="badge badge-success">Entrada</span>
+                                {% else %}
+                                <span class="badge badge-danger">Saída</span>
+                                {% endif %}
+                            </td>
                             <td>{{ mov.descricao }}</td>
-                            <td class="{% if mov.valor > 0 %}text-success{% else %}text-danger{% endif %}">
+                            <td class="{% if mov.tipo == 'entrada' %}text-success{% else %}text-danger{% endif %}">
                                 R$ {{ mov.valor|floatformat:2|intcomma }}
                             </td>
                             <td>R$ {{ mov.saldo_anterior|floatformat:2|intcomma }}</td>

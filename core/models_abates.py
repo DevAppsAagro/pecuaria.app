@@ -11,6 +11,12 @@ class Abate(models.Model):
         ('CANCELADO', 'Cancelado'),
     ]
 
+    INTERVALO_PARCELAS_CHOICES = [
+        (30, 'Mensal'),
+        (15, 'Quinzenal'),
+        (7, 'Semanal'),
+    ]
+
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     comprador = models.ForeignKey(Contato, on_delete=models.PROTECT, verbose_name='Comprador', 
                                 limit_choices_to={'tipo': 'CO'}, related_name='abates')
@@ -25,7 +31,7 @@ class Abate(models.Model):
     
     # Campos de parcelamento
     numero_parcelas = models.IntegerField('Número de Parcelas', default=1)
-    intervalo_parcelas = models.IntegerField('Intervalo de Parcelas', default=30)  # 30 dias por padrão
+    intervalo_parcelas = models.IntegerField('Intervalo de Parcelas', default=30, choices=INTERVALO_PARCELAS_CHOICES)  # 30 dias por padrão
     
     data_cadastro = models.DateTimeField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
@@ -64,6 +70,12 @@ class Abate(models.Model):
             else:
                 self.status = 'PENDENTE'
             self.save()
+
+    def save(self, *args, **kwargs):
+        # Se tiver data de pagamento, atualiza o status para PAGO
+        if self.data_pagamento:
+            self.status = 'PAGO'
+        super().save(*args, **kwargs)
 
 class AbateAnimal(models.Model):
     abate = models.ForeignKey(Abate, on_delete=models.CASCADE, related_name='animais')

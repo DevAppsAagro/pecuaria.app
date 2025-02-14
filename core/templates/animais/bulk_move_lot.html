@@ -35,7 +35,7 @@
                         <li>
                             {{ animal.brinco_visual }} 
                             {% if animal.brinco_eletronico %}- {{ animal.brinco_eletronico }}{% endif %}
-                            (Lote atual: {{ animal.lote.id_lote }} - {{ animal.lote.finalidade_lote.nome }})
+                            (Lote atual: {{ animal.lote.id_lote|default:'Sem lote' }} - {{ animal.lote.finalidade_lote.nome|default:'Sem lote' }})
                         </li>
                         {% endfor %}
                     </ul>
@@ -104,6 +104,7 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -116,32 +117,23 @@
         // Função para atualizar os pastos disponíveis com base no lote selecionado
         function atualizarPastos() {
             const loteId = loteDestinoSelect.value;
-            const fazendaId = loteId ? loteDestinoSelect.selectedOptions[0].dataset.fazenda : '';
+            const fazendaId = loteId ? loteDestinoSelect.options[loteDestinoSelect.selectedIndex].dataset.fazenda : '';
             
-            // Limpar opções atuais
-            pastoDestinoSelect.innerHTML = '<option value="">Carregando pastos...</option>';
-            
-            if (!loteId) {
-                pastoDestinoSelect.innerHTML = '<option value="">Selecione primeiro o lote de destino...</option>';
-                return;
-            }
-
-            // Buscar pastos da fazenda do lote
-            fetch(`/pastos-por-lote/${loteId}/`)
-                .then(response => response.json())
-                .then(pastos => {
-                    pastoDestinoSelect.innerHTML = '<option value="">Selecione um pasto...</option>';
-                    pastos.forEach(pasto => {
-                        const option = document.createElement('option');
-                        option.value = pasto.id;
-                        option.textContent = `${pasto.id_pasto} - ${pasto.nome}`;
-                        pastoDestinoSelect.appendChild(option);
+            if (fazendaId) {
+                fetch(`/pastos_por_fazenda/${fazendaId}/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        pastoDestinoSelect.innerHTML = '<option value="">Selecione um pasto...</option>';
+                        data.pastos.forEach(pasto => {
+                            const option = document.createElement('option');
+                            option.value = pasto.id;
+                            option.textContent = `${pasto.id_pasto} - ${pasto.nome}`;
+                            pastoDestinoSelect.appendChild(option);
+                        });
                     });
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar pastos:', error);
-                    pastoDestinoSelect.innerHTML = '<option value="">Erro ao carregar pastos</option>';
-                });
+            } else {
+                pastoDestinoSelect.innerHTML = '<option value="">Selecione primeiro o lote de destino...</option>';
+            }
         }
 
         // Atualizar visibilidade do campo de pasto
@@ -154,9 +146,8 @@
         loteDestinoSelect.addEventListener('change', atualizarPastos);
         moverParaPastoCheck.addEventListener('change', atualizarVisibilidadePasto);
 
-        // Inicialização
+        // Inicializar
         atualizarVisibilidadePasto();
     });
 </script>
-{% endblock %}
 {% endblock %}

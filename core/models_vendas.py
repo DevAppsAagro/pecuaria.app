@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-from .models import Animal, ContaBancaria, Contato
+from .models import Animal, ContaBancaria, Contato, Pesagem
 
 class Venda(models.Model):
     TIPO_CHOICES = [
@@ -46,6 +46,19 @@ class Venda(models.Model):
     def __str__(self):
         return f"Venda {self.id} - {self.data}"
 
+    @property
+    def valor_total(self):
+        """Retorna o valor total da venda somando os valores de todos os animais"""
+        from django.db.models import Sum
+        total = self.animais.aggregate(total=Sum('valor_total'))['total']
+        return total if total is not None else 0
+
+    def save(self, *args, **kwargs):
+        # Se tiver data de pagamento, atualiza o status para PAGO
+        if self.data_pagamento:
+            self.status = 'PAGO'
+        super().save(*args, **kwargs)
+
 class VendaAnimal(models.Model):
     venda = models.ForeignKey(Venda, on_delete=models.CASCADE, related_name='animais')
     animal = models.ForeignKey(Animal, on_delete=models.PROTECT)
@@ -68,7 +81,8 @@ class VendaAnimal(models.Model):
             self.animal.situacao = 'VENDIDO'
             self.animal.data_saida = self.venda.data
             self.animal.valor_venda = self.valor_total
-            self.animal.save()
+            self.animal.save()  # Salva as alterações no animal
+            
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

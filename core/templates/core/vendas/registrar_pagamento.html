@@ -30,9 +30,9 @@
                             <input type="date" class="form-control" id="data_pagamento" name="data_pagamento" 
                                    value="{% now 'Y-m-d' %}" required>
                         </div>
-                        <div class="d-grid gap-2">
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             <button type="submit" class="btn btn-primary">Registrar Pagamento</button>
-                            <a href="{% url 'vendas_detalhe' parcela.venda.id %}" class="btn btn-secondary">Voltar</a>
+                            <a href="{% url 'detalhe_venda' parcela.venda.id %}" class="btn btn-secondary">Voltar</a>
                         </div>
                     </form>
                 </div>

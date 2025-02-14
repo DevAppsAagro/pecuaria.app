@@ -11,6 +11,10 @@
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
+    .card {
+        box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
+        margin-bottom: 1rem;
+    }
 </style>
 {% endblock %}
 
@@ -52,11 +56,21 @@
                             <th>Fazenda:</th>
                             <td>{{ benfeitoria.fazenda.nome }}</td>
                         </tr>
+                        {% if benfeitoria.coordenadas %}
+                        <tr>
+                            <th>Coordenadas:</th>
+                            <td>Lat: {{ benfeitoria.coordenadas.lat|floatformat:6 }}, Lng: {{ benfeitoria.coordenadas.lng|floatformat:6 }}</td>
+                        </tr>
+                        {% endif %}
                     </table>
 
                     <div class="mt-3">
-                        <a href="{% url 'benfeitoria_edit' benfeitoria.pk %}" class="btn btn-primary">Editar</a>
-                        <a href="{% url 'benfeitorias_list' %}" class="btn btn-secondary">Voltar</a>
+                        <a href="{% url 'benfeitoria_edit' benfeitoria.pk %}" class="btn btn-primary">
+                            <i class="fas fa-edit"></i> Editar
+                        </a>
+                        <a href="{% url 'benfeitorias_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
                     </div>
                 </div>
             </div>
@@ -80,6 +94,9 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 $(document).ready(function() {
+    // Debug: Log coordinates to console
+    console.log('Benfeitoria coordinates:', {% if benfeitoria.coordenadas %}{{ benfeitoria.coordenadas|safe }}{% else %}null{% endif %});
+    
     // Inicializa o mapa
     var map = L.map('map');
     
@@ -87,7 +104,7 @@ $(document).ready(function() {
     var googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
         maxZoom: 20,
         subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-        attribution: '© Google Maps'
+        attribution: 'Google Maps'
     }).addTo(map);
 
     // Camadas para pastos e benfeitorias
@@ -97,23 +114,34 @@ $(document).ready(function() {
     // Adiciona o marcador da benfeitoria atual
     {% if benfeitoria.coordenadas %}
         var coords = {{ benfeitoria.coordenadas|safe }};
-        var marker = L.marker([coords.lat, coords.lng])
-            .bindPopup('<strong>{{ benfeitoria.nome }}</strong>')
-            .addTo(benfeitoriasLayer);
+        console.log('Adding marker at coordinates:', coords);
+        if (coords && coords.lat && coords.lng) {
+            var marker = L.marker([coords.lat, coords.lng])
+                .bindPopup('<strong>{{ benfeitoria.nome }}</strong>')
+                .addTo(benfeitoriasLayer);
+            console.log('Marker added successfully');
+        } else {
+            console.error('Invalid coordinates format:', coords);
+        }
         
         // Centraliza o mapa na benfeitoria
-        map.setView([coords.lat, coords.lng], 15);
+        map.setView([coords.lat, coords.lng], 16);
+    {% else %}
+        console.log('No coordinates available for this benfeitoria');
+        // Se não houver coordenadas, centraliza na fazenda
+        map.setView([-15.7801, -47.9292], 4); // Centro do Brasil
     {% endif %}
 
     // Carrega os pastos da fazenda
-    $.get('/fazenda/{{ benfeitoria.fazenda.id }}/pastos/', function(data) {
+    $.get('{% url "get_pastos" benfeitoria.fazenda.id %}', function(data) {
         if (data.success && data.pastos) {
             data.pastos.forEach(function(pasto) {
                 if (pasto.coordenadas && Array.isArray(pasto.coordenadas)) {
                     var polygon = L.polygon(pasto.coordenadas, {
-                        color: 'blue',
+                        color: '#3388ff',
                         fillColor: '#3388ff',
-                        fillOpacity: 0.2
+                        fillOpacity: 0.2,
+                        weight: 2
                     }).bindPopup(pasto.nome || 'Pasto sem nome');
                     
                     pastosLayer.addLayer(polygon);
@@ -123,16 +151,19 @@ $(document).ready(function() {
     });
 
     // Carrega outras benfeitorias da mesma fazenda
-    $.get('/fazenda/get_benfeitorias/{{ benfeitoria.fazenda.id }}/', function(data) {
+    $.get('{% url "get_benfeitorias_fazenda" benfeitoria.fazenda.id %}', function(data) {
         if (data.success && data.benfeitorias) {
             data.benfeitorias.forEach(function(b) {
-                // Não adiciona a benfeitoria atual novamente
                 if (b.id !== {{ benfeitoria.pk }} && b.coordenadas) {
                     var coords = b.coordenadas;
                     if (coords.lat && coords.lng) {
-                        var marker = L.marker([coords.lat, coords.lng])
-                            .bindPopup(b.nome)
-                            .addTo(benfeitoriasLayer);
+                        var marker = L.marker([coords.lat, coords.lng], {
+                            icon: L.divIcon({
+                                className: 'custom-div-icon',
+                                html: '<div style="background-color: #fff; border: 2px solid #666; border-radius: 50%; width: 12px; height: 12px;"></div>'
+                            })
+                        }).bindPopup(b.nome)
+                        .addTo(benfeitoriasLayer);
                     }
                 }
             });

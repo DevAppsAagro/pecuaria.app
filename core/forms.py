@@ -28,14 +28,14 @@ class MovimentacaoNaoOperacionalForm(forms.ModelForm):
 class AbateForm(forms.ModelForm):
     class Meta:
         model = Abate
-        fields = ['data', 'data_vencimento', 'valor_arroba', 'rendimento_padrao',
-                 'conta_bancaria', 'numero_parcelas', 'comprador']
+        fields = ['data', 'data_vencimento', 'data_pagamento', 'valor_arroba', 'rendimento_padrao',
+                 'conta_bancaria', 'comprador']
         widgets = {
             'data': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'data_vencimento': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'data_pagamento': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'valor_arroba': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'rendimento_padrao': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'numero_parcelas': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
             'conta_bancaria': forms.Select(attrs={'class': 'form-control'}),
             'comprador': forms.Select(attrs={'class': 'form-control'}),
         }

@@ -33,9 +33,7 @@ from .models_vendas import Venda, VendaAnimal
 from .models_abates import Abate, AbateAnimal
 
 from .forms import *
-
-# URL do produto na Eduzz
-EDUZZ_PRODUCT_URL = "https://chk.eduzz.com/40QDNRN3WB"
+from .views_estatisticas import get_estatisticas_animais
 
 def login_view(request):
     return render(request, 'registration/login.html')
@@ -475,10 +473,7 @@ def get_cidade_coordenadas(request):
                 'id': pasto.id,
                 'id_pasto': pasto.id_pasto,
                 'nome': pasto.nome,
-                'fazenda': {
-                    'nome': pasto.fazenda.nome,
-                    'id': pasto.fazenda.id
-                },
+                'fazenda_nome': pasto.fazenda.nome,
                 'fazenda_id': pasto.fazenda.id,
                 'area': float(pasto.area),
                 'capacidade_ua': float(pasto.capacidade_ua),
@@ -950,12 +945,13 @@ def lote_detail(request, lote_id):
     custo_total = Decimal(str(custo_fixo)) + Decimal(str(custo_variavel))
 
     # Calcula custos por kg e por @
+    custo_por_kg = 0
+    custo_por_arroba = 0
+    
     if peso_total > 0:
-        custo_kg = custo_total / Decimal(str(peso_total))
-        custo_arroba = custo_kg * 15
-    else:
-        custo_kg = Decimal('0')
-        custo_arroba = Decimal('0')
+        custo_por_kg = float(custo_total / peso_total)
+        # Calcula custo por @ (custo total / @ produzida)
+        custo_por_arroba = float(custo_total / (peso_total / 15))
 
     # Calcula custos diários
     if total_animais > 0:
@@ -983,8 +979,8 @@ def lote_detail(request, lote_id):
         'custo_fixo': custo_fixo,
         'custo_variavel': custo_variavel,
         'custo_total': custo_total,
-        'custo_por_kg': custo_kg,
-        'custo_por_arroba': custo_arroba,
+        'custo_por_kg': custo_por_kg,
+        'custo_por_arroba': custo_por_arroba,
         'custo_diario': custo_diario,
         'custo_variavel_diario': custo_variavel_diario,
         'custo_fixo_diario': custo_fixo_diario,
@@ -997,81 +993,96 @@ def lote_detail(request, lote_id):
 
 @login_required
 def animal_list(request):
-    # Inicializa o queryset base
+    from django.utils import timezone
+    from django.db.models import Count, Q, Max, F, OuterRef, Subquery
+    from .views_estatisticas import get_estatisticas_animais
+    
+    # Subconsulta para pegar o peso mais recente
+    ultima_pesagem = Pesagem.objects.filter(
+        animal=OuterRef('pk')
+    ).order_by('-data').values('peso')[:1]
+    
+    # Inicializa o queryset com select_related para otimizar as queries
     queryset = Animal.objects.filter(usuario=request.user).select_related(
         'raca', 'lote', 'categoria_animal', 'fazenda_atual', 'pasto_atual'
-    ).prefetch_related('pesagens')
+    ).prefetch_related('pesagens').annotate(
+        peso_atual=Coalesce(
+            Subquery(ultima_pesagem),
+            F('peso_entrada')
+        )
+    )
     
-    # Aplicar filtros
-    fazenda_id = request.GET.get('fazenda')
-    lote_id = request.GET.get('lote')
-    pasto_id = request.GET.get('pasto')
-    categoria_id = request.GET.get('categoria')
-    raca_id = request.GET.get('raca')
-    brinco = request.GET.get('brinco')
-
-    # Aplicar filtros somente se os valores não forem vazios
-    if fazenda_id and fazenda_id.strip():
-        queryset = queryset.filter(fazenda_atual_id=fazenda_id)
-
-    if lote_id and lote_id.strip():
-        queryset = queryset.filter(lote_id=lote_id)
-
-    if pasto_id and pasto_id.strip():
-        queryset = queryset.filter(pasto_atual_id=pasto_id)
-
-    if categoria_id and categoria_id.strip():
-        queryset = queryset.filter(categoria_animal_id=categoria_id)
-
-    if raca_id and raca_id.strip():
-        queryset = queryset.filter(raca_id=raca_id)
-
-    if brinco and brinco.strip():
+    # Carrega as opções dos filtros - incluindo globais (usuario=None) e do usuário
+    categorias = CategoriaAnimal.objects.filter(
+        Q(usuario=None) | Q(usuario=request.user)
+    ).order_by('nome')
+    
+    racas = Raca.objects.filter(
+        Q(usuario=None) | Q(usuario=request.user)
+    ).order_by('nome')
+    
+    # Filtros
+    filtros = {}
+    
+    if request.GET.get('fazenda'):
+        filtros['fazenda'] = request.GET.get('fazenda')
+        queryset = queryset.filter(fazenda_atual_id=filtros['fazenda'])
+        
+        # Se tiver fazenda selecionada, filtra lotes e pastos dessa fazenda
+        lotes = Lote.objects.filter(fazenda_id=filtros['fazenda'], usuario=request.user)
+        pastos = Pasto.objects.filter(fazenda_id=filtros['fazenda'], fazenda__usuario=request.user)
+    else:
+        # Se não tiver fazenda selecionada, mostra todos os lotes e pastos do usuário
+        lotes = Lote.objects.filter(usuario=request.user)
+        pastos = Pasto.objects.filter(fazenda__usuario=request.user)
+    
+    if request.GET.get('lote'):
+        filtros['lote'] = request.GET.get('lote')
+        queryset = queryset.filter(lote_id=filtros['lote'])
+    
+    if request.GET.get('pasto'):
+        filtros['pasto'] = request.GET.get('pasto')
+        queryset = queryset.filter(pasto_atual_id=filtros['pasto'])
+    
+    if request.GET.get('categoria'):
+        categoria_id = request.GET.get('categoria')
+        filtros['categoria'] = int(categoria_id)
+        queryset = queryset.filter(categoria_animal_id=filtros['categoria'])
+    
+    if request.GET.get('raca'):
+        raca_id = request.GET.get('raca')
+        filtros['raca'] = int(raca_id)
+        queryset = queryset.filter(raca_id=filtros['raca'])
+    
+    if request.GET.get('brinco'):
+        filtros['brinco'] = request.GET.get('brinco')
         queryset = queryset.filter(
-            Q(brinco_visual__icontains=brinco) |
-            Q(brinco_eletronico__icontains=brinco)
+            Q(brinco_visual__icontains=filtros['brinco']) |
+            Q(brinco_eletronico__icontains=filtros['brinco'])
         )
 
-    # Ordenar por brinco visual
-    animais = queryset.order_by('brinco_visual')
-
-    # Carregar dados para os filtros
-    fazendas = Fazenda.objects.filter(usuario=request.user)
-    lotes = Lote.objects.filter(usuario=request.user)
-    if fazenda_id and fazenda_id.strip():
-        pastos = Pasto.objects.filter(fazenda_id=fazenda_id, fazenda__usuario=request.user)
-    else:
-        pastos = Pasto.objects.filter(fazenda__in=fazendas)
-    categorias = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
-    racas = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
-    
-    # Preparar dados dos animais com a última pesagem
-    animais_com_pesagem = []
-    for animal in animais:
-        ultima_pesagem = animal.pesagens.order_by('-data').first()
-        peso_atual = ultima_pesagem.peso if ultima_pesagem else animal.peso_entrada
-        animais_com_pesagem.append({
-            'animal': animal,
-            'peso_atual': peso_atual
-        })
+    # Obtém as estatísticas
+    estatisticas = get_estatisticas_animais(request, queryset)
 
     context = {
-        'animais': animais_com_pesagem,
-        'fazendas': fazendas,
+        'animais': queryset,
+        'fazendas': Fazenda.objects.filter(usuario=request.user),
         'lotes': lotes,
         'pastos': pastos,
         'categorias': categorias,
         'racas': racas,
-        'filtros': {
-            'fazenda': fazenda_id or '',
-            'lote': lote_id or '',
-            'pasto': pasto_id or '',
-            'categoria': categoria_id or '',
-            'raca': raca_id or '',
-            'brinco': brinco or ''
-        },
+        'filtros': filtros,
+        'estatisticas': estatisticas,  # Removido o ['stats'] para passar o dicionário completo
+        'categorias_chart': estatisticas['categorias'],
+        'total_ativos': estatisticas['stats']['ATIVO']['quantidade'],
+        'total_vendidos': estatisticas['stats']['VENDIDO']['quantidade'],
+        'total_mortos': estatisticas['stats']['MORTO']['quantidade'],
+        'total_abatidos': estatisticas['stats']['ABATIDO']['quantidade'],
+        'total_peso_kg': estatisticas['stats']['ATIVO']['peso_total'],
+        'total_peso_arroba': estatisticas['stats']['ATIVO']['peso_arroba'],
         'active_tab': 'animais'
     }
+    
     return render(request, 'animais/animal_list.html', context)
 
 @login_required
@@ -1128,8 +1139,8 @@ def animal_create(request):
     lotes = Lote.objects.filter(usuario=request.user)
     pastos = []  # Inicialmente vazio, será preenchido via AJAX quando um lote for selecionado
     
-    racas = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
-    categorias = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
+    racas = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).order_by('nome')
+    categorias = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).order_by('nome')
     
     return render(request, 'animais/animal_form.html', {
         'racas': racas,
@@ -1181,9 +1192,9 @@ def animal_edit(request, pk):
             messages.error(request, f'Erro ao atualizar animal: {str(e)}')
     
     # GET request
-    racas = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
+    racas = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).order_by('nome')
     lotes = Lote.objects.filter(usuario=request.user)
-    categorias = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True))
+    categorias = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).order_by('nome')
     pastos = Pasto.objects.filter(fazenda=animal.fazenda_atual)
     
     context = {
@@ -1222,7 +1233,7 @@ def animal_detail(request, pk):
     if abate_animal:
         data_final = abate_animal.abate.data
     elif venda:
-        data_final = venda.data
+        data_final = venda.venda.data  # Acessando a data através do relacionamento com Venda
     else:
         data_final = timezone.now().date()
     
@@ -1307,7 +1318,7 @@ def animal_detail(request, pk):
         arrobas_final = (peso_final * rendimento_carcaca / Decimal('15')) if peso_final else 0
         lucro = valor_saida - valor_entrada - custos_total if valor_saida else 0
     elif venda:
-        peso_final = venda.peso
+        peso_final = venda.peso_venda
         valor_saida = venda.valor_total
         arrobas_final = peso_final / Decimal('30')  # Venda usa rendimento padrão de 50%
         lucro = valor_saida - valor_entrada - custos_total if valor_saida else 0
@@ -1589,7 +1600,7 @@ def bulk_edit(request):
     context = {
         'animals': animals,
         'lotes': Lote.objects.filter(usuario=request.user),
-        'categorias': CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)),
+        'categorias': CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).order_by('nome'),
         'active_tab': 'animais'
     }
     return render(request, 'animais/bulk_edit.html', context)
@@ -1659,7 +1670,6 @@ def bulk_move_lot(request):
         try:
             lote_destino = request.POST.get('lote_destino')
             data_movimentacao = request.POST.get('data_movimentacao')
-            motivo = request.POST.get('motivo', 'Movimentação de lote em massa')
             mover_para_pasto = request.POST.get('mover_para_pasto') == 'on'
             pasto_destino = request.POST.get('pasto_destino') if mover_para_pasto else None
             
@@ -2282,13 +2292,33 @@ def benfeitoria_create(request):
                 'valor_residual': converter_moeda_para_decimal(request.POST.get('valor_residual')),
                 'vida_util': int(request.POST.get('vida_util')),
                 'data_aquisicao': request.POST.get('data_aquisicao'),
-                'fazenda_id': request.POST.get('fazenda')
+                'fazenda_id': request.POST.get('fazenda'),
+                'usuario_id': request.user.id  # Usando o ID do usuário atual
             }
             
+            print("Data before coordinates:", data)  # Debug
+            
+            # Processa as coordenadas se existirem
+            coordenadas = request.POST.get('coordenadas')
+            print("Raw coordinates:", coordenadas)  # Debug
+            
+            if coordenadas:
+                try:
+                    data['coordenadas'] = json.loads(coordenadas)
+                    print("Parsed coordinates:", data['coordenadas'])  # Debug
+                except json.JSONDecodeError as e:
+                    print("Error parsing coordinates:", str(e))  # Debug
+                    messages.warning(request, 'Formato inválido das coordenadas. O ponto no mapa será ignorado.')
+            
+            print("Final data:", data)  # Debug
+            
             benfeitoria = Benfeitoria.objects.create(**data)
+            print("Benfeitoria created:", benfeitoria.id)  # Debug
+            
             messages.success(request, 'Benfeitoria cadastrada com sucesso!')
             return redirect('benfeitorias_list')
         except Exception as e:
+            print("Error creating benfeitoria:", str(e))  # Debug
             messages.error(request, f'Erro ao cadastrar benfeitoria: {str(e)}')
     
     fazendas = Fazenda.objects.filter(usuario=request.user)
@@ -2322,6 +2352,14 @@ def benfeitoria_edit(request, pk):
             benfeitoria.data_aquisicao = request.POST.get('data_aquisicao')
             benfeitoria.fazenda_id = request.POST.get('fazenda')
             benfeitoria.save()
+            
+            # Processa as coordenadas
+            coordenadas = request.POST.get('coordenadas')
+            if coordenadas:
+                try:
+                    benfeitoria.coordenadas = json.loads(coordenadas)
+                except json.JSONDecodeError:
+                    messages.warning(request, 'Formato inválido das coordenadas. O ponto no mapa será ignorado.')
             
             messages.success(request, 'Benfeitoria atualizada com sucesso!')
             return redirect('benfeitorias_list')
@@ -2404,12 +2442,6 @@ def compras_list(request):
     })
 
 @login_required
-def vendas_list(request):
-    return render(request, 'financeiro/vendas_list.html', {
-        'active_tab': 'financeiro'
-    })
-
-@login_required
 def abates_list(request):
     return render(request, 'financeiro/abates_list.html', {
         'active_tab': 'financeiro'
@@ -2460,6 +2492,24 @@ class ContaBancariaListView(LoginRequiredMixin, ListView):
             )
             saldo -= sum(despesa.valor_final() for despesa in despesas)
             
+            # Vendas 
+            vendas = Venda.objects.filter(
+                usuario=self.request.user,
+                conta_bancaria=conta,
+                status='PAGO',
+                data_pagamento__isnull=False
+            )
+            saldo += sum(venda.valor_total for venda in vendas)
+            
+            # Compras
+            compras = Compra.objects.filter(
+                usuario=self.request.user,
+                conta_bancaria=conta,
+                status='PAGO',
+                data_pagamento__isnull=False
+            )
+            saldo -= sum(compra.valor_total for compra in compras)
+            
             # Abates
             abates = Abate.objects.filter(
                 usuario=self.request.user,
@@ -2479,14 +2529,13 @@ class ContaBancariaListView(LoginRequiredMixin, ListView):
             for mov in nao_operacionais:
                 if mov.tipo == 'entrada':
                     saldo += mov.valor
-                else:
+                else:  # saida
                     saldo -= mov.valor
             
-            # Atualiza o saldo da conta
+            # Atualiza o saldo da conta em memória apenas
             conta.saldo = saldo
-            conta.save()
             
-            # Adiciona ao total geral
+            # Adiciona ao total geral se a conta estiver ativa
             if conta.ativa:
                 context['total_saldo'] += saldo
         
@@ -3056,7 +3105,7 @@ def animal_detail(request, pk):
     if abate_animal:
         data_final = abate_animal.abate.data
     elif venda:
-        data_final = venda.data
+        data_final = venda.venda.data  # Acessando a data através do relacionamento com Venda
     else:
         data_final = timezone.now().date()
     
@@ -3141,7 +3190,7 @@ def animal_detail(request, pk):
         arrobas_final = (peso_final * rendimento_carcaca / Decimal('15')) if peso_final else 0
         lucro = valor_saida - valor_entrada - custos_total if valor_saida else 0
     elif venda:
-        peso_final = venda.peso
+        peso_final = venda.peso_venda
         valor_saida = venda.valor_total
         arrobas_final = peso_final / Decimal('30')  # Venda usa rendimento padrão de 50%
         lucro = valor_saida - valor_entrada - custos_total if valor_saida else 0
@@ -3280,6 +3329,134 @@ class ContatoDeleteView(LoginRequiredMixin, DeleteView):
     def get_queryset(self):
         return Contato.objects.filter(usuario=self.request.user)
 
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Sum, Q, Case, When, Value, CharField
+from django.utils import timezone
+from django.views.generic import ListView
+from decimal import Decimal
+from .models import Despesa, ItemDespesa, Fazenda, Contato
+
+
+@login_required
+def get_pastos_por_fazenda(request, fazenda_id):
+    """Retorna lista de pastos de uma fazenda em formato JSON"""
+    try:
+        fazenda = Fazenda.objects.get(id=fazenda_id, usuario=request.user)
+        pastos = Pasto.objects.filter(fazenda=fazenda).values('id', 'nome')
+        return JsonResponse(list(pastos), safe=False)
+    except Fazenda.DoesNotExist:
+        return JsonResponse([], safe=False)
+
+@login_required
+def get_lotes_por_fazenda(request, fazenda_id):
+    """Retorna lista de lotes de uma fazenda em formato JSON"""
+    try:
+        fazenda = Fazenda.objects.get(id=fazenda_id, usuario=request.user)
+        lotes = Lote.objects.filter(fazenda_id=fazenda_id, usuario=request.user)
+        return JsonResponse(list(lotes.values('id', 'id_lote')), safe=False)
+    except Fazenda.DoesNotExist:
+        return JsonResponse([], safe=False)
+
+def get_estatisticas_animais(request, queryset=None):
+    from django.utils import timezone
+    from datetime import timedelta
+    from django.db.models import Count
+    
+    # Se não receber um queryset, usa todos os animais do usuário
+    if queryset is None:
+        queryset = Animal.objects.filter(usuario=request.user)
+    
+    # Data atual e data há 12 meses atrás
+    data_atual = timezone.now().date()
+    data_12_meses = data_atual - timedelta(days=365)
+    
+    # Inicializa o dicionário com todos os status possíveis
+    stats = {
+        'ATIVO': {'quantidade': 0, 'variacao': 0},
+        'VENDIDO': {'quantidade': 0, 'variacao': 0},
+        'MORTO': {'quantidade': 0, 'variacao': 0},
+        'ABATIDO': {'quantidade': 0, 'variacao': 0}
+    }
+    
+    # Contagem atual
+    contagem_atual = queryset.values('situacao').annotate(
+        total=Count('id')
+    )
+    
+    # Contagem há 12 meses
+    contagem_anterior = queryset.filter(
+        data_cadastro__lte=data_12_meses
+    ).values('situacao').annotate(
+        total=Count('id')
+    )
+    
+    # Preenche as quantidades atuais
+    for item in contagem_atual:
+        situacao = item['situacao']
+        stats[situacao]['quantidade'] = item['total']
+    
+    # Calcula as variações
+    for item in contagem_anterior:
+        situacao = item['situacao']
+        qtd_anterior = item['total']
+        qtd_atual = stats[situacao]['quantidade']
+        
+        if qtd_anterior > 0:
+            variacao = ((qtd_atual - qtd_anterior) / qtd_anterior) * 100
+            stats[situacao]['variacao'] = round(variacao, 1)
+    
+    return stats
+
+def get_estatisticas_animais(request, queryset=None):
+    from django.utils import timezone
+    from datetime import timedelta
+    from django.db.models import Count
+    
+    # Se não receber um queryset, usa todos os animais do usuário
+    if queryset is None:
+        queryset = Animal.objects.filter(usuario=request.user)
+    
+    # Data atual e data há 12 meses atrás
+    data_atual = timezone.now().date()
+    data_12_meses = data_atual - timedelta(days=365)
+    
+    # Inicializa o dicionário com todos os status possíveis
+    stats = {
+        'ATIVO': {'quantidade': 0, 'variacao': 0},
+        'VENDIDO': {'quantidade': 0, 'variacao': 0},
+        'MORTO': {'quantidade': 0, 'variacao': 0},
+        'ABATIDO': {'quantidade': 0, 'variacao': 0}
+    }
+    
+    # Contagem atual
+    contagem_atual = queryset.values('situacao').annotate(
+        total=Count('id')
+    )
+    
+    # Contagem há 12 meses
+    contagem_anterior = queryset.filter(
+        data_cadastro__lte=data_12_meses
+    ).values('situacao').annotate(
+        total=Count('id')
+    )
+    
+    # Preenche as quantidades atuais
+    for item in contagem_atual:
+        situacao = item['situacao']
+        stats[situacao]['quantidade'] = item['total']
+    
+    # Calcula as variações
+    for item in contagem_anterior:
+        situacao = item['situacao']
+        qtd_anterior = item['total']
+        qtd_atual = stats[situacao]['quantidade']
+        
+        if qtd_anterior > 0:
+            variacao = ((qtd_atual - qtd_anterior) / qtd_anterior) * 100
+            stats[situacao]['variacao'] = round(variacao, 1)
+    
+    return stats
+
 class ExtratoBancarioListView(LoginRequiredMixin, ListView):
     model = ExtratoBancario
     template_name = 'financeiro/extrato_bancario_list.html'
@@ -3311,7 +3488,14 @@ class ExtratoBancarioListView(LoginRequiredMixin, ListView):
                 status='PAGO',
                 data_pagamento__isnull=False
             )
-            saldo -= sum(despesa.valor_final() for despesa in despesas)
+            for despesa in despesas:
+                queryset.append({
+                    'data': despesa.data_pagamento,
+                    'descricao': f'Despesa - {despesa.contato}',
+                    'tipo': 'saida',
+                    'valor': despesa.valor_final(),
+                    'referencia': f'Despesa #{despesa.id}'
+                })
             
             # Busca vendas pagas
             vendas = Venda.objects.filter(
@@ -3320,7 +3504,14 @@ class ExtratoBancarioListView(LoginRequiredMixin, ListView):
                 status='PAGO',
                 data_pagamento__isnull=False
             )
-            saldo += sum(venda.valor_total for venda in vendas)
+            for venda in vendas:
+                queryset.append({
+                    'data': venda.data_pagamento,
+                    'descricao': f'Venda - {venda.comprador}',
+                    'tipo': 'entrada',
+                    'valor': venda.valor_total,
+                    'referencia': f'Venda #{venda.id}'
+                })
             
             # Busca compras pagas
             compras = Compra.objects.filter(
@@ -3329,7 +3520,14 @@ class ExtratoBancarioListView(LoginRequiredMixin, ListView):
                 status='PAGO',
                 data_pagamento__isnull=False
             )
-            saldo -= sum(compra.valor_total for compra in compras)
+            for compra in compras:
+                queryset.append({
+                    'data': compra.data_pagamento,
+                    'descricao': f'Compra - {compra.vendedor}',
+                    'tipo': 'saida',
+                    'valor': compra.valor_total,
+                    'referencia': f'Compra #{compra.id}'
+                })
             
             # Busca abates com pagamentos
             abates = Abate.objects.filter(
@@ -3338,7 +3536,14 @@ class ExtratoBancarioListView(LoginRequiredMixin, ListView):
                 status='PAGO',
                 data_pagamento__isnull=False
             )
-            saldo += sum(abate.valor_total for abate in abates)
+            for abate in abates:
+                queryset.append({
+                    'data': abate.data_pagamento,
+                    'descricao': f'Abate - {abate.comprador}',
+                    'tipo': 'entrada',
+                    'valor': abate.valor_total,
+                    'referencia': f'Abate #{abate.id}'
+                })
             
             # Busca movimentações não operacionais
             nao_operacionais = MovimentacaoNaoOperacional.objects.filter(
@@ -3349,20 +3554,34 @@ class ExtratoBancarioListView(LoginRequiredMixin, ListView):
             )
             for mov in nao_operacionais:
                 if mov.tipo == 'entrada':
-                    saldo += mov.valor
+                    queryset.append({
+                        'data': mov.data_pagamento,
+                        'descricao': f'Movimentação não operacional - Entrada',
+                        'tipo': 'entrada',
+                        'valor': mov.valor,
+                        'referencia': f'Movimentação não operacional #{mov.id}'
+                    })
                 else:
-                    saldo -= mov.valor
+                    queryset.append({
+                        'data': mov.data_pagamento,
+                        'descricao': f'Movimentação não operacional - Saída',
+                        'tipo': 'saida',
+                        'valor': mov.valor,
+                        'referencia': f'Movimentação não operacional #{mov.id}'
+                    })
             
             # Ordena por data
             queryset.sort(key=lambda x: x['data'])
 
             # Calcular saldos
-            conta_selecionada = ContaBancaria.objects.filter(usuario=self.request.user).get(id=conta_id) if conta_id else None
-            saldo = conta_selecionada.saldo if conta_selecionada else Decimal('0.00')
+            saldo = conta.saldo if data_inicio is None else conta.calcular_saldo_em_data(data_inicio)
             
             for mov in queryset:
                 saldo_anterior = saldo
-                saldo += Decimal(str(mov['valor']))
+                if mov['tipo'] == 'entrada':
+                    saldo += Decimal(str(mov['valor']))
+                else:  # saida
+                    saldo -= Decimal(str(mov['valor']))
                 mov['saldo_anterior'] = saldo_anterior
                 mov['saldo_atual'] = saldo
 
@@ -3385,8 +3604,8 @@ class ExtratoBancarioListView(LoginRequiredMixin, ListView):
         
         # Calcular totais
         movimentacoes = context['object_list']
-        context['total_entradas'] = sum((Decimal(str(m['valor'])) for m in movimentacoes if m['valor'] > 0), Decimal('0.00'))
-        context['total_saidas'] = abs(sum((Decimal(str(m['valor'])) for m in movimentacoes if m['valor'] < 0), Decimal('0.00')))
+        context['total_entradas'] = sum((Decimal(str(m['valor'])) for m in movimentacoes if m['tipo'] == 'entrada'), Decimal('0.00'))
+        context['total_saidas'] = sum((Decimal(str(m['valor'])) for m in movimentacoes if m['tipo'] == 'saida'), Decimal('0.00'))
         
         # Calcular saldo no período
         if movimentacoes:
@@ -3400,6 +3619,19 @@ class ExtratoBancarioListView(LoginRequiredMixin, ListView):
         
         return context
 
+from django.http import JsonResponse
+from .models import SubcategoriaCusto
+
+def get_subcategorias_por_categoria(request, categoria_id):
+    """
+    Retorna uma lista de subcategorias para uma determinada categoria de custo.
+    """
+    try:
+        subcategorias = SubcategoriaCusto.objects.filter(categoria_id=categoria_id).values('id', 'nome')
+        return JsonResponse(list(subcategorias), safe=False)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum, Q, Case, When, Value, CharField
 from django.utils import timezone
@@ -3411,242 +3643,189 @@ class DespesasListView(LoginRequiredMixin, ListView):
     model = Despesa
     template_name = 'financeiro/despesas_list.html'
     context_object_name = 'despesas'
-    
+
     def get_queryset(self):
+        queryset = super().get_queryset()
+        queryset = queryset.filter(usuario=self.request.user)
+
         hoje = timezone.localdate()
-        queryset = (Despesa.objects
-            .filter(usuario=self.request.user)
-            .select_related('contato', 'conta_bancaria')
-            .prefetch_related('itens')
-            .annotate(
-                valor_total=Sum('itens__valor_total'),
-                status_real=Case(
-                    When(status='PENDENTE', data_vencimento=hoje, then=Value('VENCE_HOJE')),
-                    When(status='PENDENTE', data_vencimento__lt=hoje, then=Value('VENCIDO')),
-                    default='status',
-                    output_field=CharField(),
-                )
-            ))
-        
+
+        # Prefetch related para otimizar as queries
+        queryset = queryset.prefetch_related(
+            'itens__categoria',
+            'itens__subcategoria',
+            'itens__fazenda_destino',
+            'itens__lote_destino',
+            'itens__maquina_destino',
+            'itens__benfeitoria_destino',
+            'itens__pastagem_destino'
+        ).select_related('contato').annotate(
+            status_real=Case(
+                When(status='PENDENTE', data_vencimento=hoje, then=Value('VENCE_HOJE')),
+                When(status='PENDENTE', data_vencimento__lt=hoje, then=Value('VENCIDO')),
+                default='status',
+                output_field=CharField(),
+            )
+        )
+
+        # Aplicar filtros
+        filtros = {}
+
         # Filtro de fazenda
         fazenda = self.request.GET.get('fazenda')
         if fazenda:
-            itens_fazenda = ItemDespesa.objects.filter(
-                Q(categoria__alocacao='fazenda', fazenda_destino_id=fazenda) |
-                Q(categoria__alocacao='lote', lote_destino__fazenda_id=fazenda) |
-                Q(categoria__alocacao='maquina', maquina_destino__fazenda_id=fazenda) |
-                Q(categoria__alocacao='benfeitoria', benfeitoria_destino__fazenda_id=fazenda) |
-                Q(categoria__alocacao='pastagem', pastagem_destino__fazenda_id=fazenda)
-            ).values_list('despesa_id', flat=True)
-            
-            queryset = queryset.filter(id__in=itens_fazenda)
-            
+            fazenda_query = (
+                Q(itens__fazenda_destino_id=fazenda) |
+                Q(itens__lote_destino__fazenda_id=fazenda) |
+                Q(itens__maquina_destino__fazenda_id=fazenda) |
+                Q(itens__benfeitoria_destino__fazenda_id=fazenda) |
+                Q(itens__pastagem_destino__fazenda_id=fazenda)
+            )
+            queryset = queryset.filter(fazenda_query).distinct()
+            filtros['fazenda'] = fazenda
+
         # Filtro de fornecedor
-        contato_id = self.request.GET.get('contato')
-        if contato_id:
-            queryset = queryset.filter(contato_id=contato_id)
-            
+        contato = self.request.GET.get('contato')
+        if contato:
+            queryset = queryset.filter(contato_id=contato)
+            filtros['contato'] = contato
+
+        # Filtro de categoria
+        categoria = self.request.GET.get('categoria')
+        if categoria:
+            queryset = queryset.filter(itens__categoria_id=categoria).distinct()
+            filtros['categoria'] = categoria
+
+        # Filtro de subcategoria
+        subcategoria = self.request.GET.get('subcategoria')
+        if subcategoria:
+            queryset = queryset.filter(itens__subcategoria_id=subcategoria).distinct()
+            filtros['subcategoria'] = subcategoria
+
+        # Filtro de destino (pode ser qualquer tipo de destino)
+        destino = self.request.GET.get('destino')
+        if destino:
+            destino_query = (
+                Q(itens__fazenda_destino_id=destino) |
+                Q(itens__lote_destino_id=destino) |
+                Q(itens__maquina_destino_id=destino) |
+                Q(itens__benfeitoria_destino_id=destino) |
+                Q(itens__pastagem_destino_id=destino)
+            )
+            queryset = queryset.filter(destino_query).distinct()
+            filtros['destino'] = destino
+
         # Filtro de status
         status = self.request.GET.get('status')
         if status:
             if status == 'VENCE_HOJE':
-                queryset = queryset.filter(status='PENDENTE', data_vencimento=hoje)
-            elif status == 'VENCIDO':
-                queryset = queryset.filter(status='PENDENTE', data_vencimento__lt=hoje)
-            elif status == 'PENDENTE':
-                queryset = queryset.filter(
-                    status='PENDENTE',
-                    data_vencimento__gt=hoje
-                )
-            elif status == 'PAGO':
-                queryset = queryset.filter(status='PAGO')
-            
+                hoje = timezone.localdate()
+                queryset = queryset.filter(data_vencimento=hoje)
+            else:
+                queryset = queryset.filter(status=status)
+            filtros['status'] = status
+
         # Filtro de data
         data_inicio = self.request.GET.get('data_inicio')
+        if data_inicio:
+            queryset = queryset.filter(data_emissao__gte=data_inicio)
+            filtros['data_inicio'] = data_inicio
+
         data_fim = self.request.GET.get('data_fim')
-        
-        if data_inicio and data_inicio.strip():
-            try:
-                queryset = queryset.filter(data_emissao__gte=data_inicio)
-            except (ValueError, TypeError):
-                print(f"Data início inválida: {data_inicio}")
-                
-        if data_fim and data_fim.strip():
-            try:
-                queryset = queryset.filter(data_emissao__lte=data_fim)
-            except (ValueError, TypeError):
-                print(f"Data fim inválida: {data_fim}")
-            
-        return queryset.order_by('-data_emissao')
-    
+        if data_fim:
+            queryset = queryset.filter(data_emissao__lte=data_fim)
+            filtros['data_fim'] = data_fim
+
+        self.filtros = filtros
+
+        return queryset
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Adiciona fazendas ao contexto
-        context['fazendas'] = Fazenda.objects.filter(usuario=self.request.user).order_by('nome')
+        # Adiciona os filtros ao contexto
+        context['filtros'] = self.filtros
         
-        # Adiciona fornecedores ao contexto (tipo FO = Fornecedor)
-        context['fornecedores'] = Contato.objects.filter(
-            usuario=self.request.user,
-            tipo='FO'
-        ).order_by('nome')
+        # Pega as fazendas do usuário primeiro
+        fazendas_usuario = Fazenda.objects.filter(usuario=self.request.user)
+        context['fazendas'] = fazendas_usuario
         
-        # Adiciona filtros atuais ao contexto
-        context['filtros'] = {
-            'fazenda': self.request.GET.get('fazenda', ''),
-            'contato': self.request.GET.get('contato', ''),
-            'status': self.request.GET.get('status', ''),
-            'data_inicio': self.request.GET.get('data_inicio', ''),
-            'data_fim': self.request.GET.get('data_fim', '')
-        }
+        # Adiciona as opções de filtro ao contexto
+        context['fornecedores'] = Contato.objects.filter(usuario=self.request.user, tipo='FO')
+        context['categorias'] = CategoriaCusto.objects.filter(Q(usuario__isnull=True))  # Alterado para buscar globais
+        context['subcategorias'] = SubcategoriaCusto.objects.filter(Q(usuario__isnull=True))  # Alterado para buscar globais
         
-        # Inicializa todos os status possíveis com zero
+        # Busca todos os possíveis destinos
+        context['destinos'] = []
+        
+        # Adiciona fazendas
+        for fazenda in fazendas_usuario:
+            context['destinos'].append({
+                'id': fazenda.id,
+                'nome': fazenda.nome,
+                'tipo': 'fazenda'
+            })
+        
+        # Adiciona lotes (filtrando pela fazenda do usuário)
+        lotes = Lote.objects.filter(fazenda__in=fazendas_usuario).select_related('fazenda')
+        for lote in lotes:
+            context['destinos'].append({
+                'id': lote.id,
+                'nome': f"Lote {lote.id_lote} - {lote.fazenda.nome}",
+                'tipo': 'lote'
+            })
+        
+        # Adiciona máquinas (filtrando pela fazenda do usuário)
+        maquinas = Maquina.objects.filter(fazenda__in=fazendas_usuario).select_related('fazenda')
+        for maquina in maquinas:
+            context['destinos'].append({
+                'id': maquina.id,
+                'nome': f"{maquina.nome} - {maquina.fazenda.nome}",
+                'tipo': 'maquina'
+            })
+        
+        # Adiciona benfeitorias (filtrando pela fazenda do usuário)
+        benfeitorias = Benfeitoria.objects.filter(fazenda__in=fazendas_usuario).select_related('fazenda')
+        for benfeitoria in benfeitorias:
+            context['destinos'].append({
+                'id': benfeitoria.id,
+                'nome': f"{benfeitoria.nome} - {benfeitoria.fazenda.nome}",
+                'tipo': 'benfeitoria'
+            })
+        
+        # Adiciona pastagens (filtrando pela fazenda do usuário)
+        pastagens = Pasto.objects.filter(fazenda__in=fazendas_usuario).select_related('fazenda')
+        for pastagem in pastagens:
+            context['destinos'].append({
+                'id': pastagem.id,
+                'nome': f"{pastagem.nome} - {pastagem.fazenda.nome}",
+                'tipo': 'pastagem'
+            })
+        
+        # Calcula os totais por status
         totais_status = {
-            'PAGO': {'valor': Decimal('0.00'), 'cor': 'success', 'icone': 'bi-check-circle'},
-            'PENDENTE': {'valor': Decimal('0.00'), 'cor': 'warning', 'icone': 'bi-clock'},
-            'VENCIDO': {'valor': Decimal('0.00'), 'cor': 'danger', 'icone': 'bi-exclamation-circle'},
-            'VENCE_HOJE': {'valor': Decimal('0.00'), 'cor': 'info', 'icone': 'bi-calendar-check'}
+            'PAGO': {'valor': Decimal('0.00'), 'cor': 'success', 'icone': 'bi-check-circle-fill'},
+            'PENDENTE': {'valor': Decimal('0.00'), 'cor': 'warning', 'icone': 'bi-clock-fill'},
+            'VENCIDO': {'valor': Decimal('0.00'), 'cor': 'danger', 'icone': 'bi-exclamation-circle-fill'},
+            'VENCE_HOJE': {'valor': Decimal('0.00'), 'cor': 'info', 'icone': 'bi-calendar-check-fill'}
         }
         
-        # Calcular totais por status usando o status_real anotado
-        for despesa in self.get_queryset():
-            if despesa.status_real in totais_status:
-                totais_status[despesa.status_real]['valor'] += despesa.valor_total or Decimal('0.00')
-
-        # Formata os valores para exibição
-        for status_info in totais_status.values():
-            status_info['valor_formatado'] = f"R$ {'{:,.2f}'.format(status_info['valor']).replace(',', '#').replace('.', ',').replace('#', '.')}"
-      
-        context['totais_status'] = totais_status
-        context['active_tab'] = 'financeiro'
-        
-        return context
-
-class DespesasListView(LoginRequiredMixin, ListView):
-    model = Despesa
-    template_name = 'financeiro/despesas_list.html'
-    context_object_name = 'despesas'
-    
-    def get_queryset(self):
-        # Pega a fazenda selecionada no filtro
-        fazenda_id = self.request.GET.get('fazenda')
-        
-        # Se tiver fazenda selecionada, usa o timezone dela
-        if fazenda_id:
-            try:
-                fazenda = Fazenda.objects.get(id=fazenda_id, usuario=self.request.user)
-                timezone.activate(fazenda.timezone)
-            except Fazenda.DoesNotExist:
-                timezone.activate('America/Sao_Paulo')  # fallback para São Paulo
-        else:
-            timezone.activate('America/Sao_Paulo')  # fallback para São Paulo
-            
         hoje = timezone.localdate()
-        queryset = (Despesa.objects
-            .filter(usuario=self.request.user)
-            .select_related('contato', 'conta_bancaria')
-            .prefetch_related('itens')
-            .annotate(
-                valor_total=Sum('itens__valor_total'),
-                status_real=Case(
-                    When(status='PENDENTE', data_vencimento=hoje, then=Value('VENCE_HOJE')),
-                    When(status='PENDENTE', data_vencimento__lt=hoje, then=Value('VENCIDO')),
-                    default='status',
-                    output_field=CharField(),
-                )
-            ))
         
-        # Filtro de fazenda
-        fazenda = self.request.GET.get('fazenda')
-        if fazenda:
-            itens_fazenda = ItemDespesa.objects.filter(
-                Q(categoria__alocacao='fazenda', fazenda_destino_id=fazenda) |
-                Q(categoria__alocacao='lote', lote_destino__fazenda_id=fazenda) |
-                Q(categoria__alocacao='maquina', maquina_destino__fazenda_id=fazenda) |
-                Q(categoria__alocacao='benfeitoria', benfeitoria_destino__fazenda_id=fazenda) |
-                Q(categoria__alocacao='pastagem', pastagem_destino__fazenda_id=fazenda)
-            ).values_list('despesa_id', flat=True)
-            
-            queryset = queryset.filter(id__in=itens_fazenda)
-            
-        # Filtro de fornecedor
-        contato_id = self.request.GET.get('contato')
-        if contato_id:
-            queryset = queryset.filter(contato_id=contato_id)
-            
-        # Filtro de status
-        status = self.request.GET.get('status')
-        if status:
-            if status == 'VENCE_HOJE':
-                queryset = queryset.filter(status='PENDENTE', data_vencimento=hoje)
-            elif status == 'VENCIDO':
-                queryset = queryset.filter(status='PENDENTE', data_vencimento__lt=hoje)
-            elif status == 'PENDENTE':
-                queryset = queryset.filter(
-                    status='PENDENTE',
-                    data_vencimento__gt=hoje
-                )
-            elif status == 'PAGO':
-                queryset = queryset.filter(status='PAGO')
-            
-        # Filtro de data
-        data_inicio = self.request.GET.get('data_inicio')
-        data_fim = self.request.GET.get('data_fim')
-        
-        if data_inicio and data_inicio.strip():
-            try:
-                queryset = queryset.filter(data_emissao__gte=data_inicio)
-            except (ValueError, TypeError):
-                print(f"Data início inválida: {data_inicio}")
-                
-        if data_fim and data_fim.strip():
-            try:
-                queryset = queryset.filter(data_emissao__lte=data_fim)
-            except (ValueError, TypeError):
-                print(f"Data fim inválida: {data_fim}")
-            
-        return queryset.order_by('-data_emissao')
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        # Adiciona fazendas ao contexto
-        context['fazendas'] = Fazenda.objects.filter(usuario=self.request.user).order_by('nome')
-        
-        # Adiciona fornecedores ao contexto (tipo FO = Fornecedor)
-        context['fornecedores'] = Contato.objects.filter(
-            usuario=self.request.user,
-            tipo='FO'
-        ).order_by('nome')
-        
-        # Adiciona filtros atuais ao contexto
-        context['filtros'] = {
-            'fazenda': self.request.GET.get('fazenda', ''),
-            'contato': self.request.GET.get('contato', ''),
-            'status': self.request.GET.get('status', ''),
-            'data_inicio': self.request.GET.get('data_inicio', ''),
-            'data_fim': self.request.GET.get('data_fim', '')
-        }
-        
-        # Inicializa todos os status possíveis com zero
-        totais_status = {
-            'PAGO': {'valor': Decimal('0.00'), 'cor': 'success', 'icone': 'bi-check-circle'},
-            'PENDENTE': {'valor': Decimal('0.00'), 'cor': 'warning', 'icone': 'bi-clock'},
-            'VENCIDO': {'valor': Decimal('0.00'), 'cor': 'danger', 'icone': 'bi-exclamation-circle'},
-            'VENCE_HOJE': {'valor': Decimal('0.00'), 'cor': 'info', 'icone': 'bi-calendar-check'}
-        }
-        
-        # Calcular totais por status usando o status_real anotado
         for despesa in self.get_queryset():
-            if despesa.status_real in totais_status:
-                totais_status[despesa.status_real]['valor'] += despesa.valor_total or Decimal('0.00')
-
+            if despesa.status == 'PAGO':
+                totais_status['PAGO']['valor'] += despesa.valor_final()
+            elif despesa.status_real == 'VENCIDO':  # Usando status_real para vencidos
+                totais_status['VENCIDO']['valor'] += despesa.valor_final()
+            elif despesa.status_real == 'VENCE_HOJE':  # Usando status_real para vence hoje
+                totais_status['VENCE_HOJE']['valor'] += despesa.valor_final()
+            elif despesa.status == 'PENDENTE':  # Pendentes normais (não vencidos)
+                totais_status['PENDENTE']['valor'] += despesa.valor_final()
+        
         # Formata os valores para exibição
-        for status_info in totais_status.values():
-            status_info['valor_formatado'] = f"R$ {'{:,.2f}'.format(status_info['valor']).replace(',', '#').replace('.', ',').replace('#', '.')}"
-      
+        for status in totais_status.values():
+            status['valor_formatado'] = f"R$ {status['valor']:,.2f}"
+        
         context['totais_status'] = totais_status
-        context['active_tab'] = 'financeiro'
         
         return context
-        

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="container">
@@ -9,7 +10,7 @@
                     <h4 class="mb-0">{% if venda %}Editar{% else %}Nova{% endif %} Venda</h4>
                 </div>
                 <div class="card-body">
-                    <form method="post" novalidate>
+                    <form method="post" novalidate id="vendaForm" onsubmit="return validarFormulario()">
                         {% csrf_token %}
                         
                         <div class="row mb-3">
@@ -105,72 +106,49 @@
                             </div>
                         </div>
 
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label for="fazenda_filter" class="form-label">Filtrar por Fazenda</label>
-                                        <select id="fazenda_filter" class="form-control">
-                                            <option value="">Todas as Fazendas</option>
-                                            {% for fazenda in fazendas %}
-                                                <option value="{{ fazenda.id }}">{{ fazenda.nome }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="lote_filter" class="form-label">Filtrar por Lote</label>
-                                        <select id="lote_filter" class="form-control">
-                                            <option value="">Todos os Lotes</option>
-                                            {% for lote in lotes %}
-                                                <option value="{{ lote.id }}">{{ lote.nome }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                </div>
+                        {% include 'core/vendas/partials/filtros.html' %}
 
-                                <label class="form-label">Selecione os Animais</label>
-                                <div class="table-responsive">
-                                    <table class="table table-striped table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th><input type="checkbox" id="select-all" class="form-check-input"></th>
-                                                <th>Brinco</th>
-                                                <th>Lote</th>
-                                                <th>Fazenda</th>
-                                                <th>Peso (kg)</th>
-                                                <th>Valor Total</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for animal in animais_disponiveis %}
-                                            <tr data-fazenda="{{ animal.fazenda_atual.id }}" data-lote="{{ animal.lote.id|default:'' }}">
-                                                <td>
-                                                    <input type="checkbox" name="animal" value="{{ animal.id }}" 
-                                                           class="animal-checkbox form-check-input" data-peso="{{ animal.peso_atual|default:0 }}"
-                                                           {% if animal.id in animais_selecionados %}checked{% endif %}>
-                                                </td>
-                                                <td>{{ animal.brinco_visual }}</td>
-                                                <td>{{ animal.lote.nome|default:"-" }}</td>
-                                                <td>{{ animal.fazenda_atual.nome }}</td>
-                                                <td>{{ animal.peso_atual|default:"0" }}</td>
-                                                <td class="valor-total-animal">--</td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                        <div class="table-responsive mt-4">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="selecionar-todos"></th>
+                                        <th>Identificação</th>
+                                        <th>Lote</th>
+                                        <th>Peso Atual (kg)</th>
+                                        <th>Valor</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for animal in animais_disponiveis %}
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" name="animal" value="{{ animal.id }}" 
+                                                class="animal-checkbox" 
+                                                data-peso="{{ animal.get_peso_atual }}"
+                                                {% if animal.id|stringformat:"s" in animais_selecionados %}checked{% endif %}>
+                                        </td>
+                                        <td>{{ animal.brinco_visual }}</td>
+                                        <td>{{ animal.lote.id_lote|default:"-" }}</td>
+                                        <td>{{ animal.get_peso_atual|default:"-" }}</td>
+                                        <td class="valor-animal">R$ 0,00</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="4" class="text-end"><strong>Valor Total:</strong></td>
+                                        <td id="valor-total">R$ 0,00</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
 
-                        <div class="row mb-3">
+                        <div class="row">
                             <div class="col-md-12 text-end">
-                                <h5>Valor Total: R$ <span id="valor-total-geral">0.00</span></h5>
+                                <a href="{% url 'lista_vendas' %}" class="btn btn-secondary">Cancelar</a>
+                                <button type="submit" class="btn btn-primary">Salvar</button>
                             </div>
-                        </div>
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
-                            <a href="{% url 'vendas_list' %}" class="btn btn-secondary me-md-2">Cancelar</a>
-                            <button type="submit" class="btn btn-primary">Salvar</button>
                         </div>
                     </form>
                 </div>
@@ -178,96 +156,144 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/vendas/filtros.js' %}"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const tipoVendaSelect = document.getElementById('{{ form.tipo_venda.id_for_label }}');
-    const valorUnitarioInput = document.getElementById('{{ form.valor_unitario.id_for_label }}');
-    const fazendaFilter = document.getElementById('fazenda_filter');
-    const loteFilter = document.getElementById('lote_filter');
-    const selectAllCheckbox = document.getElementById('select-all');
+    const tipoVendaSelect = document.querySelector('#{{ form.tipo_venda.id_for_label }}');
+    const valorUnitarioInput = document.querySelector('#{{ form.valor_unitario.id_for_label }}');
     const checkboxes = document.querySelectorAll('.animal-checkbox');
-    
-    function calcularValorTotal(checkbox) {
-        const row = checkbox.closest('tr');
-        const valorTotalCell = row.querySelector('.valor-total-animal');
-        const peso = parseFloat(checkbox.getAttribute('data-peso')) || 0;
+    const selecionarTodos = document.querySelector('#selecionar-todos');
+
+    // Função para aplicar os filtros
+    function aplicarFiltros() {
+        const fazendaId = document.getElementById('filtro-fazenda').value;
+        const loteId = document.getElementById('filtro-lote').value;
+        
+        let url = window.location.pathname + '?';
+        const params = [];
+        
+        if (fazendaId) {
+            params.push('fazenda=' + fazendaId);
+        }
+        if (loteId) {
+            params.push('lote=' + loteId);
+        }
+        
+        window.location.href = url + params.join('&');
+    }
+
+    // Adiciona eventos aos filtros
+    document.getElementById('filtro-fazenda').addEventListener('change', aplicarFiltros);
+    document.getElementById('filtro-lote').addEventListener('change', aplicarFiltros);
+
+    function formatarMoeda(valor) {
+        return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function calcularValorAnimal(checkbox) {
+        const peso = parseFloat(checkbox.dataset.peso) || 0;
         const valorUnitario = parseFloat(valorUnitarioInput.value) || 0;
         const tipoVenda = tipoVendaSelect.value;
         
-        let valorTotal = 0;
+        let valor = 0;
         if (checkbox.checked) {
             if (tipoVenda === 'KG') {
-                valorTotal = peso * valorUnitario;
+                valor = peso * valorUnitario;
             } else {
-                valorTotal = valorUnitario;
+                valor = valorUnitario;
             }
         }
         
-        valorTotalCell.textContent = valorTotal > 0 ? `R$ ${valorTotal.toFixed(2)}` : '--';
-        return valorTotal;
+        // Atualiza o valor na linha da tabela
+        const linha = checkbox.closest('tr');
+        const tdValor = linha.querySelector('.valor-animal');
+        tdValor.textContent = formatarMoeda(valor);
+        
+        return valor;
     }
-    
-    function atualizarValorTotalGeral() {
-        let valorTotalGeral = 0;
+
+    function atualizarValorTotal() {
+        let valorTotal = 0;
         checkboxes.forEach(checkbox => {
-            const row = checkbox.closest('tr');
-            if (row.style.display !== 'none') {
-                valorTotalGeral += calcularValorTotal(checkbox);
-            }
-        });
-        document.getElementById('valor-total-geral').textContent = valorTotalGeral.toFixed(2);
-    }
-    
-    // Filtrar animais
-    function filtrarAnimais() {
-        const fazendaId = fazendaFilter.value;
-        const loteId = loteFilter.value;
-        
-        document.querySelectorAll('tbody tr').forEach(tr => {
-            if (!tr.dataset.fazenda) return; // Pula a linha "Nenhum animal disponível"
-            
-            const matchFazenda = !fazendaId || tr.dataset.fazenda === fazendaId;
-            const matchLote = !loteId || tr.dataset.lote === loteId;
-            
-            tr.style.display = matchFazenda && matchLote ? '' : 'none';
+            valorTotal += calcularValorAnimal(checkbox);
         });
         
-        atualizarValorTotalGeral();
+        document.querySelector('#valor-total').textContent = formatarMoeda(valorTotal);
     }
-    
+
     // Event Listeners
-    tipoVendaSelect.addEventListener('change', function() {
-        const label = valorUnitarioInput.previousElementSibling;
-        if (this.value === 'KG') {
-            label.textContent = 'Valor por Kg';
-        } else {
-            label.textContent = 'Valor por Unidade';
-        }
-        atualizarValorTotalGeral();
-    });
-    
-    valorUnitarioInput.addEventListener('input', atualizarValorTotalGeral);
-    
-    selectAllCheckbox.addEventListener('change', function() {
-        const visibleCheckboxes = document.querySelectorAll('tbody tr:not([style*="display: none"]) .animal-checkbox');
-        visibleCheckboxes.forEach(checkbox => {
-            checkbox.checked = this.checked;
-        });
-        atualizarValorTotalGeral();
-    });
+    tipoVendaSelect.addEventListener('change', atualizarValorTotal);
+    valorUnitarioInput.addEventListener('input', atualizarValorTotal);
     
     checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', atualizarValorTotalGeral);
+        checkbox.addEventListener('change', atualizarValorTotal);
     });
     
-    fazendaFilter.addEventListener('change', filtrarAnimais);
-    loteFilter.addEventListener('change', filtrarAnimais);
-    
-    // Inicialização
-    atualizarValorTotalGeral();
-});
+    selecionarTodos.addEventListener('change', function() {
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+        atualizarValorTotal();
+    });
+
+    // Atualiza os valores iniciais se houver valores preenchidos
+    if (valorUnitarioInput.value) {
+        atualizarValorTotal();
+    }
+
+    function validarFormulario() {
+        console.log('Validando formulário...');
+        
+        // Verifica se há animais selecionados
+        const animaisSelecionados = document.querySelectorAll('.animal-checkbox:checked');
+        console.log('Animais selecionados:', Array.from(animaisSelecionados).map(cb => cb.value));
+        
+        if (animaisSelecionados.length === 0) {
+            alert('Selecione pelo menos um animal para a venda.');
+            return false;
+        }
+        
+        // Verifica campos obrigatórios
+        const form = document.getElementById('vendaForm');
+        const data = form.querySelector('#{{ form.data.id_for_label }}').value;
+        const valorUnitario = form.querySelector('#{{ form.valor_unitario.id_for_label }}').value;
+        const comprador = form.querySelector('#{{ form.comprador.id_for_label }}').value;
+        const dataVencimento = form.querySelector('#{{ form.data_vencimento.id_for_label }}').value;
+        const tipoPagamento = form.querySelector('#{{ form.tipo_venda.id_for_label }}').value;
+        
+        console.log('Dados do formulário:', {
+            data,
+            dataVencimento,
+            valorUnitario,
+            comprador,
+            tipoPagamento,
+            animais: Array.from(animaisSelecionados).map(cb => cb.value)
+        });
+        
+        if (!data) {
+            alert('A data da venda é obrigatória.');
+            return false;
+        }
+        
+        if (!dataVencimento) {
+            alert('A data de vencimento é obrigatória.');
+            return false;
+        }
+        
+        if (!valorUnitario || valorUnitario <= 0) {
+            alert('O valor unitário deve ser maior que zero.');
+            return false;
+        }
+        
+        if (!comprador) {
+            alert('Selecione um comprador.');
+            return false;
+        }
+        
+        console.log('Formulário válido, enviando...');
+        return true;
+    }
 </script>
-{% endblock %}
 {% endblock %}

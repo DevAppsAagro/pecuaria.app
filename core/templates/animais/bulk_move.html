@@ -35,7 +35,7 @@
                         <li>
                             {{ animal.brinco_visual }} 
                             {% if animal.brinco_eletronico %}- {{ animal.brinco_eletronico }}{% endif %}
-                            (Pasto atual: {{ animal.pasto_atual.id_pasto }} - {{ animal.pasto_atual.nome }})
+                            (Pasto atual: {{ animal.pasto_atual.id_pasto|default:'Sem pasto' }} - {{ animal.pasto_atual.nome|default:'Sem pasto' }})
                         </li>
                         {% endfor %}
                     </ul>

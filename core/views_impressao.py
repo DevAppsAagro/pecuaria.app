@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from .models import Animal, Pesagem, ManejoSanitario, MovimentacaoAnimal, RateioCusto, Lote
 from .models_compras import CompraAnimal, Compra
-from .models_vendas import VendaAnimal
+from .models_vendas import VendaAnimal, Venda
 from .models_abates import AbateAnimal
 from django.db.models import Sum, F
 from core.models import Despesa, Contato, Fazenda
@@ -589,3 +589,73 @@ def imprimir_compras(request):
     }
     
     return render(request, 'impressao/compras_print.html', context)
+
+@login_required
+def vendas_print(request):
+    # Obter os parâmetros do filtro
+    comprador_id = request.GET.get('comprador')
+    fazenda_id = request.GET.get('fazenda')
+    status = request.GET.get('status')
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    # Query base
+    vendas = Venda.objects.filter(usuario=request.user)
+
+    # Aplicar filtros
+    if comprador_id:
+        vendas = vendas.filter(contato_id=comprador_id)
+    if fazenda_id:
+        vendas = vendas.filter(fazenda_id=fazenda_id)
+    if status:
+        vendas = vendas.filter(status=status)
+    if data_inicio:
+        data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        vendas = vendas.filter(data__gte=data_inicio)
+    if data_fim:
+        data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        vendas = vendas.filter(data__lte=data_fim)
+
+    # Calcular totais por status
+    totais_status = {
+        'PAGO': {'valor': Decimal('0.00')},
+        'PENDENTE': {'valor': Decimal('0.00')},
+        'VENCE_HOJE': {'valor': Decimal('0.00')},
+        'VENCIDO': {'valor': Decimal('0.00')}
+    }
+
+    hoje = timezone.now().date()
+    
+    for venda in vendas:
+        if venda.status == 'PAGO':
+            totais_status['PAGO']['valor'] += venda.valor_total
+        elif venda.status == 'PENDENTE':
+            if venda.data_vencimento == hoje:
+                totais_status['VENCE_HOJE']['valor'] += venda.valor_total
+            elif venda.data_vencimento < hoje:
+                totais_status['VENCIDO']['valor'] += venda.valor_total
+            else:
+                totais_status['PENDENTE']['valor'] += venda.valor_total
+
+    # Formatar os valores
+    for status in totais_status:
+        totais_status[status]['valor_formatado'] = f"R$ {totais_status[status]['valor']:,.2f}"
+
+    # Preparar filtros para exibição
+    filtros = {
+        'contato': Contato.objects.filter(id=comprador_id).first() if comprador_id else None,
+        'fazenda': Fazenda.objects.filter(id=fazenda_id).first() if fazenda_id else None,
+        'status': dict(Venda.STATUS_CHOICES).get(status) if status else None,
+        'data_inicio': data_inicio if data_inicio else None,
+        'data_fim': data_fim if data_fim else None,
+    }
+
+    context = {
+        'vendas': vendas,
+        'totais_status': totais_status,
+        'filtros': filtros,
+        'data_impressao': timezone.now(),
+        'usuario': request.user,
+    }
+
+    return render(request, 'impressao/vendas_print.html', context)

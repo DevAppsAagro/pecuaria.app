@@ -1,6 +1,8 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from .models_vendas import Venda
-from .models import Contato
+from .models import Contato, ContaBancaria
+from django.utils import timezone
 
 class VendaForm(forms.ModelForm):
     class Meta:
@@ -31,8 +33,50 @@ class VendaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         usuario = kwargs.pop('usuario', None)
         super().__init__(*args, **kwargs)
-        # Filtra apenas contatos do tipo CO (Comprador)
-        self.fields['comprador'].queryset = Contato.objects.filter(
-            usuario=usuario if not self.instance.pk else self.instance.usuario,
-            tipo='CO'
-        )
+        
+        if usuario:
+            # Filtra apenas contatos do tipo CO (Comprador)
+            self.fields['comprador'].queryset = Contato.objects.filter(
+                usuario=usuario,
+                tipo='CO'
+            )
+            
+            # Filtra as contas bancárias pelo usuário
+            self.fields['conta_bancaria'].queryset = ContaBancaria.objects.filter(
+                usuario=usuario,
+                ativa=True
+            )
+        
+        # Adiciona mensagens se não houver registros
+        if not self.fields['comprador'].queryset.exists():
+            self.fields['comprador'].empty_label = "Nenhum comprador cadastrado"
+        if not self.fields['conta_bancaria'].queryset.exists():
+            self.fields['conta_bancaria'].empty_label = "Nenhuma conta bancária cadastrada"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        data = cleaned_data.get('data')
+        data_vencimento = cleaned_data.get('data_vencimento')
+        data_pagamento = cleaned_data.get('data_pagamento')
+        valor_unitario = cleaned_data.get('valor_unitario')
+        numero_parcelas = cleaned_data.get('numero_parcelas')
+
+        if data and data > timezone.localdate():
+            raise ValidationError('A data da venda não pode ser futura.')
+
+        if data_vencimento and data and data_vencimento < data:
+            raise ValidationError('A data de vencimento não pode ser anterior à data da venda.')
+
+        if data_pagamento:
+            if data and data_pagamento < data:
+                raise ValidationError('A data de pagamento não pode ser anterior à data da venda.')
+            if data_pagamento > timezone.localdate():
+                raise ValidationError('A data de pagamento não pode ser futura.')
+
+        if valor_unitario and valor_unitario <= 0:
+            raise ValidationError('O valor unitário deve ser maior que zero.')
+
+        if numero_parcelas and numero_parcelas < 1:
+            raise ValidationError('O número de parcelas deve ser maior que zero.')
+
+        return cleaned_data

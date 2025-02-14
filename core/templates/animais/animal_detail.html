@@ -153,16 +153,20 @@
                     {% if venda %}
                     <dl class="row mb-3">
                         <dt class="col-sm-4">Data da Venda</dt>
-                        <dd class="col-sm-8">{{ venda.venda.data|date:"d/m/Y" }}</dd>
+                        <dd class="col-sm-8">
+                            <a href="{% url 'detalhe_venda' venda.venda.pk %}" class="text-decoration-none">
+                                {{ venda.venda.data|date:"d/m/Y" }}
+                            </a>
+                        </dd>
 
-                        <dt class="col-sm-4">Valor por @</dt>
-                        <dd class="col-sm-8">{{ venda.venda.valor_arroba|format_currency_br }}</dd>
+                        <dt class="col-sm-4">Valor por kg</dt>
+                        <dd class="col-sm-8">{{ venda.valor_kg|format_currency_br }}</dd>
+
+                        <dt class="col-sm-4">Peso na Venda</dt>
+                        <dd class="col-sm-8">{{ venda.peso_venda|format_decimal_br }} kg</dd>
 
                         <dt class="col-sm-4">Valor Total</dt>
                         <dd class="col-sm-8">{{ venda.valor_total|format_currency_br }}</dd>
-
-                        <dt class="col-sm-4">@ Total</dt>
-                        <dd class="col-sm-8">{{ venda.arroba_total|format_decimal_br }} @</dd>
 
                         <dt class="col-sm-4">Cliente</dt>
                         <dd class="col-sm-8">{{ venda.venda.contato.nome }}</dd>
@@ -170,7 +174,7 @@
                         <dt class="col-sm-4">Status</dt>
                         <dd class="col-sm-8">
                             <span class="badge {% if venda.venda.status == 'PAGO' %}bg-success{% else %}bg-warning{% endif %}">
-                                {{ venda.venda.status }}
+                                {{ venda.venda.get_status_display }}
                             </span>
                         </dd>
                     </dl>
@@ -363,13 +367,15 @@
                             <tbody>
                                 <!-- Pesagens do Manejo (mais recentes primeiro) -->
                                 {% for pesagem in pesagens|dictsortreversed:"data" %}
-                                <tr {% if pesagem.peso == animal.peso_entrada %}class="table-info"{% elif abate and pesagem.peso == abate.peso_vivo %}class="table-primary"{% endif %}>
+                                <tr {% if pesagem.peso == animal.peso_entrada %}class="table-info"{% elif abate and pesagem.peso == abate.peso_vivo %}class="table-primary"{% elif venda and pesagem.peso == venda.peso_venda %}class="table-success"{% endif %}>
                                     <td>
                                         {{ pesagem.data|date:"d/m/Y" }}
                                         {% if pesagem.peso == animal.peso_entrada %}
                                             <span class="badge bg-info">Peso de Entrada</span>
                                         {% elif abate and pesagem.peso == abate.peso_vivo %}
                                             <span class="badge bg-primary">Peso de Abate</span>
+                                        {% elif venda and pesagem.peso == venda.peso_venda %}
+                                            <span class="badge bg-success">Peso de Venda</span>
                                         {% endif %}
                                     </td>
                                     <td>{{ pesagem.peso|format_decimal_br }}</td>
@@ -498,15 +504,15 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <p><strong>Data:</strong> {{ venda.data|date:"d/m/Y" }}</p>
-                            <p><strong>Peso:</strong> {{ venda.peso|format_decimal_br }} kg</p>
-                            <p><strong>Total de @:</strong> {{ arrobas_final|format_decimal_br }} </p>
+                            <p><strong>Data:</strong> {{ venda.venda.data|date:"d/m/Y" }}</p>
+                            <p><strong>Peso:</strong> {{ venda.peso_venda|format_decimal_br }} kg</p>
+                            <p><strong>Cliente:</strong> {{ venda.venda.comprador.nome }}</p>
                         </div>
                         <div class="col-md-6">
-                            <p><strong>Valor por @:</strong> {{ venda.valor_arroba|format_currency_br }}</p>
+                            <p><strong>Valor por kg:</strong> {{ venda.valor_kg|format_currency_br }}</p>
                             <p><strong>Valor Total:</strong> {{ venda.valor_total|format_currency_br }}</p>
-                            <p><strong>Lucro:</strong> <span class="{% if lucro >= 0 %}text-success{% else %}text-danger{% endif %}">
-                                {{ lucro|format_currency_br }}
+                            <p><strong>Status:</strong> <span class="badge {% if venda.venda.status == 'PAGO' %}bg-success{% else %}bg-warning{% endif %}">
+                                {{ venda.venda.get_status_display }}
                             </span></p>
                         </div>
                     </div>

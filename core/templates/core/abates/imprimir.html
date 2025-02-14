@@ -1,0 +1,97 @@
+{% extends 'base_print.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h2>Relatório de Abates</h2>
+            <p class="text-muted">
+                {% if data_inicio and data_fim %}
+                    Período: {{ data_inicio|date:"d/m/Y" }} a {{ data_fim|date:"d/m/Y" }}
+                {% else %}
+                    Todos os períodos
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- Resumo -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <table class="table table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Status</th>
+                        <th class="text-end">Quantidade</th>
+                        <th class="text-end">Valor Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Pagos</td>
+                        <td class="text-end">{{ abates_pagos }}</td>
+                        <td class="text-end">R$ {{ valor_total_pago|floatformat:2 }}</td>
+                    </tr>
+                    <tr>
+                        <td>Pendentes</td>
+                        <td class="text-end">{{ abates_pendentes }}</td>
+                        <td class="text-end">R$ {{ valor_total_pendente|floatformat:2 }}</td>
+                    </tr>
+                    <tr>
+                        <td>Vencidos</td>
+                        <td class="text-end">{{ abates_vencidos }}</td>
+                        <td class="text-end">R$ {{ valor_total_vencido|floatformat:2 }}</td>
+                    </tr>
+                    <tr class="table-light fw-bold">
+                        <td>Total</td>
+                        <td class="text-end">{{ total_abates }}</td>
+                        <td class="text-end">R$ {{ valor_total_geral|floatformat:2 }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Lista de Abates -->
+    <div class="row">
+        <div class="col-12">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>Data Abate</th>
+                        <th>Data Vencimento</th>
+                        <th>Comprador</th>
+                        <th class="text-end">Valor/@</th>
+                        <th class="text-end">Rendimento</th>
+                        <th class="text-end">Valor Total</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for abate in abates %}
+                    <tr>
+                        <td>{{ abate.data|date:"d/m/Y" }}</td>
+                        <td>{{ abate.data_vencimento|date:"d/m/Y" }}</td>
+                        <td>{{ abate.comprador.nome }}</td>
+                        <td class="text-end">R$ {{ abate.valor_arroba|floatformat:2 }}</td>
+                        <td class="text-end">{{ abate.rendimento_padrao|floatformat:2 }}%</td>
+                        <td class="text-end">R$ {{ abate.valor_total|floatformat:2 }}</td>
+                        <td>
+                            {% if abate.status == 'PAGO' %}
+                                <span class="text-success">Pago</span>
+                            {% elif abate.status == 'PENDENTE' %}
+                                <span class="text-warning">Pendente</span>
+                            {% elif abate.status == 'VENCIDO' %}
+                                <span class="text-danger">Vencido</span>
+                            {% else %}
+                                <span class="text-secondary">Cancelado</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

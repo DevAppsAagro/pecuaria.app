@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load humanize %}
 
 {% block content %}
 <div class="container mt-4">
@@ -14,8 +15,10 @@
                         <p><strong>Venda:</strong> #{{ parcela.venda.id }}</p>
                         <p><strong>Parcela:</strong> {{ parcela.numero }}/{{ parcela.venda.numero_parcelas }}</p>
                         <p><strong>Valor Total:</strong> R$ {{ parcela.valor|floatformat:2 }}</p>
-                        <p><strong>Valor Restante:</strong> R$ {{ parcela.valor_restante|floatformat:2 }}</p>
+                        <p><strong>Valor Pago:</strong> R$ {{ valor_pago|floatformat:2 }}</p>
+                        <p><strong>Valor Restante:</strong> R$ {{ valor_restante|floatformat:2 }}</p>
                         <p><strong>Vencimento:</strong> {{ parcela.data_vencimento|date:"d/m/Y" }}</p>
+                        <p><strong>Status:</strong> {{ parcela.get_status_display }}</p>
                     </div>
 
                     <h5>Pagamentos Realizados</h5>
@@ -42,8 +45,8 @@
                         </table>
                     </div>
 
-                    <div class="d-grid gap-2 mt-3">
-                        <a href="{% url 'vendas_detalhe' parcela.venda.id %}" class="btn btn-secondary">Voltar</a>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
+                        <a href="{% url 'detalhe_venda' parcela.venda.id %}" class="btn btn-secondary">Voltar</a>
                     </div>
                 </div>
             </div>

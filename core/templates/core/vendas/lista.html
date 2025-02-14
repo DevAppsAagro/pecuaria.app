@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
 
 {% block extra_head %}
 <!-- DataTables -->
@@ -7,7 +6,6 @@
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css">
 <style>
-    /* Estilos copiados do template de despesas */
     .btn-group .btn {
         margin: 0 2px;
     }
@@ -23,10 +21,13 @@
         display: block;
         margin-bottom: 20px;
         box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+        overflow: hidden;
     }
 
     .small-box > .inner {
         padding: 20px;
+        position: relative;
+        z-index: 2;
     }
 
     .small-box h3 {
@@ -39,15 +40,39 @@
 
     .small-box p {
         font-size: 1rem;
+        margin-bottom: 0;
     }
 
     .small-box .icon {
-        color: rgba(0,0,0,0.15);
-        z-index: 0;
         position: absolute;
-        right: 15px;
         top: 15px;
+        right: 15px;
+        z-index: 1;
         font-size: 60px;
+    }
+
+    .small-box:hover {
+        text-decoration: none;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(50,50,93,.11), 0 1px 3px rgba(0,0,0,.08);
+        transition: all .3s ease;
+    }
+
+    /* Ícones específicos por cor de card */
+    .bg-success .icon {
+        color: rgba(255,255,255,0.3);
+    }
+
+    .bg-warning .icon {
+        color: rgba(0,0,0,0.2);
+    }
+
+    .bg-info .icon {
+        color: rgba(255,255,255,0.3);
+    }
+
+    .bg-danger .icon {
+        color: rgba(255,255,255,0.3);
     }
 
     .bg-success {
@@ -69,9 +94,92 @@
         background-color: #17a2b8!important;
         color: #fff;
     }
+    
+    /* Demais estilos existentes */
+    .bg-gradient-primary {
+        color: #fff;
+    }
+    .bg-gradient-warning {
+        color: #1f2d3d;
+    }
+    .bg-gradient-danger {
+        color: #fff;
+    }
+    
+    /* Cor personalizada para o botão Nova Venda */
+    .btn-success-dark {
+        background-color: #00a65a !important;
+        border-color: #008d4c !important;
+        color: #fff !important;
+    }
+    .btn-success-dark:hover {
+        background-color: #008d4c !important;
+        border-color: #00733e !important;
+    }
 
-    .table-hover tbody tr:hover {
-        background-color: rgba(0,0,0,.075);
+    /* Cor personalizada para o botão de ações */
+    .btn-actions {
+        background-color: #6c757d !important;
+        border-color: #5a6268 !important;
+        color: #fff !important;
+    }
+    .btn-actions:hover {
+        background-color: #5a6268 !important;
+        border-color: #545b62 !important;
+    }
+    
+    /* Ajustes para responsividade */
+    .dtr-details {
+        width: 100%;
+    }
+    .dtr-data {
+        word-break: break-word;
+    }
+    
+    /* Ajustes para o dropdown */
+    .dropdown-menu {
+        min-width: 200px;
+        padding: 0.5rem 0;
+        margin: 0;
+        border: 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    
+    .dropdown-item {
+        padding: 0.5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .dropdown-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .dropdown-item i {
+        width: 16px;
+        text-align: center;
+    }
+
+    /* Estilos para os filtros */
+    .form-select, .form-control {
+        border-radius: 0.25rem;
+        border: 1px solid #ced4da;
+        padding: 0.375rem 0.75rem;
+        font-size: 1rem;
+        line-height: 1.5;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+
+    .form-select:focus, .form-control:focus {
+        border-color: #80bdff;
+        outline: 0;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+
+    .form-label {
+        margin-bottom: 0.5rem;
+        font-weight: 500;
     }
 </style>
 {% endblock %}
@@ -95,93 +203,9 @@
         </div>
     </div>
 
+    <!-- Main content -->
     <section class="content">
         <div class="container-fluid">
-            <!-- Cards de Totais -->
-            <div class="row mb-4">
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-success">
-                        <div class="inner">
-                            <h3>{{ totais_status.PAGO.valor_formatado }}</h3>
-                            <p>Total Pago</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-warning">
-                        <div class="inner">
-                            <h3>{{ totais_status.PENDENTE.valor_formatado }}</h3>
-                            <p>Pendente</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-info">
-                        <div class="inner">
-                            <h3>{{ totais_status.VENCE_HOJE.valor_formatado }}</h3>
-                            <p>Vence Hoje</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-calendar-check"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-danger">
-                        <div class="inner">
-                            <h3>{{ totais_status.VENCIDO.valor_formatado }}</h3>
-                            <p>Vencido</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-exclamation-circle"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Filtros -->
-            <div class="row mb-4">
-                <div class="col-md-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">Filtros</h3>
-                        </div>
-                        <div class="card-body">
-                            <form method="get" class="row g-3">
-                                <div class="col-md-3">
-                                    <input type="text" name="search" class="form-control" placeholder="Buscar por brinco ou comprador..." value="{{ search_query }}">
-                                </div>
-                                <div class="col-md-3">
-                                    <select name="status" class="form-select">
-                                        <option value="">Status</option>
-                                        <option value="PAGO" {% if status == 'PAGO' %}selected{% endif %}>Pago</option>
-                                        <option value="PENDENTE" {% if status == 'PENDENTE' %}selected{% endif %}>Pendente</option>
-                                        <option value="VENCIDO" {% if status == 'VENCIDO' %}selected{% endif %}>Vencido</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2">
-                                    <input type="date" name="data_inicio" class="form-control" value="{{ data_inicio|date:'Y-m-d' }}" placeholder="Data Inicial">
-                                </div>
-                                <div class="col-md-2">
-                                    <input type="date" name="data_fim" class="form-control" value="{{ data_fim|date:'Y-m-d' }}" placeholder="Data Final">
-                                </div>
-                                <div class="col-md-2">
-                                    <button type="submit" class="btn btn-primary w-100">
-                                        <i class="fas fa-search"></i> Filtrar
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div class="card card-primary card-outline">
                 <div class="card-header">
                     <h3 class="card-title">
@@ -189,70 +213,179 @@
                         Lista de Vendas
                     </h3>
                     <div class="card-tools">
-                        <a href="{% url 'vendas_criar' %}" class="btn btn-success">
-                            <i class="fas fa-plus"></i> Nova Venda
-                        </a>
+                        <div class="float-right">
+                            <a href="{% url 'criar_venda' %}" class="btn btn-success-dark elevation-2">
+                                <i class="fas fa-plus-circle mr-1"></i> Nova Venda
+                            </a>
+                            <a href="{% url 'vendas_print' %}" class="btn btn-secondary" target="_blank">
+                                <i class="fas fa-print"></i> Imprimir
+                            </a>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table id="vendas-table" class="table table-bordered table-striped dt-responsive nowrap" width="100%">
-                            <thead>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Vencimento</th>
-                                    <th>Comprador</th>
-                                    <th>Animais</th>
-                                    <th>Valor</th>
-                                    <th>Status</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for venda in vendas %}
-                                <tr>
-                                    <td>{{ venda.data|date:"d/m/Y" }}</td>
-                                    <td>{{ venda.data_vencimento|date:"d/m/Y" }}</td>
-                                    <td>{{ venda.comprador.nome }}</td>
-                                    <td>
-                                        {% for animal_venda in venda.animais.all %}
-                                            {{ animal_venda.animal.brinco_visual }}{% if not forloop.last %}, {% endif %}
-                                        {% endfor %}
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-success">R$ {{ venda.animais.all|sum_attr:"valor_total"|floatformat:2 }}</span>
-                                        {% if venda.numero_parcelas > 1 %}
-                                            <br>
-                                            <small class="text-muted">{{ venda.parcelas_pagas }}/{{ venda.numero_parcelas }} parcelas</small>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if venda.status == 'PAGO' %}
-                                            <span class="badge bg-success">Pago</span>
-                                        {% elif venda.status == 'PENDENTE' %}
-                                            <span class="badge bg-warning">Pendente</span>
-                                        {% elif venda.status == 'ATRASADO' %}
-                                            <span class="badge bg-danger">Atrasado</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="btn-group">
-                                            <a href="{% url 'vendas_editar' venda.id %}" class="btn btn-sm btn-info" data-bs-toggle="tooltip" title="Editar">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <a href="{% url 'vendas_detalhes' venda.id %}" class="btn btn-sm btn-primary" data-bs-toggle="tooltip" title="Detalhes">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            <a href="{% url 'vendas_excluir' venda.id %}" class="btn btn-sm btn-danger" data-bs-toggle="tooltip" title="Excluir">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <!-- Filtros -->
+                    <div class="mb-4">
+                        <form method="get" class="row g-3">
+                            <div class="col-md-3">
+                                <label for="comprador" class="form-label">Comprador</label>
+                                <select name="comprador" id="comprador" class="form-select">
+                                    <option value="">Todos</option>
+                                    {% for comprador in compradores %}
+                                        <option value="{{ comprador.id }}" {% if request.GET.comprador|stringformat:"s" == comprador.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ comprador.nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="fazenda" class="form-label">Fazenda</label>
+                                <select name="fazenda" id="fazenda" class="form-select">
+                                    <option value="">Todas</option>
+                                    {% for fazenda in fazendas %}
+                                        <option value="{{ fazenda.id }}" {% if request.GET.fazenda|stringformat:"s" == fazenda.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ fazenda.nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="status" class="form-label">Status</label>
+                                <select name="status" id="status" class="form-select">
+                                    <option value="">Todos</option>
+                                    <option value="PENDENTE" {% if request.GET.status == 'PENDENTE' %}selected{% endif %}>Pendente</option>
+                                    <option value="PAGO" {% if request.GET.status == 'PAGO' %}selected{% endif %}>Pago</option>
+                                    <option value="VENCIDO" {% if request.GET.status == 'VENCIDO' %}selected{% endif %}>Atrasado</option>
+                                    <option value="VENCE_HOJE" {% if request.GET.status == 'VENCE_HOJE' %}selected{% endif %}>Vence Hoje</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="data_inicio" class="form-label">Data Inicial</label>
+                                <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ request.GET.data_inicio|default:'' }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="data_fim" class="form-label">Data Final</label>
+                                <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ request.GET.data_fim|default:'' }}">
+                            </div>
+                            <div class="col-12 mt-3">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Filtrar
+                                </button>
+                                <a href="{% url 'lista_vendas' %}" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Limpar Filtros
+                                </a>
+                            </div>
+                        </form>
                     </div>
+
+                    <!-- Cards de Totais -->
+                    <div class="row mb-4">
+                        <div class="col-lg-3 col-6">
+                            <div class="small-box bg-success">
+                                <div class="inner">
+                                    <h3>{{ totais_status.PAGO.valor_formatado }}</h3>
+                                    <p>Total Pago</p>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-6">
+                            <div class="small-box bg-warning">
+                                <div class="inner">
+                                    <h3>{{ totais_status.PENDENTE.valor_formatado }}</h3>
+                                    <p>Pendente</p>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-6">
+                            <div class="small-box bg-info">
+                                <div class="inner">
+                                    <h3>{{ totais_status.VENCE_HOJE.valor_formatado }}</h3>
+                                    <p>Vence Hoje</p>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-calendar-check"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-6">
+                            <div class="small-box bg-danger">
+                                <div class="inner">
+                                    <h3>{{ totais_status.VENCIDO.valor_formatado }}</h3>
+                                    <p>Vencido</p>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table id="vendas-table" class="table table-bordered table-striped dt-responsive nowrap" width="100%">
+                        <thead>
+                            <tr>
+                                <th>Data Venda</th>
+                                <th>Data Vencimento</th>
+                                <th>Comprador</th>
+                                <th>Valor Total</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for venda in vendas %}
+                            <tr>
+                                <td>{{ venda.data|date:"d/m/Y" }}</td>
+                                <td>{{ venda.data_vencimento|date:"d/m/Y" }}</td>
+                                <td>{{ venda.comprador.nome }}</td>
+                                <td>R$ {{ venda.valor_total|floatformat:2 }}</td>
+                                <td>
+                                    {% if venda.status == 'PAGO' %}
+                                        <span class="badge bg-success">Pago</span>
+                                    {% elif venda.status == 'PENDENTE' %}
+                                        <span class="badge bg-warning">Pendente</span>
+                                    {% elif venda.status == 'VENCIDO' %}
+                                        <span class="badge bg-danger">Atrasado</span>
+                                    {% elif venda.status == 'VENCE_HOJE' %}
+                                        <span class="badge bg-info">Vence Hoje</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button type="button" class="btn btn-actions btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="fas fa-cog"></i> Ações
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'detalhe_venda' venda.id %}">
+                                                    <i class="fas fa-eye text-primary"></i> Visualizar
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'editar_venda' venda.id %}">
+                                                    <i class="fas fa-pencil-alt text-warning"></i> Editar
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <hr class="dropdown-divider">
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item text-danger" href="{% url 'excluir_venda' venda.id %}">
+                                                    <i class="fas fa-trash-alt text-danger"></i> Excluir
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -311,12 +444,12 @@
                     "sSortDescending": ": Ordenar colunas de forma descendente"
                 }
             },
-            "order": [[0, "desc"]], // Ordena por data por padrão
-            "pageLength": 25,
-            "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
-                   "<'row'<'col-sm-12'tr>>" +
-                   "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>"
-        });
+            "order": [[0, "desc"]], // Ordena por data de emissão por padrão
+                        "pageLength": 25,
+                        "dom": "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                            "<'row'<'col-sm-12'tr>>" +
+                            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>"
+            });
     });
 </script>
 {% endblock %}

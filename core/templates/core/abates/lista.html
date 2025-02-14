@@ -1,14 +1,11 @@
 {% extends 'base.html' %}
-{% load static %}
 
 {% block extra_head %}
 <!-- DataTables -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.10.24/css/dataTables.bootstrap5.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css">
-<script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.10.24/js/dataTables.bootstrap5.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css">
 <style>
-    /* Estilos para os botões */
     .btn-group .btn {
         margin: 0 2px;
     }
@@ -24,10 +21,13 @@
         display: block;
         margin-bottom: 20px;
         box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+        overflow: hidden;
     }
 
     .small-box > .inner {
         padding: 20px;
+        position: relative;
+        z-index: 2;
     }
 
     .small-box h3 {
@@ -40,15 +40,39 @@
 
     .small-box p {
         font-size: 1rem;
+        margin-bottom: 0;
     }
 
     .small-box .icon {
-        color: rgba(0,0,0,0.15);
-        z-index: 0;
         position: absolute;
-        right: 15px;
         top: 15px;
+        right: 15px;
+        z-index: 1;
         font-size: 60px;
+    }
+
+    .small-box:hover {
+        text-decoration: none;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(50,50,93,.11), 0 1px 3px rgba(0,0,0,.08);
+        transition: all .3s ease;
+    }
+
+    /* Ícones específicos por cor de card */
+    .bg-success .icon {
+        color: rgba(255,255,255,0.3);
+    }
+
+    .bg-warning .icon {
+        color: rgba(0,0,0,0.2);
+    }
+
+    .bg-info .icon {
+        color: rgba(255,255,255,0.3);
+    }
+
+    .bg-danger .icon {
+        color: rgba(255,255,255,0.3);
     }
 
     .bg-success {
@@ -70,17 +94,81 @@
         background-color: #17a2b8!important;
         color: #fff;
     }
-
-    .table-hover tbody tr:hover {
-        background-color: rgba(0,0,0,.075);
+    
+    /* Cor personalizada para o botão Novo Abate */
+    .btn-success-dark {
+        background-color: #00a65a !important;
+        border-color: #008d4c !important;
+        color: #fff !important;
+    }
+    .btn-success-dark:hover {
+        background-color: #008d4c !important;
+        border-color: #00733e !important;
     }
 
+    /* Cor personalizada para o botão de ações */
+    .btn-actions {
+        background-color: #6c757d !important;
+        border-color: #5a6268 !important;
+        color: #fff !important;
+    }
+    .btn-actions:hover {
+        background-color: #5a6268 !important;
+        border-color: #545b62 !important;
+    }
+    
     /* Ajustes para responsividade */
     .dtr-details {
         width: 100%;
     }
     .dtr-data {
         word-break: break-word;
+    }
+    
+    /* Ajustes para o dropdown */
+    .dropdown-menu {
+        min-width: 200px;
+        padding: 0.5rem 0;
+        margin: 0;
+        border: 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    
+    .dropdown-item {
+        padding: 0.5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .dropdown-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .dropdown-item i {
+        width: 16px;
+        text-align: center;
+    }
+
+    /* Estilos para os filtros */
+    .form-select, .form-control {
+        border-radius: 0.25rem;
+        border: 1px solid #ced4da;
+        padding: 0.375rem 0.75rem;
+        font-size: 1rem;
+        line-height: 1.5;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+
+    .form-select:focus, .form-control:focus {
+        border-color: #80bdff;
+        outline: 0;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+
+    .form-label {
+        margin-bottom: 0.5rem;
+        font-weight: 500;
     }
 </style>
 {% endblock %}
@@ -106,108 +194,172 @@
 
     <section class="content">
         <div class="container-fluid">
-            <!-- Cards de Status -->
-            <div class="row mb-4">
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-info">
-                        <div class="inner">
-                            <h3>{{ total_abates }}</h3>
-                            <p>Total de Abates</p>
-                            <h5>R$ {{ valor_total_geral|floatformat:2 }}</h5>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-clipboard-check"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-success">
-                        <div class="inner">
-                            <h3>{{ abates_pagos }}</h3>
-                            <p>Abates Pagos</p>
-                            <h5>R$ {{ valor_total_pago|floatformat:2 }}</h5>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-warning">
-                        <div class="inner">
-                            <h3>{{ abates_pendentes }}</h3>
-                            <p>Abates Pendentes</p>
-                            <h5>R$ {{ valor_total_pendente|floatformat:2 }}</h5>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-danger">
-                        <div class="inner">
-                            <h3>{{ abates_vencidos }}</h3>
-                            <p>Abates Vencidos</p>
-                            <h5>R$ {{ valor_total_vencido|floatformat:2 }}</h5>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-exclamation-circle"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div class="card card-primary card-outline">
                 <div class="card-header">
                     <h3 class="card-title">
-                        <i class="fas fa-list mr-1"></i>
+                        <i class="fas fa-cow mr-1"></i>
                         Lista de Abates
                     </h3>
+                    <div class="card-tools">
+                        <a href="{% url 'abates_criar' %}" class="btn btn-success-dark">
+                            <i class="fas fa-plus"></i> Novo Abate
+                        </a>
+                        <a href="{% url 'abates_imprimir' %}" class="btn btn-secondary" target="_blank">
+                            <i class="fas fa-print"></i> Imprimir
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table id="tabela-abates" class="table table-bordered table-striped">
-                            <thead>
-                                <tr>
-                                    <th scope="col">Data</th>
-                                    <th scope="col">Data Vencimento</th>
-                                    <th scope="col">Comprador</th>
-                                    <th scope="col">Valor/@</th>
-                                    <th scope="col">Rendimento</th>
-                                    <th scope="col">Status</th>
-                                    <th scope="col">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for abate in abates %}
-                                <tr>
-                                    <td data-order="{{ abate.data|date:'Y-m-d' }}">{{ abate.data|date:"d/m/Y" }}</td>
-                                    <td data-order="{{ abate.data_vencimento|date:'Y-m-d' }}">{{ abate.data_vencimento|date:"d/m/Y" }}</td>
-                                    <td>{{ abate.comprador.nome|default:'' }}</td>
-                                    <td data-order="{{ abate.valor_arroba }}">R$ {{ abate.valor_arroba|floatformat:2 }}</td>
-                                    <td data-order="{{ abate.rendimento_padrao }}">{{ abate.rendimento_padrao|floatformat:2 }}%</td>
-                                    <td>{{ abate.status }}</td>
-                                    <td>
-                                        <a href="{% url 'abates_detalhe' abate.pk %}" class="btn btn-info btn-sm">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <a href="{% url 'abates_editar' abate.pk %}" class="btn btn-warning btn-sm">
-                                            <i class="fas fa-pencil-alt"></i>
-                                        </a>
-                                        <a href="{% url 'abates_excluir' abate.pk %}" class="btn btn-danger btn-sm">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="7" class="text-center">Nenhum abate registrado.</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <!-- Filtros -->
+                    <div class="mb-4">
+                        <form method="get" class="row g-3">
+                            <div class="col-md-3">
+                                <label for="search" class="form-label">Buscar</label>
+                                <input type="text" class="form-control" id="search" name="search" value="{{ search_query }}" placeholder="Buscar por comprador ou brinco...">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status" name="status">
+                                    <option value="">Todos</option>
+                                    <option value="PENDENTE" {% if status == 'PENDENTE' %}selected{% endif %}>Pendente</option>
+                                    <option value="PAGO" {% if status == 'PAGO' %}selected{% endif %}>Pago</option>
+                                    <option value="VENCIDO" {% if status == 'VENCIDO' %}selected{% endif %}>Vencido</option>
+                                    <option value="CANCELADO" {% if status == 'CANCELADO' %}selected{% endif %}>Cancelado</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="data_inicio" class="form-label">Data Início</label>
+                                <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ data_inicio }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="data_fim" class="form-label">Data Fim</label>
+                                <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ data_fim }}">
+                            </div>
+                            <div class="col-12 mt-3">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Filtrar
+                                </button>
+                                <a href="{% url 'abates_list' %}" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Limpar
+                                </a>
+                            </div>
+                        </form>
                     </div>
+
+                    <!-- Cards de Status -->
+                    <div class="row mb-4">
+                        <div class="col-lg-3 col-6">
+                            <div class="small-box bg-success">
+                                <div class="inner">
+                                    <h3>{{ abates_pagos }}</h3>
+                                    <p>Abates Pagos</p>
+                                    <h5>R$ {{ valor_total_pago|floatformat:2 }}</h5>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-6">
+                            <div class="small-box bg-warning">
+                                <div class="inner">
+                                    <h3>{{ abates_pendentes }}</h3>
+                                    <p>Abates Pendentes</p>
+                                    <h5>R$ {{ valor_total_pendente|floatformat:2 }}</h5>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-6">
+                            <div class="small-box bg-danger">
+                                <div class="inner">
+                                    <h3>{{ abates_vencidos }}</h3>
+                                    <p>Abates Vencidos</p>
+                                    <h5>R$ {{ valor_total_vencido|floatformat:2 }}</h5>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-6">
+                            <div class="small-box bg-info">
+                                <div class="inner">
+                                    <h3>{{ total_abates }}</h3>
+                                    <p>Total de Abates</p>
+                                    <h5>R$ {{ valor_total_geral|floatformat:2 }}</h5>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-clipboard-check"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabela de Abates -->
+                    <table id="abates-table" class="table table-bordered table-striped dt-responsive nowrap" width="100%">
+                        <thead>
+                            <tr>
+                                <th>Data Abate</th>
+                                <th>Data Vencimento</th>
+                                <th>Comprador</th>
+                                <th>Valor/@</th>
+                                <th>Rendimento</th>
+                                <th>Valor Total</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for abate in abates %}
+                            <tr>
+                                <td data-order="{{ abate.data|date:'Y-m-d' }}">{{ abate.data|date:"d/m/Y" }}</td>
+                                <td data-order="{{ abate.data_vencimento|date:'Y-m-d' }}">{{ abate.data_vencimento|date:"d/m/Y" }}</td>
+                                <td>{{ abate.comprador.nome }}</td>
+                                <td data-order="{{ abate.valor_arroba }}">R$ {{ abate.valor_arroba|floatformat:2 }}</td>
+                                <td data-order="{{ abate.rendimento_padrao }}">{{ abate.rendimento_padrao|floatformat:2 }}%</td>
+                                <td data-order="{{ abate.valor_total }}">R$ {{ abate.valor_total|floatformat:2 }}</td>
+                                <td>
+                                    {% if abate.status == 'PAGO' %}
+                                        <span class="badge bg-success">Pago</span>
+                                    {% elif abate.status == 'PENDENTE' %}
+                                        <span class="badge bg-warning">Pendente</span>
+                                    {% elif abate.status == 'VENCIDO' %}
+                                        <span class="badge bg-danger">Vencido</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Cancelado</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <button type="button" class="btn btn-actions dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                            Ações
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'abates_detalhe' abate.pk %}">
+                                                    <i class="fas fa-eye"></i> Visualizar
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'abates_editar' abate.pk %}">
+                                                    <i class="fas fa-edit"></i> Editar
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item text-danger" href="{% url 'abates_excluir' abate.pk %}">
+                                                    <i class="fas fa-trash"></i> Excluir
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -216,33 +368,31 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- DataTables & Plugins -->
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+
 <script>
-$(document).ready(function() {
-    var table = $('#tabela-abates').DataTable({
-        "ordering": true,
-        "order": [[0, "desc"]],
-        "columnDefs": [
-            { "orderable": false, "targets": 6 }
-        ],
-        "language": {
-            "emptyTable": "Nenhum registro encontrado",
-            "info": "Mostrando _START_ até _END_ de _TOTAL_ registros",
-            "infoEmpty": "Mostrando 0 até 0 de 0 registros",
-            "infoFiltered": "(Filtrados de _MAX_ registros)",
-            "infoThousands": ".",
-            "loadingRecords": "Carregando...",
-            "processing": "Processando...",
-            "zeroRecords": "Nenhum registro encontrado",
-            "search": "Pesquisar:",
-            "paginate": {
-                "next": "Próximo",
-                "previous": "Anterior",
-                "first": "Primeiro",
-                "last": "Último"
+    $(document).ready(function() {
+        $('#abates-table').DataTable({
+            responsive: true,
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
             },
-            "lengthMenu": "Exibir _MENU_ resultados por página"
-        }
+            order: [[0, 'desc']],
+            pageLength: 25,
+            columnDefs: [
+                {
+                    targets: -1,
+                    orderable: false,
+                    searchable: false
+                }
+            ]
+        });
     });
-});
 </script>
 {% endblock %}

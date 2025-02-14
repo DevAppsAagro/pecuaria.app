@@ -13,8 +13,8 @@
                     <p><strong>Comprador:</strong> {{ venda.comprador.nome }}</p>
                     <p><strong>Animais:</strong></p>
                     <ul>
-                        {% for animal_venda in venda.animais.all %}
-                            <li>{{ animal_venda.animal.brinco_visual }}</li>
+                        {% for venda_animal in animais %}
+                            <li>{{ venda_animal.animal.brinco_visual }}</li>
                         {% endfor %}
                     </ul>
                     <p class="text-danger">Esta ação irá:</p>
@@ -26,7 +26,7 @@
                     <form method="post">
                         {% csrf_token %}
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{% url 'vendas_detalhe' venda.pk %}" class="btn btn-secondary me-md-2">Voltar</a>
+                            <a href="{% url 'lista_vendas' %}" class="btn btn-secondary me-md-2">Voltar</a>
                             <button type="submit" class="btn btn-danger">Confirmar Cancelamento</button>
                         </div>
                     </form>
