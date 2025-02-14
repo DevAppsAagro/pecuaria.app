@@ -125,6 +125,18 @@ class Animal(models.Model):
         verbose_name = 'Animal'
         verbose_name_plural = 'Animais'
         ordering = ['brinco_visual']
+        indexes = [
+            models.Index(fields=['usuario', 'situacao']),  # Corrigido de status para situacao
+            models.Index(fields=['fazenda_atual']),
+            models.Index(fields=['lote']),
+            models.Index(fields=['pasto_atual']),
+            models.Index(fields=['categoria_animal']),
+            models.Index(fields=['raca']),
+            models.Index(fields=['brinco_visual']),
+            models.Index(fields=['brinco_eletronico']),
+            models.Index(fields=['data_cadastro']),
+            models.Index(fields=['data_atualizacao']),
+        ]
 
     def __str__(self):
         return f'{self.brinco_visual} - {self.categoria_animal}'

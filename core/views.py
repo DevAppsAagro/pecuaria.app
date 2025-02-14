@@ -18,6 +18,7 @@ import json
 import pandas as pd
 import numpy as np
 from geopy.geocoders import Nominatim
+from django.urls import reverse
 
 from .models import (
     Fazenda, Pasto, Animal, Lote, MovimentacaoAnimal, 
@@ -33,7 +34,7 @@ from .models_vendas import Venda, VendaAnimal
 from .models_abates import Abate, AbateAnimal
 
 from .forms import *
-from .views_estatisticas import get_estatisticas_animais
+from .views_estatisticas import get_estatisticas_animais, get_estatisticas_detalhadas
 
 def login_view(request):
     return render(request, 'registration/login.html')
@@ -995,47 +996,100 @@ def lote_detail(request, lote_id):
 def animal_list(request):
     from django.utils import timezone
     from django.db.models import Count, Q, Max, F, OuterRef, Subquery
-    from .views_estatisticas import get_estatisticas_animais
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    from django.db.models.functions import Coalesce
+    from .views_estatisticas import get_estatisticas_animais, get_estatisticas_detalhadas
     
-    # Subconsulta para pegar o peso mais recente
-    ultima_pesagem = Pesagem.objects.filter(
-        animal=OuterRef('pk')
-    ).order_by('-data').values('peso')[:1]
+    # Cache as consultas comuns
+    user = request.user
     
-    # Inicializa o queryset com select_related para otimizar as queries
-    queryset = Animal.objects.filter(usuario=request.user).select_related(
-        'raca', 'lote', 'categoria_animal', 'fazenda_atual', 'pasto_atual'
-    ).prefetch_related('pesagens').annotate(
-        peso_atual=Coalesce(
-            Subquery(ultima_pesagem),
-            F('peso_entrada')
-        )
+    # Otimiza a subconsulta do peso mais recente
+    ultima_pesagem = (
+        Pesagem.objects
+        .filter(animal=OuterRef('pk'))
+        .order_by('-data')
+        .values('peso')[:1]
     )
     
-    # Carrega as opções dos filtros - incluindo globais (usuario=None) e do usuário
-    categorias = CategoriaAnimal.objects.filter(
-        Q(usuario=None) | Q(usuario=request.user)
-    ).order_by('nome')
+    # Query base otimizada
+    queryset = (
+        Animal.objects
+        .filter(usuario=user)
+        .select_related(
+            'raca',
+            'lote',
+            'categoria_animal',
+            'fazenda_atual',
+            'pasto_atual'
+        )
+        .annotate(
+            peso_atual=Coalesce(
+                Subquery(ultima_pesagem),
+                F('peso_entrada')
+            )
+        )
+        .only(  # Seleciona apenas os campos necessários
+            'brinco_visual',
+            'brinco_eletronico',
+            'data_nascimento',
+            'situacao',
+            'peso_entrada',
+            'raca__nome',
+            'lote__id_lote',
+            'categoria_animal__nome',
+            'fazenda_atual__nome',
+            'pasto_atual__id_pasto',
+            'pasto_atual__nome'
+        )
+        .defer('observacoes')  # Exclui campos grandes não utilizados
+    )
     
-    racas = Raca.objects.filter(
-        Q(usuario=None) | Q(usuario=request.user)
-    ).order_by('nome')
+    # Cache das opções de filtro
+    categorias = (
+        CategoriaAnimal.objects
+        .filter(Q(usuario=None) | Q(usuario=user))
+        .only('id', 'nome')
+        .order_by('nome')
+    )
     
-    # Filtros
+    racas = (
+        Raca.objects
+        .filter(Q(usuario=None) | Q(usuario=user))
+        .only('id', 'nome')
+        .order_by('nome')
+    )
+    
+    # Filtros otimizados
     filtros = {}
     
     if request.GET.get('fazenda'):
         filtros['fazenda'] = request.GET.get('fazenda')
         queryset = queryset.filter(fazenda_atual_id=filtros['fazenda'])
         
-        # Se tiver fazenda selecionada, filtra lotes e pastos dessa fazenda
-        lotes = Lote.objects.filter(fazenda_id=filtros['fazenda'], usuario=request.user)
-        pastos = Pasto.objects.filter(fazenda_id=filtros['fazenda'], fazenda__usuario=request.user)
+        # Cache dos lotes e pastos filtrados
+        lotes = (
+            Lote.objects
+            .filter(fazenda_id=filtros['fazenda'], usuario=user)
+            .only('id', 'id_lote')
+        )
+        pastos = (
+            Pasto.objects
+            .filter(fazenda_id=filtros['fazenda'], fazenda__usuario=user)
+            .only('id', 'id_pasto', 'nome')
+        )
     else:
-        # Se não tiver fazenda selecionada, mostra todos os lotes e pastos do usuário
-        lotes = Lote.objects.filter(usuario=request.user)
-        pastos = Pasto.objects.filter(fazenda__usuario=request.user)
+        lotes = (
+            Lote.objects
+            .filter(usuario=user)
+            .only('id', 'id_lote')
+        )
+        pastos = (
+            Pasto.objects
+            .filter(fazenda__usuario=user)
+            .only('id', 'id_pasto', 'nome')
+        )
     
+    # Aplicar outros filtros
     if request.GET.get('lote'):
         filtros['lote'] = request.GET.get('lote')
         queryset = queryset.filter(lote_id=filtros['lote'])
@@ -1061,18 +1115,41 @@ def animal_list(request):
             Q(brinco_eletronico__icontains=filtros['brinco'])
         )
 
-    # Obtém as estatísticas
+    # Obtém as estatísticas usando queryset otimizado
     estatisticas = get_estatisticas_animais(request, queryset)
+    
+    # Obtém estatísticas detalhadas apenas se necessário
+    estatisticas_detalhadas = get_estatisticas_detalhadas(request, queryset)
+
+    # Paginação
+    items_per_page = 50
+    paginator = Paginator(queryset, items_per_page)
+    page = request.GET.get('page')
+    
+    try:
+        animais_paginados = paginator.page(page)
+    except PageNotAnInteger:
+        animais_paginados = paginator.page(1)
+    except EmptyPage:
+        animais_paginados = paginator.page(paginator.num_pages)
+
+    # Cache da query de fazendas
+    fazendas = (
+        Fazenda.objects
+        .filter(usuario=user)
+        .only('id', 'nome')
+    )
 
     context = {
-        'animais': queryset,
-        'fazendas': Fazenda.objects.filter(usuario=request.user),
+        'animais': animais_paginados,
+        'fazendas': fazendas,
         'lotes': lotes,
         'pastos': pastos,
         'categorias': categorias,
         'racas': racas,
         'filtros': filtros,
-        'estatisticas': estatisticas,  # Removido o ['stats'] para passar o dicionário completo
+        'estatisticas': estatisticas,
+        'estatisticas_detalhadas': estatisticas_detalhadas,
         'categorias_chart': estatisticas['categorias'],
         'total_ativos': estatisticas['stats']['ATIVO']['quantidade'],
         'total_vendidos': estatisticas['stats']['VENDIDO']['quantidade'],
@@ -1744,22 +1821,31 @@ def animal_import(request):
     if request.method == 'POST' and request.FILES.get('arquivo'):
         try:
             # Ler o arquivo Excel
-            df = pd.read_excel(request.FILES['arquivo'], parse_dates=['Data de Nascimento* (DD/MM/AAAA)', 'Data de Entrada* (DD/MM/AAAA)'], date_parser=lambda x: pd.to_datetime(x, format='%d/%m/%Y', errors='coerce'))
+            df = pd.read_excel(
+                request.FILES['arquivo'],
+                parse_dates=['Data de Nascimento* (DD/MM/AAAA)', 'Data de Entrada* (DD/MM/AAAA)'],
+                date_format='%d/%m/%Y'
+            )
             
             # Validar cabeçalhos
             required_columns = [
                 'Brinco Visual*',
-                'ID do Lote*',
+                'Nome do Lote*',
                 'Data de Nascimento* (DD/MM/AAAA)',
                 'Data de Entrada* (DD/MM/AAAA)',
                 'Raça*',
-                'Categoria*'
+                'Categoria*',
+                'Peso de Entrada (kg)*',
+                'Valor de Compra (R$)*',
+                'Pasto Atual*'
             ]
             
             missing_columns = [col for col in required_columns if col not in df.columns]
             if missing_columns:
-                messages.error(request, f'Colunas obrigatórias faltando: {", ".join(missing_columns)}')
-                return redirect('animal_import')
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Colunas obrigatórias faltando: {", ".join(missing_columns)}'
+                })
             
             # Validar dados
             errors = []
@@ -1779,23 +1865,30 @@ def animal_import(request):
                     
                     # Validar lote
                     try:
-                        lote = Lote.objects.get(id_lote=row['ID do Lote*'], usuario=request.user)
+                        lote = Lote.objects.get(id_lote=row['Nome do Lote*'], usuario=request.user)
                     except Lote.DoesNotExist:
-                        errors.append(f'Linha {index + 2}: Lote não encontrado')
+                        errors.append(f'Linha {index + 2}: Lote não encontrado: {row["Nome do Lote*"]}')
+                        continue
+                    
+                    # Validar pasto
+                    try:
+                        pasto = Pasto.objects.get(id_pasto=row['Pasto Atual*'], fazenda=lote.fazenda)
+                    except Pasto.DoesNotExist:
+                        errors.append(f'Linha {index + 2}: Pasto não encontrado: {row["Pasto Atual*"]}')
                         continue
                     
                     # Validar raça
                     try:
                         raca = Raca.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).get(nome=row['Raça*'])
                     except Raca.DoesNotExist:
-                        errors.append(f'Linha {index + 2}: Raça não encontrada')
+                        errors.append(f'Linha {index + 2}: Raça não encontrada: {row["Raça*"]}')
                         continue
                         
                     # Validar categoria
                     try:
                         categoria = CategoriaAnimal.objects.filter(Q(usuario=request.user) | Q(usuario__isnull=True)).get(nome=row['Categoria*'])
                     except CategoriaAnimal.DoesNotExist:
-                        errors.append(f'Linha {index + 2}: Categoria não encontrada')
+                        errors.append(f'Linha {index + 2}: Categoria não encontrada: {row["Categoria*"]}')
                         continue
                     
                     # Converter datas
@@ -1813,6 +1906,14 @@ def animal_import(request):
                         errors.append(f'Linha {index + 2}: Formato de data inválido - {str(e)}')
                         continue
                     
+                    # Validar peso e valor
+                    try:
+                        peso_entrada = float(row['Peso de Entrada (kg)*'])
+                        valor_compra = float(row['Valor de Compra (R$)*'])
+                    except (ValueError, TypeError):
+                        errors.append(f'Linha {index + 2}: Peso ou valor inválido')
+                        continue
+                    
                     # Criar o animal
                     animal = Animal(
                         brinco_visual=row['Brinco Visual*'],
@@ -1822,9 +1923,10 @@ def animal_import(request):
                         data_entrada=data_entrada,
                         lote=lote,
                         categoria_animal=categoria,
-                        peso_entrada=row.get('Peso de Entrada (kg)'),
-                        valor_compra=row.get('Valor de Compra (R$)'),
+                        peso_entrada=peso_entrada,
+                        valor_compra=valor_compra,
                         fazenda_atual=lote.fazenda,
+                        pasto_atual=pasto,
                         usuario=request.user
                     )
                     animal.save()
@@ -1835,17 +1937,22 @@ def animal_import(request):
             
             # Reportar resultados
             if success_count > 0:
-                messages.success(request, f'{success_count} animais importados com sucesso!')
-            if errors:
-                messages.warning(request, 'Alguns erros ocorreram durante a importação:')
-                for error in errors:
-                    messages.error(request, error)
-            
-            return redirect('animal_list')
+                return JsonResponse({
+                    'status': 'success',
+                    'message': f'{success_count} animais importados com sucesso!',
+                    'redirect_url': reverse('animal_list')
+                })
+            else:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Erros na importação: ' + '; '.join(errors)
+                })
             
         except Exception as e:
-            messages.error(request, f'Erro ao processar arquivo: {str(e)}')
-            return redirect('animal_import')
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Erro ao processar arquivo: {str(e)}'
+            })
     
     return render(request, 'animais/animal_import.html')
 
@@ -3278,7 +3385,7 @@ def get_destinos(request):
         data = [{'id': item.id, 'nome': item.nome} for item in items]
     elif tipo_alocacao in ['lote', 'LOTE']:
         items = Lote.objects.filter(fazenda__usuario=usuario)
-        data = [{'id': item.id, 'nome': str(item)} for item in items]
+        return JsonResponse(list(items.values('id', 'id_lote')), safe=False)
     elif tipo_alocacao in ['maquina', 'MAQUINA']:
         items = Maquina.objects.filter(fazenda__usuario=usuario)
         data = [{'id': item.id, 'nome': f"{item.id_maquina} - {item.nome}"} for item in items]
@@ -3287,7 +3394,7 @@ def get_destinos(request):
         data = [{'id': item.id, 'nome': f"{item.id_benfeitoria} - {item.nome}"} for item in items]
     elif tipo_alocacao in ['pastagem', 'PASTAGEM']:
         items = Pasto.objects.filter(fazenda__usuario=usuario)
-        data = [{'id': item.id, 'nome': str(item)} for item in items]
+        return JsonResponse(list(items.values('id', 'id_pasto')), safe=False)
     elif tipo_alocacao in ['estoque', 'ESTOQUE']:
         items = Fazenda.objects.filter(usuario=usuario)
         data = [{'id': item.id, 'nome': item.nome} for item in items]
@@ -3407,53 +3514,34 @@ def get_estatisticas_animais(request, queryset=None):
     
     return stats
 
-def get_estatisticas_animais(request, queryset=None):
-    from django.utils import timezone
-    from datetime import timedelta
-    from django.db.models import Count
+def get_estatisticas_detalhadas(request, queryset=None):
+    from django.db.models import Count, Sum, Q
     
     # Se não receber um queryset, usa todos os animais do usuário
     if queryset is None:
         queryset = Animal.objects.filter(usuario=request.user)
     
-    # Data atual e data há 12 meses atrás
-    data_atual = timezone.now().date()
-    data_12_meses = data_atual - timedelta(days=365)
-    
     # Inicializa o dicionário com todos os status possíveis
     stats = {
-        'ATIVO': {'quantidade': 0, 'variacao': 0},
-        'VENDIDO': {'quantidade': 0, 'variacao': 0},
-        'MORTO': {'quantidade': 0, 'variacao': 0},
-        'ABATIDO': {'quantidade': 0, 'variacao': 0}
+        'ATIVO': {'quantidade': 0, 'peso_total': 0, 'peso_arroba': 0},
+        'VENDIDO': {'quantidade': 0, 'peso_total': 0, 'peso_arroba': 0},
+        'MORTO': {'quantidade': 0, 'peso_total': 0, 'peso_arroba': 0},
+        'ABATIDO': {'quantidade': 0, 'peso_total': 0, 'peso_arroba': 0}
     }
     
     # Contagem atual
     contagem_atual = queryset.values('situacao').annotate(
-        total=Count('id')
-    )
-    
-    # Contagem há 12 meses
-    contagem_anterior = queryset.filter(
-        data_cadastro__lte=data_12_meses
-    ).values('situacao').annotate(
-        total=Count('id')
+        total=Count('id'),
+        peso_total=Sum('peso_atual'),
+        peso_arroba=Sum(Coalesce('peso_atual', Value(0)) / Decimal('15'))
     )
     
     # Preenche as quantidades atuais
     for item in contagem_atual:
         situacao = item['situacao']
         stats[situacao]['quantidade'] = item['total']
-    
-    # Calcula as variações
-    for item in contagem_anterior:
-        situacao = item['situacao']
-        qtd_anterior = item['total']
-        qtd_atual = stats[situacao]['quantidade']
-        
-        if qtd_anterior > 0:
-            variacao = ((qtd_atual - qtd_anterior) / qtd_anterior) * 100
-            stats[situacao]['variacao'] = round(variacao, 1)
+        stats[situacao]['peso_total'] = item['peso_total']
+        stats[situacao]['peso_arroba'] = item['peso_arroba']
     
     return stats
 

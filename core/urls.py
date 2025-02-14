@@ -13,6 +13,7 @@ from . import views_dashboard
 from . import views_impressao
 from . import views_reproducao
 from . import views_config
+from . import importacao_views
 from django.contrib.auth import views as auth_views
 from .views_fazenda import (
     salvar_coordenadas_benfeitoria,
@@ -49,7 +50,7 @@ urlpatterns = [
     path('animais/<int:pk>/editar/', views.animal_edit, name='animal_edit'),
     path('animais/<int:pk>/excluir/', views.animal_delete, name='animal_delete'),
     path('animais/importar/', views.animal_import, name='animal_import'),
-    path('animais/download-planilha-modelo/', views.download_planilha_modelo, name='download_planilha_modelo'),
+    path('animais/download-planilha-modelo/', importacao_views.download_planilha_modelo, name='download_planilha_modelo'),
     path('animais/<int:animal_pk>/movimentacoes/', views.movimentacao_list, name='movimentacao_list'),
     path('animais/<int:animal_pk>/movimentacoes/nova/', views.movimentacao_create, name='movimentacao_create'),
     path('animal/<int:animal_pk>/movimentacao/criar/', views.movimentacao_create, name='movimentacao_create'),
