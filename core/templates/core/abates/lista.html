@@ -201,7 +201,7 @@
                         Lista de Abates
                     </h3>
                     <div class="card-tools">
-                        <a href="{% url 'abates_criar' %}" class="btn btn-success-dark">
+                        <a href="{% url 'criar_abate' %}" class="btn btn-success-dark">
                             <i class="fas fa-plus"></i> Novo Abate
                         </a>
                         <a href="{% url 'abates_imprimir' %}" class="btn btn-secondary" target="_blank">
@@ -339,17 +339,17 @@
                                         </button>
                                         <ul class="dropdown-menu">
                                             <li>
-                                                <a class="dropdown-item" href="{% url 'abates_detalhe' abate.pk %}">
-                                                    <i class="fas fa-eye"></i> Visualizar
+                                                <a class="dropdown-item" href="{% url 'detalhe_abate' abate.pk %}">
+                                                    <i class="fas fa-eye text-primary"></i> Detalhes
                                                 </a>
                                             </li>
                                             <li>
-                                                <a class="dropdown-item" href="{% url 'abates_editar' abate.pk %}">
-                                                    <i class="fas fa-edit"></i> Editar
+                                                <a class="dropdown-item" href="{% url 'editar_abate' abate.pk %}">
+                                                    <i class="fas fa-edit text-warning"></i> Editar
                                                 </a>
                                             </li>
                                             <li>
-                                                <a class="dropdown-item text-danger" href="{% url 'abates_excluir' abate.pk %}">
+                                                <a class="dropdown-item text-danger" href="{% url 'excluir_abate' abate.pk %}">
                                                     <i class="fas fa-trash"></i> Excluir
                                                 </a>
                                             </li>

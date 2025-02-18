@@ -3,7 +3,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth import login, authenticate
+from django.contrib.auth import login, authenticate, logout
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse, FileResponse
 from django.urls import reverse_lazy
@@ -35,20 +35,50 @@ from .models_abates import Abate, AbateAnimal
 
 from .forms import *
 from .views_estatisticas import get_estatisticas_animais, get_estatisticas_detalhadas
+from .auth_supabase import register_with_email, login_with_email, reset_password, verify_email
 
 def login_view(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        
+        if login_with_email(request, email, password):
+            return redirect('dashboard')
+            
     return render(request, 'registration/login.html')
 
 def register_view(request):
     if request.method == 'POST':
-        form = UserCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            messages.success(request, 'Conta criada com sucesso!')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        first_name = request.POST.get('first_name', '')
+        last_name = request.POST.get('last_name', '')
+        
+        if register_with_email(request, email, password, first_name, last_name):
+            messages.success(request, 'Conta criada com sucesso! Por favor, verifique seu email.')
             return redirect('login')
-    else:
-        form = UserCreationForm()
-    return render(request, 'registration/register.html', {'form': form})
+            
+    return render(request, 'registration/register.html')
+
+def reset_password_view(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        if reset_password(email):
+            messages.success(request, 'Um email foi enviado com instruções para redefinir sua senha.')
+            return redirect('login')
+        else:
+            messages.error(request, 'Erro ao enviar email de redefinição de senha.')
+    
+    return render(request, 'registration/reset_password.html')
+
+def verificar_email_view(request):
+    return render(request, 'registration/verificar_email.html')
+
+@login_required
+def logout_view(request):
+    logout(request)
+    messages.success(request, 'Você foi desconectado com sucesso.')
+    return redirect('login')
 
 @login_required
 def dashboard_view(request):
@@ -2712,14 +2742,14 @@ class ContatoListView(LoginRequiredMixin, ListView):
         vendas_subquery = VendaAnimal.objects.filter(
             venda__comprador=OuterRef('pk')
         ).values('venda__comprador').annotate(
-            total=Sum(F('valor_total'), output_field=DecimalField(max_digits=10, decimal_places=2))
+            total=Sum('valor_total', output_field=DecimalField(max_digits=10, decimal_places=2))
         ).values('total')
 
         # Compras (onde o contato é vendedor)
         compras_subquery = CompraAnimal.objects.filter(
             compra__vendedor=OuterRef('pk')
         ).values('compra__vendedor').annotate(
-            total=Sum(F('valor_total'), output_field=DecimalField(max_digits=10, decimal_places=2))
+            total=Sum('valor_total', output_field=DecimalField(max_digits=10, decimal_places=2))
         ).values('total')
 
         # Despesas (onde o contato é fornecedor)

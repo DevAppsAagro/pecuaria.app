@@ -34,6 +34,12 @@ class VendaForm(forms.ModelForm):
         usuario = kwargs.pop('usuario', None)
         super().__init__(*args, **kwargs)
         
+        # Define valores padrão para as datas
+        if not self.instance.pk:  # Se for uma nova venda
+            hoje = timezone.localdate()
+            self.fields['data'].initial = hoje
+            self.fields['data_vencimento'].initial = hoje
+        
         if usuario:
             # Filtra apenas contatos do tipo CO (Comprador)
             self.fields['comprador'].queryset = Contato.objects.filter(
@@ -60,6 +66,16 @@ class VendaForm(forms.ModelForm):
         data_pagamento = cleaned_data.get('data_pagamento')
         valor_unitario = cleaned_data.get('valor_unitario')
         numero_parcelas = cleaned_data.get('numero_parcelas')
+
+        # Se não tiver data, usa hoje
+        if not data:
+            data = timezone.localdate()
+            cleaned_data['data'] = data
+
+        # Se não tiver data de vencimento, usa hoje
+        if not data_vencimento:
+            data_vencimento = timezone.localdate()
+            cleaned_data['data_vencimento'] = data_vencimento
 
         if data and data > timezone.localdate():
             raise ValidationError('A data da venda não pode ser futura.')

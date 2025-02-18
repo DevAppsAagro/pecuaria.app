@@ -17,9 +17,9 @@
                     
                     <form method="post">
                         {% csrf_token %}
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-danger">Confirmar Exclusão</button>
-                            <a href="{% url 'abates_detalhe' abate.pk %}" class="btn btn-secondary">Cancelar</a>
+                        <div class="d-flex justify-content-end">
+                            <a href="{% url 'detalhe_abate' abate.pk %}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-danger ms-2">Confirmar Exclusão</button>
                         </div>
                     </form>
                 </div>

@@ -1,0 +1,95 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Checkout{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Teste de Checkout Eduzz</h3>
+                </div>
+                <div class="card-body">
+                    <form id="checkoutForm" method="POST" action="{% url 'eduzz_checkout' %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="nome" class="form-label">Nome</label>
+                            <input type="text" class="form-control" id="nome" name="nome" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="plano" class="form-label">Plano</label>
+                            <select class="form-control" id="plano" name="plano" required>
+                                <option value="mensal" data-id="{{ settings.EDUZZ_SOFTWARE_MENSAL_ID }}" data-valor="97.90">Mensal (R$ 97,90)</option>
+                                <option value="anual" data-id="{{ settings.EDUZZ_SOFTWARE_ANUAL_ID }}" data-valor="997.90">Anual (R$ 997,90)</option>
+                                <option value="cortesia" data-id="{{ settings.EDUZZ_SOFTWARE_CORTESIA_ID }}" data-valor="0">Cortesia</option>
+                            </select>
+                        </div>
+                        <div id="errorMessage" class="alert alert-danger d-none"></div>
+                        <button type="submit" class="btn btn-primary">Ir para Checkout</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('checkoutForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const planoSelect = document.getElementById('plano');
+    const selectedOption = planoSelect.options[planoSelect.selectedIndex];
+    const errorDiv = document.getElementById('errorMessage');
+    
+    // Pega os valores do option selecionado
+    const produto_id = selectedOption.getAttribute('data-id');
+    const valor = selectedOption.getAttribute('data-valor');
+    
+    // Log para debug
+    console.log('Enviando dados:', {
+        email: formData.get('email'),
+        nome: formData.get('nome'),
+        produto_id: produto_id,
+        valor: valor,
+        tipo_produto: 'software'
+    });
+    
+    // Adiciona os campos necessários
+    formData.append('produto_id', produto_id);
+    formData.append('valor', valor);
+    formData.append('tipo_produto', 'software');
+    
+    // Limpa mensagem de erro anterior
+    errorDiv.classList.add('d-none');
+    errorDiv.textContent = '';
+    
+    fetch('{% url "eduzz_checkout" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.checkout_url) {
+            window.location.href = data.checkout_url;
+        } else {
+            errorDiv.textContent = data.error || 'Erro ao processar o checkout';
+            errorDiv.classList.remove('d-none');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        errorDiv.textContent = 'Erro ao processar o checkout';
+        errorDiv.classList.remove('d-none');
+    });
+});
+</script>
+{% endblock %}

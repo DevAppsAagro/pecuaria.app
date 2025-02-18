@@ -449,149 +449,6 @@ class Benfeitoria(models.Model):
         """Calcula a depreciação diária da benfeitoria"""
         return self.depreciacao_anual() / 365
 
-class EduzzTransaction(models.Model):
-    STATUS_CHOICES = [
-        ('pending', 'Pendente'),
-        ('paid', 'Pago'),
-        ('canceled', 'Cancelado'),
-        ('refunded', 'Reembolsado'),
-    ]
-
-    transaction_id = models.CharField(max_length=100, unique=True)
-    email = models.EmailField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
-    product_id = models.CharField(max_length=100)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.email} - {self.status}"
-
-class ContaBancaria(models.Model):
-    TIPO_CHOICES = [
-        ('CC', 'Conta Corrente'),
-        ('CP', 'Conta Poupança'),
-        ('CI', 'Conta Investimento'),
-    ]
-
-    banco = models.CharField('Banco', max_length=100)
-    agencia = models.CharField('Agência', max_length=20, blank=True, null=True)
-    conta = models.CharField('Número da Conta', max_length=20, blank=True, null=True)
-    tipo = models.CharField('Tipo de Conta', max_length=2, choices=TIPO_CHOICES, default='CC')
-    saldo = models.DecimalField('Saldo Atual', max_digits=15, decimal_places=2, default=0)
-    data_saldo = models.DateField('Data do Saldo', default=timezone.now)
-    ativa = models.BooleanField('Conta Ativa', default=True)
-    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-    fazenda = models.ForeignKey(Fazenda, on_delete=models.SET_NULL, null=True, blank=True)
-    data_cadastro = models.DateField(auto_now_add=True)
-    data_atualizacao = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = 'Conta Bancária'
-        verbose_name_plural = 'Contas Bancárias'
-        ordering = ['banco', 'agencia', 'conta']
-        unique_together = ['banco', 'agencia', 'conta', 'usuario']
-
-    def __str__(self):
-        return f"{self.banco} - Ag: {self.agencia} - CC: {self.conta}"
-
-    def atualizar_saldo(self, novo_saldo, data=None):
-        """Atualiza o saldo da conta com a data fornecida ou data atual"""
-        self.saldo = novo_saldo
-        self.data_saldo = data or timezone.now().date()
-        self.save()
-        
-        # Cria uma movimentação não operacional para ajuste de saldo
-        ExtratoBancario.objects.create(
-            conta=self,
-            data=self.data_saldo,
-            tipo='nao_operacional',
-            descricao='Ajuste de Saldo',
-            valor=novo_saldo - self.saldo if novo_saldo > self.saldo else -(self.saldo - novo_saldo),
-            saldo_anterior=self.saldo,
-            saldo_atual=novo_saldo,
-            referencia_id=0,
-            usuario=self.usuario
-        )
-
-class ExtratoBancario(models.Model):
-    TIPO_CHOICES = [
-        ('despesa', 'Despesa'),
-        ('venda', 'Venda'),
-        ('abate', 'Abate'),
-        ('nao_operacional', 'Não Operacional'),
-    ]
-    
-    conta = models.ForeignKey(ContaBancaria, on_delete=models.CASCADE, related_name='movimentacoes')
-    data = models.DateField('Data da Movimentação')
-    tipo = models.CharField('Tipo', max_length=20, choices=TIPO_CHOICES)
-    descricao = models.CharField('Descrição', max_length=200)
-    valor = models.DecimalField('Valor', max_digits=15, decimal_places=2)
-    saldo_anterior = models.DecimalField('Saldo Anterior', max_digits=15, decimal_places=2)
-    saldo_atual = models.DecimalField('Saldo Atual', max_digits=15, decimal_places=2)
-    referencia_id = models.IntegerField('ID de Referência')  # ID da despesa, venda, etc
-    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        verbose_name = 'Extrato Bancário'
-        verbose_name_plural = 'Extratos Bancários'
-        ordering = ['-data', '-created_at']
-    
-    def __str__(self):
-        return f"{self.conta} - {self.tipo} - {self.valor} em {self.data}"
-
-    def save(self, *args, **kwargs):
-        # Se for uma nova movimentação
-        if not self.id:
-            self.saldo_anterior = self.conta.saldo
-            
-            # Calcula o novo saldo baseado no tipo de movimentação
-            if self.tipo in ['venda', 'abate', 'nao_operacional'] and self.valor > 0:
-                self.saldo_atual = self.saldo_anterior + self.valor
-            else:
-                self.saldo_atual = self.saldo_anterior - abs(self.valor)
-            
-            # Atualiza o saldo da conta
-            self.conta.saldo = self.saldo_atual
-            self.conta.data_saldo = self.data
-            self.conta.save()
-        
-        super().save(*args, **kwargs)
-
-class Pesagem(models.Model):
-    animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name='pesagens')
-    data = models.DateField('Data da Pesagem')
-    peso = models.DecimalField('Peso (kg)', max_digits=7, decimal_places=2)
-    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        verbose_name = 'Pesagem'
-        verbose_name_plural = 'Pesagens'
-        ordering = ['-data', '-created_at']
-    
-    def __str__(self):
-        return f"{self.animal.brinco_visual} - {self.peso}kg em {self.data}"
-
-class ManejoSanitario(models.Model):
-    animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name='manejos_sanitarios')
-    data = models.DateField('Data do Manejo')
-    insumo = models.CharField('Insumo', max_length=255)
-    tipo_manejo = models.CharField('Tipo de Manejo', max_length=255)
-    dias_proximo_manejo = models.IntegerField('Dias para Próximo Manejo')
-    observacao = models.TextField('Observação', blank=True, null=True)
-    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        verbose_name = 'Manejo Sanitário'
-        verbose_name_plural = 'Manejos Sanitários'
-        ordering = ['-data', '-created_at']
-    
-    def __str__(self):
-        return f"{self.animal.brinco_visual} - {self.tipo_manejo} em {self.data}"
-
 class Contato(models.Model):
     TIPO_CHOICES = [
         ('FO', 'Fornecedor'),
@@ -925,3 +782,138 @@ class MovimentacaoNaoOperacional(models.Model):
                 referencia_id=self.id,
                 usuario=self.usuario
             )
+
+class ContaBancaria(models.Model):
+    TIPO_CHOICES = [
+        ('CC', 'Conta Corrente'),
+        ('CP', 'Conta Poupança'),
+        ('CI', 'Conta Investimento'),
+    ]
+
+    banco = models.CharField('Banco', max_length=100)
+    agencia = models.CharField('Agência', max_length=20, blank=True, null=True)
+    conta = models.CharField('Número da Conta', max_length=20, blank=True, null=True)
+    tipo = models.CharField('Tipo de Conta', max_length=2, choices=TIPO_CHOICES, default='CC')
+    saldo = models.DecimalField('Saldo Atual', max_digits=15, decimal_places=2, default=0)
+    data_saldo = models.DateField('Data do Saldo', default=timezone.now)
+    ativa = models.BooleanField('Conta Ativa', default=True)
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    fazenda = models.ForeignKey(Fazenda, on_delete=models.SET_NULL, null=True, blank=True)
+    data_cadastro = models.DateField(auto_now_add=True)
+    data_atualizacao = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Conta Bancária'
+        verbose_name_plural = 'Contas Bancárias'
+        ordering = ['banco', 'agencia', 'conta']
+        unique_together = ['banco', 'agencia', 'conta', 'usuario']
+
+    def __str__(self):
+        return f"{self.banco} - Ag: {self.agencia} - CC: {self.conta}"
+
+    def atualizar_saldo(self, novo_saldo, data=None):
+        """Atualiza o saldo da conta com a data fornecida ou data atual"""
+        self.saldo = novo_saldo
+        self.data_saldo = data or timezone.now().date()
+        self.save()
+        
+        # Cria uma movimentação não operacional para ajuste de saldo
+        ExtratoBancario.objects.create(
+            conta=self,
+            data=self.data_saldo,
+            tipo='nao_operacional',
+            descricao='Ajuste de Saldo',
+            valor=novo_saldo - self.saldo if novo_saldo > self.saldo else -(self.saldo - novo_saldo),
+            saldo_anterior=self.saldo,
+            saldo_atual=novo_saldo,
+            referencia_id=0,
+            usuario=self.usuario
+        )
+
+class ExtratoBancario(models.Model):
+    TIPO_CHOICES = [
+        ('despesa', 'Despesa'),
+        ('venda', 'Venda'),
+        ('abate', 'Abate'),
+        ('nao_operacional', 'Não Operacional'),
+    ]
+    
+    conta = models.ForeignKey(ContaBancaria, on_delete=models.CASCADE, related_name='movimentacoes')
+    data = models.DateField('Data da Movimentação')
+    tipo = models.CharField('Tipo', max_length=20, choices=TIPO_CHOICES)
+    descricao = models.CharField('Descrição', max_length=200)
+    valor = models.DecimalField('Valor', max_digits=15, decimal_places=2)
+    saldo_anterior = models.DecimalField('Saldo Anterior', max_digits=15, decimal_places=2)
+    saldo_atual = models.DecimalField('Saldo Atual', max_digits=15, decimal_places=2)
+    referencia_id = models.IntegerField('ID de Referência')  # ID da despesa, venda, etc
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Extrato Bancário'
+        verbose_name_plural = 'Extratos Bancários'
+        ordering = ['-data', '-created_at']
+    
+    def __str__(self):
+        return f"{self.conta} - {self.tipo} - {self.valor} em {self.data}"
+
+    def save(self, *args, **kwargs):
+        # Se for uma nova movimentação
+        if not self.id:
+            self.saldo_anterior = self.conta.saldo
+            
+            # Calcula o novo saldo baseado no tipo de movimentação
+            if self.tipo in ['venda', 'abate', 'nao_operacional'] and self.valor > 0:
+                self.saldo_atual = self.saldo_anterior + self.valor
+            else:
+                self.saldo_atual = self.saldo_anterior - abs(self.valor)
+            
+            # Atualiza o saldo da conta
+            self.conta.saldo = self.saldo_atual
+            self.conta.data_saldo = self.data
+            self.conta.save()
+        
+        super().save(*args, **kwargs)
+
+class Pesagem(models.Model):
+    animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name='pesagens')
+    data = models.DateField('Data da Pesagem')
+    peso = models.DecimalField('Peso (kg)', max_digits=7, decimal_places=2)
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Pesagem'
+        verbose_name_plural = 'Pesagens'
+        ordering = ['-data', '-created_at']
+    
+    def __str__(self):
+        return f"{self.animal.brinco_visual} - {self.peso}kg em {self.data}"
+
+class ManejoSanitario(models.Model):
+    animal = models.ForeignKey(Animal, on_delete=models.CASCADE, related_name='manejos_sanitarios')
+    data = models.DateField('Data do Manejo')
+    insumo = models.CharField('Insumo', max_length=255)
+    tipo_manejo = models.CharField('Tipo de Manejo', max_length=255)
+    dias_proximo_manejo = models.IntegerField('Dias para Próximo Manejo')
+    observacao = models.TextField('Observação', blank=True, null=True)
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Manejo Sanitário'
+        verbose_name_plural = 'Manejos Sanitários'
+        ordering = ['-data', '-created_at']
+    
+    def __str__(self):
+        return f"{self.animal.brinco_visual} - {self.tipo_manejo} em {self.data}"
+
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    photo_url = models.URLField(max_length=500, blank=True, null=True)  # URL da imagem no Supabase
+    plan_name = models.CharField(max_length=100, blank=True, null=True)
+    next_billing_date = models.DateField(blank=True, null=True)
+
+    def __str__(self):
+        return f'Perfil de {self.user.username}'

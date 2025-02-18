@@ -1,0 +1,110 @@
+{% extends 'base_print.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h2>Relatório de Vendas</h2>
+            {% if data_inicial or data_final %}
+            <p>
+                Período: 
+                {% if data_inicial %}De {{ data_inicial }}{% endif %}
+                {% if data_final %}até {{ data_final }}{% endif %}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Cards de Status -->
+    <div class="row mb-4">
+        <div class="col-3">
+            <div class="card bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">Pago</h5>
+                    <p class="card-text">{{ totais_status.PAGO.valor_formatado }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-3">
+            <div class="card bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">Pendente</h5>
+                    <p class="card-text">{{ totais_status.PENDENTE.valor_formatado }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-3">
+            <div class="card bg-info">
+                <div class="card-body">
+                    <h5 class="card-title">Vence Hoje</h5>
+                    <p class="card-text">{{ totais_status.VENCE_HOJE.valor_formatado }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-3">
+            <div class="card bg-danger">
+                <div class="card-body">
+                    <h5 class="card-title">Vencido</h5>
+                    <p class="card-text">{{ totais_status.VENCIDO.valor_formatado }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Vendas -->
+    <div class="table-responsive">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Data Venda</th>
+                    <th>Data Vencimento</th>
+                    <th>Comprador</th>
+                    <th>Tipo</th>
+                    <th>Valor Unitário</th>
+                    <th>Qtd. Animais</th>
+                    <th>Valor Total</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for venda in vendas %}
+                <tr>
+                    <td>{{ venda.data|date:"d/m/Y" }}</td>
+                    <td>{{ venda.data_vencimento|date:"d/m/Y" }}</td>
+                    <td>{{ venda.comprador.nome }}</td>
+                    <td>{{ venda.get_tipo_venda_display }}</td>
+                    <td>R$ {{ venda.valor_unitario|floatformat:2 }}</td>
+                    <td>{{ venda.animais.count }}</td>
+                    <td>R$ {{ venda.valor_total|floatformat:2 }}</td>
+                    <td>
+                        {% if venda.status == 'PAGO' %}
+                            <span class="badge bg-success">Pago</span>
+                        {% elif venda.data_vencimento == hoje %}
+                            <span class="badge bg-info">Vence Hoje</span>
+                        {% elif venda.data_vencimento < hoje %}
+                            <span class="badge bg-danger">Vencido</span>
+                        {% else %}
+                            <span class="badge bg-warning">Pendente</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <p class="text-end">
+                <small>Relatório gerado em: {{ hoje|date:"d/m/Y H:i" }}</small>
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.onload = function() {
+        window.print();
+    }
+</script>
+{% endblock %}

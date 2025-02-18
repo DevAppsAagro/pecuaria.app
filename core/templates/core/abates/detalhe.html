@@ -7,12 +7,16 @@
             <h2>Detalhes do Abate</h2>
         </div>
         <div class="col-md-4 text-end">
-            <a href="{% url 'abates_editar' abate.pk %}" class="btn btn-primary">
-                <i class="bi bi-pencil"></i> Editar
-            </a>
-            <a href="{% url 'abates_excluir' abate.pk %}" class="btn btn-danger">
-                <i class="bi bi-trash"></i> Excluir
-            </a>
+            <div class="card-tools">
+                <!-- Botão Editar -->
+                <a href="{% url 'editar_abate' abate.pk %}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Editar
+                </a>
+                <!-- Botão Excluir -->
+                <a href="{% url 'excluir_abate' abate.pk %}" class="btn btn-danger">
+                    <i class="fas fa-trash"></i> Excluir
+                </a>
+            </div>
         </div>
     </div>
 

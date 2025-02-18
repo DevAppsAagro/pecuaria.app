@@ -72,17 +72,12 @@ class VendaAnimal(models.Model):
         verbose_name_plural = 'Animais da Venda'
 
     def save(self, *args, **kwargs):
-        # Calcula o valor total se não fornecido
-        if not self.valor_total and self.peso_venda and self.valor_kg:
-            self.valor_total = self.peso_venda * self.valor_kg
-            
         # Atualiza o animal quando vendido
         if not self.pk:  # Apenas na criação
             self.animal.situacao = 'VENDIDO'
             self.animal.data_saida = self.venda.data
             self.animal.valor_venda = self.valor_total
-            self.animal.save()  # Salva as alterações no animal
-            
+            self.animal.save()
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

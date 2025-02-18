@@ -108,19 +108,6 @@ def criar_parcelas_venda(venda, valor_total):
     # Salva todas as parcelas de uma vez
     ParcelaVenda.objects.bulk_create(parcelas)
 
-def get_peso_atual(animal):
-    """Retorna o peso atual do animal"""
-    logger = logging.getLogger(__name__)
-    logger.debug(f'Buscando peso atual do animal {animal.id}')
-    
-    ultimo_peso = Pesagem.objects.filter(animal=animal).order_by('-data').values('peso').first()
-    if ultimo_peso:
-        logger.debug(f'Último peso encontrado: {ultimo_peso["peso"]}')
-        return ultimo_peso['peso']
-    
-    logger.debug(f'Nenhum peso encontrado, usando primeiro_peso: {animal.primeiro_peso}')
-    return animal.primeiro_peso or 0
-
 @login_required
 def criar_venda(request):
     logger = logging.getLogger(__name__)
@@ -130,7 +117,9 @@ def criar_venda(request):
     fazenda_id = request.GET.get('fazenda')
     lote_id = request.GET.get('lote')
     
-    # Filtra apenas animais ativos e carrega os relacionamentos necessários
+    logger.debug(f'Parâmetros de filtro: fazenda_id={fazenda_id}, lote_id={lote_id}')
+    
+    # Filtra apenas animais ativos
     animais_disponiveis = Animal.objects.filter(
         usuario=request.user,
         situacao='ATIVO'
@@ -145,25 +134,32 @@ def criar_venda(request):
     if lote_id:
         animais_disponiveis = animais_disponiveis.filter(lote_id=lote_id)
     
+    logger.debug(f'Query SQL animais_disponiveis: {animais_disponiveis.query}')
+    logger.info(f'Total de animais disponíveis: {animais_disponiveis.count()}')
+    
     # Obtém as fazendas do usuário
     fazendas = Fazenda.objects.filter(usuario=request.user)
+    logger.debug(f'Total de fazendas: {fazendas.count()}')
     
     # Obtém os lotes do usuário, filtrados por fazenda se uma fazenda foi selecionada
     lotes = Lote.objects.filter(usuario=request.user)
     if fazenda_id:
         lotes = lotes.filter(fazenda_id=fazenda_id)
+    logger.debug(f'Total de lotes: {lotes.count()}')
     
     # Filtra apenas contatos do tipo comprador
     compradores = Contato.objects.filter(
         usuario=request.user,
         tipo='CO'
     )
+    logger.debug(f'Total de compradores: {compradores.count()}')
     
     # Filtra contas bancárias ativas
     contas = ContaBancaria.objects.filter(
         usuario=request.user,
         ativa=True
     )
+    logger.debug(f'Total de contas bancárias: {contas.count()}')
     
     if request.method == 'POST':
         logger.info('Recebido POST para criar venda')
@@ -173,6 +169,27 @@ def criar_venda(request):
         if form.is_valid():
             logger.info('Formulário é válido')
             try:
+                # Obtém os IDs dos animais
+                animais_ids = request.POST.getlist('animal')
+                logger.debug(f'IDs dos animais selecionados: {animais_ids}')
+                
+                if not animais_ids:
+                    logger.error('Nenhum animal selecionado')
+                    messages.error(request, 'Selecione pelo menos um animal.')
+                    raise ValueError('Nenhum animal selecionado')
+
+                # Verifica se algum animal já está vendido
+                animais_vendidos = Animal.objects.filter(
+                    id__in=animais_ids,
+                    situacao='VENDIDO'
+                ).values_list('brinco_visual', flat=True)
+                
+                if animais_vendidos:
+                    mensagem = f'Os seguintes animais já estão vendidos: {", ".join(animais_vendidos)}'
+                    logger.error(mensagem)
+                    messages.error(request, mensagem)
+                    raise ValueError(mensagem)
+
                 with transaction.atomic():
                     # Primeiro, salva a venda
                     venda = form.save(commit=False)
@@ -180,46 +197,66 @@ def criar_venda(request):
                     venda.save()
                     logger.info(f'Venda {venda.id} criada com sucesso')
 
+                    # Verifica se a venda foi realmente criada
+                    if not venda.id:
+                        logger.error('Venda não foi criada corretamente')
+                        messages.error(request, 'Erro ao criar venda. Por favor, tente novamente.')
+                        raise ValueError('Venda não foi criada corretamente')
+
                     # Processa os animais selecionados
                     animais_ids = request.POST.getlist('animal')
-                    logger.debug(f'Animais selecionados: {animais_ids}')
-                    
                     if not animais_ids:
                         logger.error('Nenhum animal selecionado')
                         messages.error(request, 'Selecione pelo menos um animal.')
                         raise ValueError('Nenhum animal selecionado')
 
-                    # Calcula o valor total antes de criar a venda
+                    # Calcula o valor total
                     valor_total = Decimal('0')
-                    for animal_id in animais_ids:
-                        animal = Animal.objects.get(id=animal_id, usuario=request.user)
-                        peso_atual = Decimal(str(get_peso_atual(animal)))
-                        
-                        # Calcula o valor do animal
-                        if form.cleaned_data['tipo_venda'] == 'KG':
-                            valor = peso_atual * Decimal(str(form.cleaned_data['valor_unitario']))
-                        else:
-                            valor = Decimal(str(form.cleaned_data['valor_unitario']))
-                        
-                        # Arredonda o valor para 2 casas decimais
-                        valor = valor.quantize(Decimal('.01'))
-                        
-                        logger.debug(f'Criando VendaAnimal para animal {animal.id} com valor {valor}')
-                        VendaAnimal.objects.create(
-                            venda=venda,
-                            animal=animal,
-                            peso_venda=peso_atual,
-                            valor_kg=form.cleaned_data['valor_unitario'] if form.cleaned_data['tipo_venda'] == 'KG' else None,
-                            valor_total=valor
-                        )
-                        valor_total += valor
-
-                    # Arredonda o valor total para 2 casas decimais
-                    valor_total = valor_total.quantize(Decimal('.01'))
                     
+                    for animal_id in animais_ids:
+                        try:
+                            # Obtém o animal com lock para evitar condições de corrida
+                            animal = Animal.objects.select_for_update().get(
+                                id=animal_id, 
+                                usuario=request.user,
+                                situacao='ATIVO'  # Garante que o animal ainda está ativo
+                            )
+                            logger.debug(f'Processando animal {animal.brinco_visual} (ID: {animal.id})')
+                            
+                            peso_atual = Decimal(str(get_peso_atual(animal)))
+                            logger.debug(f'Peso atual do animal: {peso_atual}')
+                            
+                            # Calcula o valor do animal
+                            if form.cleaned_data['tipo_venda'] == 'KG':
+                                valor = peso_atual * Decimal(str(form.cleaned_data['valor_unitario']))
+                            else:
+                                valor = Decimal(str(form.cleaned_data['valor_unitario']))
+                            
+                            # Arredonda o valor para 2 casas decimais
+                            valor = valor.quantize(Decimal('.01'))
+                            logger.debug(f'Valor calculado: {valor}')
+                            
+                            # Cria e salva o objeto VendaAnimal
+                            venda_animal = VendaAnimal(
+                                venda=venda,
+                                animal=animal,
+                                peso_venda=peso_atual,
+                                valor_kg=form.cleaned_data['valor_unitario'] if form.cleaned_data['tipo_venda'] == 'KG' else None,
+                                valor_total=valor
+                            )
+                            venda_animal.save()  # Salva individualmente para chamar o método save()
+                            
+                            valor_total += valor
+                        except Animal.DoesNotExist:
+                            logger.error(f'Animal {animal_id} não encontrado ou não está disponível')
+                            raise ValueError(f'Animal não encontrado ou não está mais disponível')
+                    
+                    logger.info(f'Animais processados com sucesso')
+
                     # Atualiza o valor total da venda
                     venda.valor_total = valor_total
                     venda.save()
+                    logger.info(f'Valor total da venda atualizado: {valor_total}')
 
                     # Se tiver data de pagamento, cria uma única parcela já paga
                     if venda.data_pagamento:
@@ -238,6 +275,7 @@ def criar_venda(request):
                             valor=valor_total,
                             data_pagamento=venda.data_pagamento
                         )
+                        logger.info('Parcela e pagamento criados com sucesso')
                     # Se não tiver data de pagamento, cria as parcelas normalmente
                     else:
                         logger.info('Criando parcelas para venda')
@@ -247,17 +285,17 @@ def criar_venda(request):
                 logger.info('Venda criada com sucesso, redirecionando')
                 return redirect('lista_vendas')
                 
+            except Animal.DoesNotExist:
+                logger.error('Animal não encontrado ou não está mais disponível')
+                messages.error(request, 'Um ou mais animais não estão mais disponíveis. Por favor, atualize a página e tente novamente.')
+            except ValueError as e:
+                logger.error(f'Erro de validação: {str(e)}')
+                messages.error(request, str(e))
             except Exception as e:
-                logger.error(f'Erro ao criar venda: {str(e)}')
+                logger.exception('Erro ao criar venda:')
                 messages.error(request, f'Erro ao criar venda: {str(e)}')
-                return render(request, 'core/vendas/form.html', {
-                    'form': form,
-                    'animais_disponiveis': animais_disponiveis,
-                    'fazendas': fazendas,
-                    'lotes': lotes,
-                    'fazenda_selecionada': fazenda_id,
-                    'lote_selecionado': lote_id
-                })
+        else:
+            logger.error(f'Formulário inválido. Erros: {form.errors}')
     else:
         form = VendaForm(usuario=request.user)
     
@@ -267,7 +305,9 @@ def criar_venda(request):
         'fazendas': fazendas,
         'lotes': lotes,
         'fazenda_selecionada': fazenda_id,
-        'lote_selecionado': lote_id
+        'lote_selecionado': lote_id,
+        'compradores': compradores,
+        'contas': contas
     })
 
 @login_required
@@ -317,10 +357,6 @@ def editar_venda(request, pk):
                             }
                         )
                         valor_total += valor
-                        
-                        # Atualiza o status do animal para vendido
-                        animal.situacao = 'VENDIDO'
-                        animal.save()
                     
                     # Cria as parcelas
                     criar_parcelas_venda(venda, valor_total)
@@ -507,3 +543,52 @@ def historico_pagamentos_venda(request, parcela_id):
         'valor_restante': parcela.valor_restante_calc
     }
     return render(request, 'core/vendas/historico_pagamentos.html', context)
+
+@login_required
+def get_animais_por_lote(request):
+    """Retorna lista de animais filtrados por fazenda e lote em formato JSON"""
+    logger = logging.getLogger(__name__)
+    logger.info('Iniciando get_animais_por_lote')
+    
+    fazenda_id = request.GET.get('fazenda_id')
+    lote_id = request.GET.get('lote_id')
+    
+    logger.debug(f'Parâmetros recebidos: fazenda_id={fazenda_id}, lote_id={lote_id}')
+    
+    if not (fazenda_id and lote_id):
+        logger.error('Fazenda e lote são obrigatórios')
+        return JsonResponse({'error': 'Fazenda e lote são obrigatórios'}, status=400)
+    
+    try:
+        # Filtra apenas animais ativos no lote/fazenda selecionados
+        query = Animal.objects.filter(
+            usuario=request.user,
+            situacao='ATIVO',
+            fazenda_atual_id=fazenda_id,
+            lote_id=lote_id
+        ).exclude(
+            # Exclui animais que já estão em uma venda
+            vendaanimal__isnull=False
+        ).select_related('lote')
+        
+        logger.debug(f'Query SQL: {query.query}')
+        
+        animais = query.order_by('brinco_visual')
+        logger.info(f'Total de animais encontrados: {animais.count()}')
+        
+        data = []
+        for animal in animais:
+            peso_atual = get_peso_atual(animal)
+            data.append({
+                'id': animal.id,
+                'brinco_visual': animal.brinco_visual,
+                'lote': animal.lote.id_lote if animal.lote else '-',
+                'peso_atual': peso_atual
+            })
+        
+        logger.info('Dados dos animais preparados com sucesso')
+        return JsonResponse({'animais': data})
+        
+    except Exception as e:
+        logger.exception('Erro ao buscar animais:')
+        return JsonResponse({'error': str(e)}, status=500)

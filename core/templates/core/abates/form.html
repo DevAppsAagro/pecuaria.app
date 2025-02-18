@@ -1,6 +1,12 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block extra_css %}
+<!-- DataTables CSS -->
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css"/>
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/select/1.3.4/css/select.bootstrap5.min.css"/>
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <div class="row justify-content-center">
@@ -93,8 +99,8 @@
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label">Filtrar por Fazenda</label>
-                                <select class="form-select" id="filtro-fazenda">
-                                    <option value="">Todas as Fazendas</option>
+                                <select class="form-select" id="filtro-fazenda" required>
+                                    <option value="">Selecione uma Fazenda</option>
                                     {% for fazenda in fazendas %}
                                         <option value="{{ fazenda.id }}" {% if fazenda.id|stringformat:"s" == fazenda_selecionada %}selected{% endif %}>{{ fazenda.nome }}</option>
                                     {% endfor %}
@@ -102,8 +108,8 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Filtrar por Lote</label>
-                                <select class="form-select" id="filtro-lote">
-                                    <option value="">Todos os Lotes</option>
+                                <select class="form-select" id="filtro-lote" required>
+                                    <option value="">Selecione um Lote</option>
                                     {% for lote in lotes %}
                                         <option value="{{ lote.id }}" {% if lote.id|stringformat:"s" == lote_selecionado %}selected{% endif %}>{{ lote.id_lote }}</option>
                                     {% endfor %}
@@ -111,9 +117,17 @@
                             </div>
                         </div>
 
+                        <!-- Resumo de Seleção -->
+                        <div class="alert alert-info mt-3" id="resumo-selecao" style="display: none;">
+                            <strong>Resumo da Seleção:</strong>
+                            <span id="contador-animais">0 animais selecionados</span>
+                            <span class="mx-2">|</span>
+                            <span id="peso-total">Peso Total: 0 kg</span>
+                        </div>
+
                         <!-- Tabela de Animais -->
-                        <div class="table-responsive mt-4">
-                            <table class="table table-striped">
+                        <div class="table-responsive mt-4" id="tabela-animais" style="display: none;">
+                            <table class="table table-striped" id="tabela-animais-datatable">
                                 <thead>
                                     <tr>
                                         <th><input type="checkbox" id="selecionar-todos"></th>
@@ -125,21 +139,6 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for animal in animais_disponiveis %}
-                                    <tr>
-                                        <td>
-                                            <input type="checkbox" name="animal" value="{{ animal.id }}" 
-                                                class="animal-checkbox" 
-                                                data-peso="{{ animal.get_peso_atual }}"
-                                                {% if animal.id|stringformat:"s" in animais_selecionados %}checked{% endif %}>
-                                        </td>
-                                        <td>{{ animal.brinco_visual }}</td>
-                                        <td>{{ animal.lote.id_lote|default:"-" }}</td>
-                                        <td>{{ animal.get_peso_atual|default:"-" }}</td>
-                                        <td class="peso-arroba">0.00 @</td>
-                                        <td class="valor-animal">R$ 0,00</td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                                 <tfoot>
                                     <tr>
@@ -165,129 +164,222 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/abates/filtros.js' %}"></script>
+<!-- DataTables JS -->
+<script type="text/javascript" src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+<script type="text/javascript" src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+<script type="text/javascript" src="https://cdn.datatables.net/select/1.3.4/js/dataTables.select.min.js"></script>
+
 <script>
-    const rendimentoInput = document.querySelector('#{{ form.rendimento_padrao.id_for_label }}');
-    const valorArrobaInput = document.querySelector('#{{ form.valor_arroba.id_for_label }}');
-    const checkboxes = document.querySelectorAll('.animal-checkbox');
-    const selecionarTodos = document.querySelector('#selecionar-todos');
+    let dataTable;
 
     function formatarMoeda(valor) {
-        return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
     }
 
     function formatarNumero(valor) {
-        return valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor);
     }
 
     function calcularPesoArroba(peso, rendimento) {
-        if (peso && rendimento > 0) {
-            return (peso * (rendimento / 100)) / 15;
-        }
-        return 0;
+        if (!peso || !rendimento) return 0;
+        const pesoRendimento = peso * (rendimento / 100);
+        return pesoRendimento / 15;
     }
 
     function calcularValorAnimal(checkbox) {
-        const peso = parseFloat(checkbox.dataset.peso) || 0;
-        const rendimento = parseFloat(rendimentoInput.value) || 0;
-        const valorArroba = parseFloat(valorArrobaInput.value) || 0;
+        const row = checkbox.closest('tr');
+        const pesoKg = parseFloat(checkbox.dataset.peso || 0);
+        const rendimento = parseFloat(document.getElementById('id_rendimento_padrao').value || 0);
+        const valorArroba = parseFloat(document.getElementById('id_valor_arroba').value || 0);
         
-        let pesoArroba = 0;
-        let valor = 0;
+        const pesoArroba = calcularPesoArroba(pesoKg, rendimento);
+        const valor = pesoArroba * valorArroba;
         
-        if (checkbox.checked && peso > 0 && rendimento > 0) {
-            pesoArroba = calcularPesoArroba(peso, rendimento);
-            valor = pesoArroba * valorArroba;
-        }
+        row.querySelector('.peso-arroba').textContent = formatarNumero(pesoArroba) + ' @';
+        row.querySelector('.valor-animal').textContent = formatarMoeda(valor);
         
-        // Atualiza o peso em @ na linha da tabela
-        const linha = checkbox.closest('tr');
-        const tdPesoArroba = linha.querySelector('.peso-arroba');
-        tdPesoArroba.textContent = formatarNumero(pesoArroba) + ' @';
-        
-        // Atualiza o valor na linha da tabela
-        const tdValor = linha.querySelector('.valor-animal');
-        tdValor.textContent = formatarMoeda(valor);
-        
-        return valor;
+        return { pesoKg, valor };
     }
 
     function atualizarValorTotal() {
         let valorTotal = 0;
+        document.querySelectorAll('.animal-checkbox:checked').forEach(checkbox => {
+            valorTotal += calcularValorAnimal(checkbox).valor;
+        });
+        document.getElementById('valor-total').textContent = formatarMoeda(valorTotal);
+    }
+
+    function atualizarResumoSelecao() {
+        const checkboxes = document.querySelectorAll('.animal-checkbox:checked');
+        const numAnimais = checkboxes.length;
+        let pesoTotal = 0;
+        
         checkboxes.forEach(checkbox => {
-            valorTotal += calcularValorAnimal(checkbox);
+            pesoTotal += parseFloat(checkbox.dataset.peso || 0);
         });
         
-        document.querySelector('#valor-total').textContent = formatarMoeda(valorTotal);
+        document.getElementById('contador-animais').textContent = numAnimais + ' animais selecionados';
+        document.getElementById('peso-total').textContent = 'Peso Total: ' + formatarNumero(pesoTotal) + ' kg';
+        
+        const resumo = document.getElementById('resumo-selecao');
+        resumo.style.display = numAnimais > 0 ? 'block' : 'none';
+        
+        atualizarValorTotal();
     }
 
-    // Event Listeners
-    rendimentoInput.addEventListener('input', atualizarValorTotal);
-    valorArrobaInput.addEventListener('input', atualizarValorTotal);
-    
-    checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', atualizarValorTotal);
-    });
-    
-    selecionarTodos.addEventListener('change', function() {
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = this.checked;
-        });
+    async function carregarAnimais() {
+        const fazendaId = document.querySelector('#filtro-fazenda').value;
+        const loteId = document.querySelector('#filtro-lote').value;
+        
+        if (!fazendaId || !loteId) {
+            document.getElementById('tabela-animais').style.display = 'none';
+            return;
+        }
+
+        try {
+            // Mostrar indicador de carregamento
+            document.getElementById('tabela-animais').style.display = 'none';
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loading-indicator';
+            loadingDiv.className = 'text-center mt-3';
+            loadingDiv.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div>';
+            document.getElementById('tabela-animais').parentNode.insertBefore(loadingDiv, document.getElementById('tabela-animais'));
+
+            const response = await fetch(`/financeiro/abates/get-animais-por-lote/?fazenda_id=${fazendaId}&lote_id=${loteId}`);
+            const data = await response.json();
+
+            // Remover indicador de carregamento
+            document.getElementById('loading-indicator')?.remove();
+
+            if (dataTable) {
+                dataTable.destroy();
+            }
+
+            const tbody = document.querySelector('#tabela-animais-datatable tbody');
+            tbody.innerHTML = '';
+
+            data.animais.forEach(animal => {
+                const row = `
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="animal" value="${animal.id}" 
+                                class="animal-checkbox" 
+                                data-peso="${animal.peso_atual || 0}">
+                        </td>
+                        <td>${animal.brinco_visual}</td>
+                        <td>${animal.lote || '-'}</td>
+                        <td>${animal.peso_atual || '-'}</td>
+                        <td class="peso-arroba">0.00 @</td>
+                        <td class="valor-animal">R$ 0,00</td>
+                    </tr>
+                `;
+                tbody.insertAdjacentHTML('beforeend', row);
+            });
+
+            // Inicializar DataTable
+            dataTable = $('#tabela-animais-datatable').DataTable({
+                language: {
+                    url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json',
+                    lengthMenu: "Mostrar _MENU_ registros por página",
+                },
+                pageLength: 10,
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Todos"]],
+                order: [[1, 'asc']]
+            });
+
+            // Mostrar a tabela
+            document.getElementById('tabela-animais').style.display = 'block';
+
+            // Adicionar event listeners para os checkboxes
+            document.querySelectorAll('.animal-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', () => {
+                    calcularValorAnimal(checkbox);
+                    atualizarResumoSelecao();
+                });
+            });
+
+            // Event listener para o checkbox "selecionar todos"
+            document.getElementById('selecionar-todos').addEventListener('change', function() {
+                const checkboxes = document.querySelectorAll('.animal-checkbox');
+                checkboxes.forEach(cb => {
+                    cb.checked = this.checked;
+                    calcularValorAnimal(cb);
+                });
+                atualizarResumoSelecao();
+            });
+
+        } catch (error) {
+            console.error('Erro ao carregar animais:', error);
+            alert('Erro ao carregar animais. Por favor, tente novamente.');
+        }
+    }
+
+    // Event Listeners para os filtros
+    document.querySelector('#filtro-fazenda').addEventListener('change', carregarAnimais);
+    document.querySelector('#filtro-lote').addEventListener('change', carregarAnimais);
+
+    // Event listeners para os campos de valor
+    document.getElementById('id_rendimento_padrao').addEventListener('input', () => {
+        document.querySelectorAll('.animal-checkbox:checked').forEach(calcularValorAnimal);
         atualizarValorTotal();
     });
 
-    // Atualiza os valores iniciais se houver valores preenchidos
-    if (valorArrobaInput.value && rendimentoInput.value) {
+    document.getElementById('id_valor_arroba').addEventListener('input', () => {
+        document.querySelectorAll('.animal-checkbox:checked').forEach(calcularValorAnimal);
         atualizarValorTotal();
-    }
+    });
 
     function validarFormulario() {
-        console.log('Validando formulário...');
-        
-        // Verifica se há animais selecionados
         const animaisSelecionados = document.querySelectorAll('.animal-checkbox:checked');
-        console.log('Animais selecionados:', Array.from(animaisSelecionados).map(cb => cb.value));
-        
         if (animaisSelecionados.length === 0) {
-            alert('Selecione pelo menos um animal para o abate.');
-            return false;
-        }
-        
-        // Verifica campos obrigatórios
-        const form = document.getElementById('abateForm');
-        const data = form.querySelector('#{{ form.data.id_for_label }}').value;
-        const valorArroba = form.querySelector('#{{ form.valor_arroba.id_for_label }}').value;
-        const rendimento = form.querySelector('#{{ form.rendimento_padrao.id_for_label }}').value;
-        const comprador = form.querySelector('#{{ form.comprador.id_for_label }}').value;
-        const dataVencimento = form.querySelector('#{{ form.data_vencimento.id_for_label }}').value;
-        
-        if (!data) {
-            alert('A data do abate é obrigatória.');
-            return false;
-        }
-        
-        if (!dataVencimento) {
-            alert('A data de vencimento é obrigatória.');
-            return false;
-        }
-        
-        if (!valorArroba || valorArroba <= 0) {
-            alert('O valor da arroba deve ser maior que zero.');
+            alert('Por favor, selecione pelo menos um animal para o abate.');
             return false;
         }
 
-        if (!rendimento || rendimento <= 0) {
-            alert('O rendimento padrão deve ser maior que zero.');
+        const data = document.getElementById('id_data').value;
+        const dataVencimento = document.getElementById('id_data_vencimento').value;
+        const dataPagamento = document.getElementById('id_data_pagamento').value;
+        const rendimentoPadrao = document.getElementById('id_rendimento_padrao').value;
+        const valorArroba = document.getElementById('id_valor_arroba').value;
+        const comprador = document.getElementById('id_comprador').value;
+        const contaBancaria = document.getElementById('id_conta_bancaria').value;
+
+        if (!data) {
+            alert('Por favor, preencha a data do abate.');
             return false;
         }
-        
+
+        if (!dataVencimento) {
+            alert('Por favor, preencha a data de vencimento.');
+            return false;
+        }
+
+        if (!rendimentoPadrao) {
+            alert('Por favor, preencha o rendimento padrão.');
+            return false;
+        }
+
+        if (!valorArroba) {
+            alert('Por favor, preencha o valor da arroba.');
+            return false;
+        }
+
         if (!comprador) {
-            alert('Selecione um comprador.');
+            alert('Por favor, selecione um comprador.');
             return false;
         }
-        
-        console.log('Formulário válido, enviando...');
+
+        if (!contaBancaria) {
+            alert('Por favor, selecione uma conta bancária.');
+            return false;
+        }
+
         return true;
+    }
+
+    // Carregar animais se os filtros já estiverem preenchidos
+    if (document.querySelector('#filtro-fazenda').value && document.querySelector('#filtro-lote').value) {
+        carregarAnimais();
     }
 </script>
 {% endblock %}

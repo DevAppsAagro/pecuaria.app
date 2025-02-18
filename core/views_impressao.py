@@ -7,7 +7,7 @@ from .models import Animal, Pesagem, ManejoSanitario, MovimentacaoAnimal, Rateio
 from .models_compras import CompraAnimal, Compra
 from .models_vendas import VendaAnimal, Venda
 from .models_abates import AbateAnimal
-from django.db.models import Sum, F
+from django.db.models import Sum, F, Q
 from core.models import Despesa, Contato, Fazenda
 
 @login_required
@@ -592,6 +592,67 @@ def imprimir_compras(request):
 
 @login_required
 def vendas_print(request):
+    """View para impressão da lista de vendas"""
+    vendas = Venda.objects.filter(usuario=request.user)
+    
+    # Aplicar os mesmos filtros da lista
+    search_query = request.GET.get('search', '')
+    status = request.GET.get('status')
+    data_inicial = request.GET.get('data_inicial')
+    data_final = request.GET.get('data_final')
+
+    if search_query:
+        vendas = vendas.filter(
+            Q(comprador__nome__icontains=search_query) |
+            Q(animais__animal__brinco_visual__icontains=search_query)
+        ).distinct()
+
+    if status:
+        vendas = vendas.filter(status=status)
+    if data_inicial:
+        vendas = vendas.filter(data__gte=data_inicial)
+    if data_final:
+        vendas = vendas.filter(data__lte=data_final)
+
+    # Calcular totais
+    totais_status = {
+        'PAGO': {'valor': Decimal('0.00'), 'valor_formatado': 'R$ 0,00'},
+        'PENDENTE': {'valor': Decimal('0.00'), 'valor_formatado': 'R$ 0,00'},
+        'VENCE_HOJE': {'valor': Decimal('0.00'), 'valor_formatado': 'R$ 0,00'},
+        'VENCIDO': {'valor': Decimal('0.00'), 'valor_formatado': 'R$ 0,00'}
+    }
+
+    hoje = timezone.now().date()
+
+    for venda in vendas:
+        valor_total = sum(Decimal(str(animal.valor_total)) for animal in venda.animais.all())
+        
+        if venda.status == 'PAGO':
+            totais_status['PAGO']['valor'] += valor_total
+        elif venda.data_vencimento == hoje:
+            totais_status['VENCE_HOJE']['valor'] += valor_total
+        elif venda.data_vencimento < hoje:
+            totais_status['VENCIDO']['valor'] += valor_total
+        else:
+            totais_status['PENDENTE']['valor'] += valor_total
+
+    # Formatar valores
+    for status in totais_status:
+        totais_status[status]['valor_formatado'] = f"R$ {totais_status[status]['valor']:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
+
+    context = {
+        'vendas': vendas,
+        'totais_status': totais_status,
+        'status_filter': status,
+        'data_inicial': data_inicial,
+        'data_final': data_final,
+        'hoje': hoje
+    }
+
+    return render(request, 'core/vendas/print.html', context)
+
+@login_required
+def imprimir_vendas(request):
     # Obter os parâmetros do filtro
     comprador_id = request.GET.get('comprador')
     fazenda_id = request.GET.get('fazenda')
@@ -629,13 +690,12 @@ def vendas_print(request):
     for venda in vendas:
         if venda.status == 'PAGO':
             totais_status['PAGO']['valor'] += venda.valor_total
-        elif venda.status == 'PENDENTE':
-            if venda.data_vencimento == hoje:
-                totais_status['VENCE_HOJE']['valor'] += venda.valor_total
-            elif venda.data_vencimento < hoje:
-                totais_status['VENCIDO']['valor'] += venda.valor_total
-            else:
-                totais_status['PENDENTE']['valor'] += venda.valor_total
+        elif venda.data_vencimento == hoje:
+            totais_status['VENCE_HOJE']['valor'] += venda.valor_total
+        elif venda.data_vencimento < hoje:
+            totais_status['VENCIDO']['valor'] += venda.valor_total
+        else:
+            totais_status['PENDENTE']['valor'] += venda.valor_total
 
     # Formatar os valores
     for status in totais_status:

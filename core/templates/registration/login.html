@@ -12,13 +12,22 @@
                         <img src="{% static 'img/form-logo.svg' %}" alt="PecuaristaPRO" style="height: 50px;" class="mb-3">
                         <p class="text-muted">Entre com suas credenciais para continuar</p>
                     </div>
+                    {% if messages %}
+                    <div class="messages">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     <form method="post">
                         {% csrf_token %}
                         <div class="mb-3">
-                            <label for="id_username" class="form-label text-start d-block">Usuário</label>
+                            <label for="id_email" class="form-label text-start d-block">Email</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
-                                <input type="text" name="username" class="form-control" id="id_username" required>
+                                <span class="input-group-text bg-light"><i class="bi bi-envelope"></i></span>
+                                <input type="email" name="email" class="form-control" id="id_email" required>
                             </div>
                         </div>
                         <div class="mb-3">
@@ -36,21 +45,13 @@
                                 <input type="checkbox" class="form-check-input" id="rememberMe" name="remember_me">
                                 <label class="form-check-label" for="rememberMe">Lembrar de mim</label>
                             </div>
-                            <a href="#" class="text-decoration-none">Esqueceu a senha?</a>
+                            <a href="{% url 'reset_password' %}" class="text-decoration-none">Esqueceu a senha?</a>
                         </div>
-                        {% if form.errors %}
-                            <div class="alert alert-danger d-flex align-items-center">
-                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                                <div>Email ou senha incorretos.</div>
-                            </div>
-                        {% endif %}
-                        <div class="d-grid gap-2 mt-4">
-                            <button type="submit" class="btn btn-primary py-2">
-                                <i class="bi bi-box-arrow-in-right me-2"></i>Entrar
-                            </button>
+                        <div class="mb-3">
+                            <button type="submit" class="btn btn-primary w-100">Entrar</button>
                         </div>
-                        <div class="text-center mt-4">
-                            <p class="mb-0">Não tem uma conta? <a href="{% url 'register' %}" class="text-primary text-decoration-none">Registre-se</a></p>
+                        <div class="text-center">
+                            <p>Não tem uma conta? <a href="{% url 'register' %}" class="text-decoration-none">Registre-se</a></p>
                         </div>
                     </form>
                 </div>
@@ -69,7 +70,6 @@
             </div>
         </footer>
     </div>
-    
     <!-- Banner Lateral -->
     <div class="col-lg-6 d-none d-lg-flex bg-dark">
         <div class="w-100 d-flex align-items-center justify-content-center p-5">
@@ -81,7 +81,9 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
 document.getElementById('togglePassword').addEventListener('click', function() {
     const passwordInput = document.getElementById('id_password');

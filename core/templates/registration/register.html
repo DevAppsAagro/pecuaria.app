@@ -3,81 +3,76 @@
 
 {% block auth_content %}
 <div class="row g-0 min-vh-100">
-    <!-- Banner Lateral -->
-    <div class="col-lg-6 d-none d-lg-flex bg-dark">
-        <div class="w-100 d-flex align-items-center justify-content-center p-5">
-            <div class="text-center text-white" style="max-width: 600px;">
-                <img src="{% static 'img/banner-logo.svg' %}" alt="PecuaristaPRO" style="width: 600px; height: 200px;" class="mb-4">
-                <p class="lead">Gestão inteligente para sua fazenda</p>
-                <p class="opacity-75">Sistema completo para gestão de fazendas, controle de rebanho, financeiro e muito mais.</p>
-            </div>
-        </div>
-    </div>
-    
     <!-- Formulário -->
     <div class="col-12 col-lg-6 d-flex flex-column">
         <div class="flex-grow-1 d-flex align-items-center">
             <div class="w-100 px-4">
                 <div class="mx-auto" style="max-width: 400px;">
-                    <!-- Logo acima do formulário -->
                     <div class="text-center mb-4">
                         <img src="{% static 'img/form-logo.svg' %}" alt="PecuaristaPRO" style="height: 50px;" class="mb-3">
-                        <p class="text-muted">Crie sua conta para começar</p>
+                        <h4>Criar Conta</h4>
+                        <p class="text-muted">Preencha os dados abaixo para criar sua conta</p>
                     </div>
+                    {% if messages %}
+                    <div class="messages">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     <form method="post">
                         {% csrf_token %}
-                        <div class="mb-3">
-                            <label for="id_username" class="form-label text-start d-block">Usuário</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
-                                <input type="text" name="username" class="form-control" id="id_username" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="id_first_name" class="form-label">Nome</label>
+                                <input type="text" name="first_name" class="form-control" id="id_first_name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="id_last_name" class="form-label">Sobrenome</label>
+                                <input type="text" name="last_name" class="form-control" id="id_last_name" required>
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label for="id_email" class="form-label text-start d-block">Email</label>
+                            <label for="id_email" class="form-label">Email</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="bi bi-envelope"></i></span>
                                 <input type="email" name="email" class="form-control" id="id_email" required>
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label for="id_password1" class="form-label text-start d-block">Senha</label>
+                            <label for="id_password" class="form-label">Senha</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
-                                <input type="password" name="password1" class="form-control" id="id_password1" required>
-                                <button class="btn btn-outline-secondary" type="button" id="togglePassword1">
+                                <input type="password" name="password" class="form-control" id="id_password" required>
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
                                     <i class="bi bi-eye"></i>
                                 </button>
+                            </div>
+                            <div class="form-text">
+                                A senha deve ter no mínimo 8 caracteres, incluindo letras e números.
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label for="id_password2" class="form-label text-start d-block">Confirme a Senha</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="bi bi-lock-fill"></i></span>
-                                <input type="password" name="password2" class="form-control" id="id_password2" required>
-                                <button class="btn btn-outline-secondary" type="button" id="togglePassword2">
-                                    <i class="bi bi-eye"></i>
-                                </button>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="termsCheck" required>
+                                <label class="form-check-label" for="termsCheck">
+                                    Li e aceito os <a href="#" class="text-decoration-none">Termos de Uso</a> e a <a href="#" class="text-decoration-none">Política de Privacidade</a>
+                                </label>
                             </div>
                         </div>
-                        {% if form.errors %}
-                            <div class="alert alert-danger">
-                                {{ form.errors }}
-                            </div>
-                        {% endif %}
-                        <div class="d-grid gap-2 mt-4">
-                            <button type="submit" class="btn btn-primary py-2">
-                                <i class="bi bi-person-plus me-2"></i>Registrar
-                            </button>
+                        <div class="mb-3">
+                            <button type="submit" class="btn btn-primary w-100">Criar Conta</button>
                         </div>
-                        <div class="text-center mt-4">
-                            <p class="mb-0">Já tem uma conta? <a href="{% url 'login' %}" class="text-primary text-decoration-none">Faça login</a></p>
+                        <div class="text-center">
+                            <p>Já tem uma conta? <a href="{% url 'login' %}" class="text-decoration-none">Faça login</a></p>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
-        <!-- Footer -->
+         <!-- Footer -->
         <footer class="py-3 bg-light">
             <div class="mx-auto" style="max-width: 400px;">
                 <div class="text-center">
@@ -90,28 +85,34 @@
             </div>
         </footer>
     </div>
+    <!-- Banner Lateral -->
+    <div class="col-lg-6 d-none d-lg-flex bg-dark">
+        <div class="w-100 d-flex align-items-center justify-content-center p-5">
+            <div class="text-center text-white" style="max-width: 600px;">
+                <img src="{% static 'img/banner-logo.svg' %}" alt="PecuaristaPRO" style="width: 600px; height: 200px;" class="mb-4">
+                <p class="lead">Gestão inteligente para sua fazenda</p>
+                <p class="opacity-75">Sistema completo para gestão de fazendas, controle de rebanho, financeiro e muito mais.</p>
+            </div>
+        </div>
+    </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-// Toggle password visibility for both password fields
-function setupPasswordToggle(buttonId, inputId) {
-    document.getElementById(buttonId).addEventListener('click', function() {
-        const passwordInput = document.getElementById(inputId);
-        const icon = this.querySelector('i');
-        
-        if (passwordInput.type === 'password') {
-            passwordInput.type = 'text';
-            icon.classList.remove('bi-eye');
-            icon.classList.add('bi-eye-slash');
-        } else {
-            passwordInput.type = 'password';
-            icon.classList.remove('bi-eye-slash');
-            icon.classList.add('bi-eye');
-        }
-    });
-}
-
-setupPasswordToggle('togglePassword1', 'id_password1');
-setupPasswordToggle('togglePassword2', 'id_password2');
+document.getElementById('togglePassword').addEventListener('click', function() {
+    const passwordInput = document.getElementById('id_password');
+    const icon = this.querySelector('i');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+    } else {
+        passwordInput.type = 'password';
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
+    }
+});
 </script>
 {% endblock %}

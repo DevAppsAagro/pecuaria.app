@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">Minha Conta</h1>
+
+    <!-- Informações Pessoais -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0"><i class="bi bi-person-circle me-2"></i>Informações Pessoais</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" id="profile-form">
+                {% csrf_token %}
+                <div class="row">
+                    <!-- Foto do Perfil -->
+                    <div class="col-md-3 text-center mb-3">
+                        <div class="position-relative d-inline-block">
+                            <img src="{% if user.profile.photo_url %}{{ user.profile.photo_url }}{% else %}{% static 'img/default-profile.png' %}{% endif %}" 
+                                 class="rounded-circle img-thumbnail" style="width: 150px; height: 150px; object-fit: cover;" 
+                                 alt="Foto de Perfil" id="profile-photo-preview">
+                            <label for="photo-upload" class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle p-2" style="cursor: pointer;">
+                                <i class="bi bi-camera-fill"></i>
+                            </label>
+                            <input type="file" id="photo-upload" name="photo" class="d-none" accept="image/*">
+                        </div>
+                    </div>
+                    
+                    <!-- Campos de Informação -->
+                    <div class="col-md-9">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="first_name" class="form-label">Nome</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name" value="{{ user.first_name }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="last_name" class="form-label">Sobrenome</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name" value="{{ user.last_name }}" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="phone" class="form-label">Telefone</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" value="{{ user.profile.phone }}" 
+                                       pattern="\([0-9]{2}\) [0-9]{5}-[0-9]{4}" placeholder="(00) 00000-0000">
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary" name="action" value="update_profile">
+                                <i class="bi bi-check-circle me-2"></i>Salvar Alterações
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Alteração de Senha -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0"><i class="bi bi-shield-lock me-2"></i>Alterar Senha</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" id="password-form">
+                {% csrf_token %}
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="current_password" class="form-label">Senha Atual</label>
+                        <input type="password" class="form-control" id="current_password" name="current_password" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="new_password" class="form-label">Nova Senha</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="confirm_password" class="form-label">Confirmar Nova Senha</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <button type="submit" class="btn btn-primary" name="action" value="change_password">
+                        <i class="bi bi-key me-2"></i>Alterar Senha
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Informações do Plano -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0"><i class="bi bi-star me-2"></i>Seu Plano</h5>
+        </div>
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h4 class="mb-2">Plano Atual: <span class="text-primary">{{ user.profile.plan_name|default:"Plano Básico" }}</span></h4>
+                    <p class="text-muted mb-0">Status: <span class="badge bg-success">Ativo</span></p>
+                    <p class="text-muted mb-0">Próxima Cobrança: {{ user.profile.next_billing_date|default:"Não disponível" }}</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button class="btn btn-outline-primary" disabled>
+                        <i class="bi bi-arrow-up-circle me-2"></i>Gerenciar Plano
+                        <small class="d-block">(Em breve)</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.getElementById('photo-upload').addEventListener('change', function(e) {
+    if (this.files && this.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('profile-photo-preview').src = e.target.result;
+        };
+        reader.readAsDataURL(this.files[0]);
+    }
+});
+
+// Máscara para o telefone
+document.getElementById('phone').addEventListener('input', function(e) {
+    var x = e.target.value.replace(/\D/g, '').match(/(\d{0,2})(\d{0,5})(\d{0,4})/);
+    e.target.value = !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '');
+});
+</script>
+{% endblock %}
+{% endblock %}

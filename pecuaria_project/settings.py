@@ -126,15 +126,17 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
-
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'core', 'static'),
-    os.path.join(BASE_DIR, 'public'),  
-]
+if DEBUG:
+    STATICFILES_DIRS = [
+        os.path.join(BASE_DIR, 'core', 'static'),
+        os.path.join(BASE_DIR, 'public'),
+    ]
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+else:
+    # Em produção (Vercel), os arquivos estáticos são servidos da pasta static
+    STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Configuração de MIME types
 MIMETYPES = {
@@ -145,10 +147,6 @@ MIMETYPES = {
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Em produção, os arquivos estáticos são servidos diretamente pelo Vercel
-if not DEBUG:
-    STATIC_ROOT = os.path.join(BASE_DIR, 'public')
-
 CORS_ALLOW_ALL_ORIGINS = True  # Apenas para desenvolvimento
 CORS_ALLOW_CREDENTIALS = True
 
@@ -156,6 +154,42 @@ CORS_ALLOW_CREDENTIALS = True
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
+
+# Eduzz Settings
+EDUZZ_API_KEY = config('EDUZZ_API_KEY', default='')
+EDUZZ_PUBLIC_KEY = config('EDUZZ_PUBLIC_KEY', default='')
+
+# ID da planilha na Eduzz
+EDUZZ_PLANILHA_ID = config('EDUZZ_PLANILHA_ID', default='')
+
+# Produtos COM adesão (novos clientes)
+EDUZZ_SOFTWARE_MENSAL_ID = config('EDUZZ_SOFTWARE_MENSAL_ID', default='')
+EDUZZ_SOFTWARE_ANUAL_ID = config('EDUZZ_SOFTWARE_ANUAL_ID', default='')
+
+# Produtos SEM adesão (clientes da planilha)
+EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID = config('EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID', default='')
+EDUZZ_SOFTWARE_ANUAL_SEM_ADESAO_ID = config('EDUZZ_SOFTWARE_ANUAL_SEM_ADESAO_ID', default='')
+
+# Produto cortesia
+EDUZZ_SOFTWARE_CORTESIA_ID = config('EDUZZ_SOFTWARE_CORTESIA_ID', default='')
+
+# Supabase Settings
+SUPABASE_URL = config('SUPABASE_URL')
+SUPABASE_KEY = config('SUPABASE_KEY')
+SUPABASE_SERVICE_KEY = config('SUPABASE_SERVICE_KEY')  # Para operações administrativas
+
+# Email settings para verificação
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
+
+# Storage settings
+SUPABASE_STORAGE_BUCKET = 'profile-photos'  # Bucket para fotos de perfil
+SUPABASE_RECEIPTS_BUCKET = 'payment-receipts'  # Bucket para comprovantes
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

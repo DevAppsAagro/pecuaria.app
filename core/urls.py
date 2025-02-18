@@ -15,6 +15,7 @@ from . import views_reproducao
 from . import views_config
 from . import importacao_views
 from django.contrib.auth import views as auth_views
+from . import views_account  # Nova importação
 from .views_fazenda import (
     salvar_coordenadas_benfeitoria,
     get_coordenadas_benfeitoria,
@@ -22,6 +23,7 @@ from .views_fazenda import (
     get_pastos,
     get_cidade_fazenda,
 )
+from . import views_eduzz  # Nova importação
 
 urlpatterns = [
     # Dashboard
@@ -162,18 +164,19 @@ urlpatterns = [
     path('financeiro/vendas/<int:pk>/', views_vendas.detalhe_venda, name='detalhe_venda'),
     path('financeiro/vendas/<int:pk>/editar/', views_vendas.editar_venda, name='editar_venda'),
     path('financeiro/vendas/<int:pk>/excluir/', views_vendas.excluir_venda, name='excluir_venda'),
+    path('financeiro/vendas/get-animais-por-lote/', views_vendas.get_animais_por_lote, name='get_animais_por_lote_venda'),
+    path('financeiro/vendas/parcela/<int:parcela_id>/pagamento/', views_vendas.registrar_pagamento_venda, name='registrar_pagamento_venda'),
+    path('financeiro/vendas/parcela/<int:parcela_id>/historico/', views_vendas.historico_pagamentos_venda, name='historico_pagamentos_venda'),
     path('financeiro/vendas/imprimir/', views_impressao.vendas_print, name='vendas_print'),
-    path('api/financeiro/vendas/get_peso_atual/<int:pk>/', views_vendas.get_peso_atual_json, name='get_peso_atual_json'),
-    path('api/financeiro/vendas/registrar_pagamento/<int:parcela_id>/', views_vendas.registrar_pagamento_venda, name='registrar_pagamento_venda'),
-    path('api/financeiro/vendas/historico_pagamentos/<int:parcela_id>/', views_vendas.historico_pagamentos_venda, name='historico_pagamentos_venda'),
     
     # Abates
     path('financeiro/abates/', views_abates.lista_abates, name='abates_list'),
-    path('financeiro/abates/criar/', views_abates.criar_abate, name='abates_criar'),
-    path('financeiro/abates/<int:pk>/', views_abates.detalhe_abate, name='abates_detalhe'),
-    path('financeiro/abates/<int:pk>/editar/', views_abates.editar_abate, name='abates_editar'),
-    path('financeiro/abates/<int:pk>/excluir/', views_abates.excluir_abate, name='abates_excluir'),
+    path('financeiro/abates/criar/', views_abates.criar_abate, name='criar_abate'),
+    path('financeiro/abates/<int:pk>/', views_abates.detalhe_abate, name='detalhe_abate'),
+    path('financeiro/abates/<int:pk>/editar/', views_abates.editar_abate, name='editar_abate'),
+    path('financeiro/abates/<int:pk>/excluir/', views_abates.excluir_abate, name='excluir_abate'),
     path('financeiro/abates/imprimir/', views_abates.imprimir_abates, name='abates_imprimir'),
+    path('financeiro/abates/get-animais-por-lote/', views_abates.get_animais_por_lote, name='get_animais_por_lote'),
     path('financeiro/abates/parcela/<int:parcela_id>/pagamento/', views_abates.registrar_pagamento_abate, name='registrar_pagamento_abate'),
     path('financeiro/abates/parcela/<int:parcela_id>/historico/', views_abates.historico_pagamentos_abate, name='historico_pagamentos_abate'),
     path('api/animal/peso/', views_abates.get_peso_atual_json, name='animal_peso_api'),
@@ -245,6 +248,17 @@ urlpatterns = [
     path('api/pastos-por-fazenda/<int:fazenda_id>/', views.get_pastos_por_fazenda, name='api_pastos_por_fazenda'),
     path('api/lotes-por-fazenda/<int:fazenda_id>/', views.get_lotes_por_fazenda, name='api_lotes_por_fazenda'),
     
+    # Eduzz Integration
+    path('api/eduzz/webhook/', views_eduzz.eduzz_webhook, name='eduzz_webhook'),
+    path('api/eduzz/checkout/', views_eduzz.create_checkout, name='eduzz_checkout'),
+    path('eduzz/checkout/', views_eduzz.checkout_page, name='eduzz_checkout_page'),
+    
+    # Planos e Checkout
+    path('planos/', views_eduzz.planos, name='planos'),
+    path('planos/verificar-email/', views_eduzz.verificar_email, name='verificar_email'),
+    path('planos/mensal/', views_eduzz.plano_mensal, name='plano_mensal'),
+    path('planos/anual/', views_eduzz.plano_anual, name='plano_anual'),
+    
     # Configurações - Raças
     path('configuracoes/racas/', views.raca_list, name='raca_list'),
     path('configuracoes/racas/nova/', views.raca_create, name='raca_create'),
@@ -296,10 +310,16 @@ urlpatterns = [
     # Bulk Actions
     path('pastos-por-fazenda/<int:fazenda_id>/', views.pastos_por_fazenda, name='pastos_por_fazenda'),
     
+    # Conta
+    path('conta/perfil/', views_account.profile_view, name='profile'),
+    
     # Auth URLs
-    path('login/', auth_views.LoginView.as_view(), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('login/', views.login_view, name='login'),
     path('register/', views.register_view, name='register'),
+    path('auth/verify-email/', views.verificar_email_view, name='verify-email'),
+    path('reset-password/', views.reset_password_view, name='reset_password'),
+    path('verify-email/', views.verificar_email_view, name='verify_email'),
+    path('logout/', views.logout_view, name='logout'),
     path('aguardando-pagamento/', views.awaiting_payment, name='awaiting_payment'),
     path('configuracoes/', views.configuracoes, name='configuracoes'),
     
@@ -312,4 +332,6 @@ urlpatterns = [
     # API para buscar subcategorias por categoria
     path('core/get_subcategorias_por_categoria/<int:categoria_id>/', views.get_subcategorias_por_categoria, name='get_subcategorias_por_categoria'),
     
+    # Adicionando URL para a página de verificação de email
+    path('verificar-email/', views.verificar_email_view, name='verificar_email'),
 ]

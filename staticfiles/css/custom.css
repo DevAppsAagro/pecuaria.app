@@ -43,3 +43,144 @@ body {
     font-family: 'Source Sans Pro', sans-serif !important;
     font-weight: 400 !important;
 }
+
+/* Ajustes do Menu Lateral */
+.nav-sidebar {
+    padding-bottom: 60px; /* Espaço extra no final do menu */
+}
+
+.nav-sidebar .nav-link p {
+    margin-bottom: 0;
+    white-space: normal; /* Permite quebra de linha em textos longos */
+    line-height: 1.2;
+}
+
+.nav-sidebar .nav-link i.right {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.nav-sidebar .nav-treeview {
+    display: none;
+    list-style: none;
+    padding: 0;
+    margin-left: 1rem;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    margin: 0.25rem 1rem;
+}
+
+.nav-sidebar .nav-treeview .nav-item {
+    padding: 0;
+    margin: 0;
+}
+
+.nav-sidebar .nav-treeview .nav-link {
+    padding: 0.5rem 1rem;
+    font-size: 0.95rem;
+}
+
+.nav-sidebar .nav-item.menu-open > .nav-treeview {
+    display: block;
+    padding: 0.25rem 0;
+}
+
+.nav-sidebar .nav-link {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    transition: all 0.2s ease;
+}
+
+.nav-sidebar .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-sidebar .nav-link i.nav-icon {
+    margin-right: 0.75rem;
+    width: 1.6rem;
+    text-align: center;
+    font-size: 1.1rem;
+    min-width: 1.6rem;
+}
+
+/* Ajuste para o menu colapsado */
+.sidebar-mini.sidebar-collapse .main-sidebar:not(:hover) .nav-sidebar .nav-link p {
+    display: none;
+}
+
+.sidebar-mini.sidebar-collapse .main-sidebar:not(:hover) .nav-sidebar .nav-treeview {
+    display: none !important;
+}
+
+.sidebar-mini.sidebar-collapse .main-sidebar:hover {
+    width: 250px;
+}
+
+.sidebar-mini.sidebar-collapse .main-sidebar:hover .nav-sidebar .nav-link p {
+    display: inline;
+}
+
+/* Ajuste da altura máxima do menu */
+.sidebar {
+    height: calc(100vh - 3.5rem);
+    overflow-y: auto;
+    padding-bottom: 60px;
+}
+
+/* Estilização da barra de rolagem */
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Estilos para submenu */
+.nav-treeview .nav-link {
+    padding-left: 2.5rem;
+}
+
+.nav-treeview .nav-icon {
+    font-size: 0.9rem !important;
+}
+
+/* Ajuste do wrapper e conteúdo */
+.wrapper {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.content-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.content {
+    flex: 1;
+}
+
+/* Removendo margens e paddings desnecessários */
+.content-wrapper > .content {
+    padding-bottom: 0;
+}
+
+.container-fluid {
+    height: 100%;
+}

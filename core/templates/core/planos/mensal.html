@@ -1,0 +1,41 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Plano Mensal{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">Plano Mensal - R$ 99,90/mês</h3>
+                </div>
+                <div class="card-body">
+                    <!-- Checkout da Eduzz -->
+                    <div id="elements"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.eduzzcdn.com/sun/bridge/bridge.js" async type="module"></script>
+<script>
+    (function () {
+        const load = function () {
+            window.Eduzz.Checkout.init({
+                contentId: "89AQV3B6WD",  // ID do produto mensal na Eduzz (2655883)
+                target: "elements",
+                errorCover: false
+            });
+        }
+        if (document.readyState === 'complete') {
+            load();
+            return;
+        }
+        window.addEventListener('load', load);
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Planos{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <!-- Plano Mensal -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h4 class="mb-0">Plano Mensal</h4>
+                </div>
+                <div class="card-body d-flex flex-column">
+                    <h2 class="text-center mb-4">R$ 99,90<small class="text-muted">/mês</small></h2>
+                    <ul class="list-unstyled mb-4">
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Acesso a todas as funcionalidades</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Suporte prioritário</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Atualizações gratuitas</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Sem limite de animais</li>
+                    </ul>
+                    <div class="mt-auto">
+                        <a href="{% url 'verificar_email' %}?plano=mensal" class="btn btn-primary btn-lg w-100">Assinar Agora</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plano Anual -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 border-primary">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h4 class="mb-0">Plano Anual</h4>
+                    <span class="badge bg-warning text-dark">2 Meses Grátis!</span>
+                </div>
+                <div class="card-body d-flex flex-column">
+                    <h2 class="text-center mb-4">R$ 999,90<small class="text-muted">/ano</small></h2>
+                    <ul class="list-unstyled mb-4">
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Todas as funcionalidades do plano mensal</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Economia de 2 meses</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Preço fixo garantido</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Prioridade máxima no suporte</li>
+                    </ul>
+                    <div class="mt-auto">
+                        <a href="{% url 'verificar_email' %}?plano=anual" class="btn btn-primary btn-lg w-100">Assinar Agora</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

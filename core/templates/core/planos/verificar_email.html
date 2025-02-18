@@ -1,0 +1,33 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Verificar Email{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">Verificar Email</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{% url 'verificar_email' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="plano" value="{{ plano }}">
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                            <div class="form-text">
+                                Se você já comprou nossa planilha, use o mesmo email para ganhar desconto na adesão!
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Continuar para o Checkout</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

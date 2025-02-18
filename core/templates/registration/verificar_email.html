@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body text-center p-5">
+                    <img src="{% static 'img/email-sent.svg' %}" alt="Email enviado" class="mb-4" style="width: 120px;">
+                    
+                    <h2 class="mb-4">Verifique seu Email</h2>
+                    
+                    <p class="text-muted mb-4">
+                        Enviamos um link de confirmação para o seu email.<br>
+                        Por favor, clique no link para ativar sua conta.
+                    </p>
+
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        O email pode levar alguns minutos para chegar.<br>
+                        Não se esqueça de verificar sua pasta de spam.
+                    </div>
+
+                    <hr class="my-4">
+
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'login' %}" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt me-2"></i>Ir para Login
+                        </a>
+                        <button onclick="window.location.reload()" class="btn btn-outline-secondary">
+                            <i class="fas fa-sync-alt me-2"></i>Atualizar Página
+                        </button>
+                    </div>
+
+                    <div class="mt-4">
+                        <small class="text-muted">
+                            Não recebeu o email? 
+                            <a href="{% url 'register' %}" class="text-decoration-none">Tente registrar novamente</a>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border: none;
+    border-radius: 15px;
+}
+
+.btn {
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.alert {
+    border-radius: 8px;
+}
+</style>
+{% endblock %}

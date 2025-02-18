@@ -77,9 +77,18 @@
                         <i class="bi bi-person-circle"></i> {{ user.username }}
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                        <li><a class="dropdown-item" href="{% url 'selecionar_fazenda' %}"><i class="bi bi-building"></i> Selecionar Fazenda</a></li>
+                        <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person"></i> Conta</a></li>
+                        <li><a class="dropdown-item" href="#"><i class="bi bi-wallet2"></i> Financeiro</a></li>
+                        <li><a class="dropdown-item" href="#"><i class="bi bi-palette"></i> Tema</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
+                        <li>
+                            <form method="post" action="{% url 'logout' %}" class="m-0">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item">
+                                    <i class="bi bi-box-arrow-right"></i> Sair
+                                </button>
+                            </form>
+                        </li>
                     </ul>
                 </li>
             </ul>

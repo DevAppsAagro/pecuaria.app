@@ -167,11 +167,6 @@ def criar_abate(request):
     
     context = {
         'form': form,
-        'animais_disponiveis': Animal.objects.filter(
-            usuario=request.user, 
-            situacao='ATIVO'
-        ).select_related('fazenda_atual', 'lote').order_by('brinco_visual'),
-        'animais_selecionados': [],  # Lista vazia para novo abate
         'fazendas': Fazenda.objects.filter(usuario=request.user),
         'lotes': Lote.objects.filter(usuario=request.user)
     }
@@ -432,5 +427,37 @@ def get_peso_atual_json(request):
         return JsonResponse({'peso': float(peso)})
     except Animal.DoesNotExist:
         return JsonResponse({'error': 'Animal não encontrado'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def get_animais_por_lote(request):
+    """Retorna lista de animais filtrados por fazenda e lote em formato JSON"""
+    fazenda_id = request.GET.get('fazenda_id')
+    lote_id = request.GET.get('lote_id')
+    
+    if not (fazenda_id and lote_id):
+        return JsonResponse({'error': 'Fazenda e lote são obrigatórios'}, status=400)
+    
+    try:
+        animais = Animal.objects.filter(
+            usuario=request.user,
+            situacao='ATIVO',
+            fazenda_atual_id=fazenda_id,
+            lote_id=lote_id
+        ).select_related('lote').order_by('brinco_visual')
+        
+        data = []
+        for animal in animais:
+            peso_atual = get_peso_atual(animal)
+            data.append({
+                'id': animal.id,
+                'brinco_visual': animal.brinco_visual,
+                'lote': animal.lote.id_lote if animal.lote else '-',
+                'peso_atual': peso_atual,
+                'peso_arroba': (peso_atual * Decimal('0.5')) / 15 if peso_atual else 0,  # Rendimento padrão de 50%
+            })
+        
+        return JsonResponse({'animais': data})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
