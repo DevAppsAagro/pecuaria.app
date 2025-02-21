@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <!-- Informações do Plano Atual -->
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Seu Plano Atual</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">{{ subscription.plan_name }}</h6>
+                    <p class="card-text">
+                        <strong>Status:</strong> 
+                        {% if subscription.status == 'active' %}
+                            <span class="badge bg-success">Ativo</span>
+                        {% else %}
+                            <span class="badge bg-warning">Inativo</span>
+                        {% endif %}
+                    </p>
+                    <p class="card-text">
+                        <strong>Valor:</strong> R$ {{ subscription.amount|floatformat:2 }}
+                    </p>
+                    <p class="card-text">
+                        <strong>Início:</strong> {{ subscription.start_date|date:"d/m/Y" }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Próxima Fatura -->
+        <div class="col-md-8 mb-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">Próxima Fatura</h5>
+                </div>
+                <div class="card-body">
+                    {% if next_invoice %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Vencimento:</strong> {{ next_invoice.due_date|date:"d/m/Y" }}</p>
+                                <p><strong>Valor:</strong> R$ {{ next_invoice.amount|floatformat:2 }}</p>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <a href="{{ next_invoice.payment_url }}" class="btn btn-primary" target="_blank">
+                                    <i class="bi bi-credit-card"></i> Pagar Fatura
+                                </a>
+                            </div>
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">Não há faturas pendentes.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Histórico de Faturas -->
+    <div class="card">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="card-title mb-0">Histórico de Faturas</h5>
+        </div>
+        <div class="card-body">
+            {% if paid_invoices %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Vencimento</th>
+                                <th>Valor</th>
+                                <th>Status</th>
+                                <th>Comprovante</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invoice in paid_invoices %}
+                            <tr>
+                                <td>{{ invoice.created_at|date:"d/m/Y" }}</td>
+                                <td>{{ invoice.due_date|date:"d/m/Y" }}</td>
+                                <td>R$ {{ invoice.amount|floatformat:2 }}</td>
+                                <td>
+                                    <span class="badge bg-success">Pago</span>
+                                </td>
+                                <td>
+                                    <a href="{{ invoice.invoice_url }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                        <i class="bi bi-file-pdf"></i> PDF
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">Não há faturas pagas no histórico.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Botão para Mudar de Plano -->
+    <div class="text-center mt-4">
+        <a href="{% url 'planos' %}" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-repeat"></i> Mudar de Plano
+        </a>
+    </div>
+</div>
+
+<!-- Mensagens de Feedback -->
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+{% endblock %}

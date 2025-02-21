@@ -184,6 +184,7 @@
 <script type="text/javascript" src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 <script type="text/javascript" src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 <script type="text/javascript" src="https://cdn.datatables.net/select/1.3.4/js/dataTables.select.min.js"></script>
+<script type="text/javascript" src="{% static 'js/dataTables.pt-BR.js' %}"></script>
 
 <script>
     let dataTable;
@@ -242,6 +243,24 @@
     document.querySelector('#id_tipo_venda').addEventListener('change', atualizarValoresTabela);
     document.querySelector('#id_valor_unitario').addEventListener('input', atualizarValoresTabela);
 
+    // Event listener para os checkboxes dos animais
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('animal-checkbox')) {
+            atualizarValorTotal();
+            atualizarResumoSelecao();
+        }
+    });
+
+    // Event listener para o checkbox 'selecionar todos'
+    document.getElementById('selecionar-todos').addEventListener('change', function(e) {
+        const checkboxes = document.querySelectorAll('.animal-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = e.target.checked;
+        });
+        atualizarValorTotal();
+        atualizarResumoSelecao();
+    });
+
     function carregarAnimais() {
         const fazendaId = document.querySelector('#filtro-fazenda').value;
         const loteId = document.querySelector('#filtro-lote').value;
@@ -251,119 +270,61 @@
             return;
         }
 
-        fetch(`/financeiro/vendas/get-animais-por-lote/?fazenda_id=${fazendaId}&lote_id=${loteId}`)
-            .then(response => response.json())
-            .then(data => {
-                // Destruir o DataTable existente se houver
-                if (dataTable) {
-                    dataTable.destroy();
-                }
+        try {
+            // Mostrar indicador de carregamento
+            document.querySelector('#tabela-animais').style.display = 'none';
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loading-indicator';
+            loadingDiv.className = 'text-center mt-3';
+            loadingDiv.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div>';
+            document.querySelector('#tabela-animais').parentNode.insertBefore(loadingDiv, document.querySelector('#tabela-animais'));
 
-                // Limpar a tabela
-                const tbody = document.querySelector('#tabela-animais-datatable tbody');
-                tbody.innerHTML = '';
+            fetch(`/financeiro/vendas/get-animais-por-lote/?fazenda_id=${fazendaId}&lote_id=${loteId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Remover indicador de carregamento
+                    document.getElementById('loading-indicator')?.remove();
 
-                // Adicionar os animais à tabela
-                data.animais.forEach(animal => {
-                    const tr = document.createElement('tr');
-                    
-                    // Criar o checkbox
-                    const tdCheckbox = document.createElement('td');
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.name = 'animal';
-                    checkbox.value = animal.id;
-                    checkbox.className = 'animal-checkbox';
-                    checkbox.setAttribute('data-id', animal.id); // Adiciona o ID como atributo
-                    tdCheckbox.appendChild(checkbox);
-                    tr.appendChild(tdCheckbox);
-                    
-                    // Criar as outras células
-                    const tdBrinco = document.createElement('td');
-                    tdBrinco.textContent = animal.brinco_visual;
-                    tr.appendChild(tdBrinco);
-                    
-                    const tdLote = document.createElement('td');
-                    tdLote.textContent = animal.lote;
-                    tr.appendChild(tdLote);
-                    
-                    const tdPeso = document.createElement('td');
-                    tdPeso.textContent = animal.peso_atual;
-                    tr.appendChild(tdPeso);
-                    
-                    const tdValor = document.createElement('td');
-                    tdValor.className = 'valor-animal';
-                    tdValor.textContent = 'R$ 0,00';
-                    tr.appendChild(tdValor);
-                    
-                    tbody.appendChild(tr);
-                });
+                    if (dataTable) {
+                        dataTable.destroy();
+                    }
 
-                // Mostrar a tabela
-                document.querySelector('#tabela-animais').style.display = 'block';
+                    const tbody = document.querySelector('#tabela-animais-datatable tbody');
+                    tbody.innerHTML = '';
 
-                // Inicializar DataTable
-                dataTable = $('#tabela-animais-datatable').DataTable({
-                    language: {
-                        "sEmptyTable": "Nenhum registro encontrado",
-                        "sInfo": "Mostrando de _START_ até _END_ de _TOTAL_ registros",
-                        "sInfoEmpty": "Mostrando 0 até 0 de 0 registros",
-                        "sInfoFiltered": "(Filtrados de _MAX_ registros)",
-                        "sInfoPostFix": "",
-                        "sInfoThousands": ".",
-                        "sLengthMenu": "_MENU_ resultados por página",
-                        "sLoadingRecords": "Carregando...",
-                        "sProcessing": "Processando...",
-                        "sZeroRecords": "Nenhum registro encontrado",
-                        "sSearch": "Pesquisar",
-                        "oPaginate": {
-                            "sNext": "Próximo",
-                            "sPrevious": "Anterior",
-                            "sFirst": "Primeiro",
-                            "sLast": "Último"
-                        },
-                        "oAria": {
-                            "sSortAscending": ": Ordenar colunas de forma ascendente",
-                            "sSortDescending": ": Ordenar colunas de forma descendente"
-                        },
-                        "select": {
-                            "rows": {
-                                "_": "Selecionado %d linhas",
-                                "0": "Nenhuma linha selecionada",
-                                "1": "Selecionado 1 linha"
-                            }
-                        }
-                    },
-                    pageLength: 10,
-                    lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Todos"]],
-                    order: [[1, 'asc']]
-                });
-
-                // Atualizar os valores na tabela
-                atualizarValoresTabela();
-
-                // Adicionar event listener para os checkboxes
-                document.querySelectorAll('.animal-checkbox').forEach(checkbox => {
-                    checkbox.addEventListener('change', () => {
-                        atualizarValorTotal();
-                        atualizarResumoSelecao();
+                    data.animais.forEach(animal => {
+                        const row = `
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="animal" value="${animal.id}" 
+                                        class="animal-checkbox" 
+                                        data-peso="${animal.peso_atual || 0}"
+                                        data-id="${animal.id}">  <!-- Adicionado data-id aqui -->
+                                </td>
+                                <td>${animal.brinco_visual}</td>
+                                <td>${animal.lote || '-'}</td>
+                                <td>${animal.peso_atual || '-'}</td>
+                                <td class="valor-animal">R$ 0,00</td>
+                            </tr>
+                        `;
+                        tbody.insertAdjacentHTML('beforeend', row);
                     });
+
+                    // Inicializar DataTable
+                    dataTable = $('#tabela-animais-datatable').DataTable();
+
+                    document.querySelector('#tabela-animais').style.display = 'block';
+                    atualizarValoresTabela();
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar animais:', error);
+                    alert('Erro ao carregar animais. Por favor, tente novamente.');
                 });
 
-                // Event listener para o checkbox "selecionar todos"
-                document.querySelector('#selecionar-todos').addEventListener('change', function() {
-                    const isChecked = this.checked;
-                    document.querySelectorAll('.animal-checkbox').forEach(checkbox => {
-                        checkbox.checked = isChecked;
-                    });
-                    atualizarValorTotal();
-                    atualizarResumoSelecao();
-                });
-            })
-            .catch(error => {
-                console.error('Erro ao carregar animais:', error);
-                alert('Erro ao carregar animais. Por favor, tente novamente.');
-            });
+        } catch (error) {
+            console.error('Erro ao carregar animais:', error);
+            alert('Erro ao carregar animais. Por favor, tente novamente.');
+        }
     }
 
     function validarFormulario() {

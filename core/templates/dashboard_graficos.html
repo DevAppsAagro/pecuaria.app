@@ -1,266 +1,308 @@
 <!-- Gráficos -->
-<div class="container-fluid mt-4">
-    <!-- Primeira linha - Evolução de Peso e GMD -->
+<div class="dashboard-graphs">
     <div class="row">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Evolução do Peso</h5>
+        <div class="col-lg-8">
+            <div class="graph-card">
+                <div class="graph-header">
+                    <h5>Evolução do Rebanho</h5>
+                    <div class="graph-actions">
+                        <select class="form-select form-select-sm">
+                            <option>Último Ano</option>
+                            <option>Últimos 6 Meses</option>
+                            <option>Último Mês</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <canvas id="grafico-peso" height="250"></canvas>
+                <div class="graph-body">
+                    <canvas id="grafico-evolucao"></canvas>
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Evolução do GMD</h5>
+        <div class="col-lg-4">
+            <div class="graph-card">
+                <div class="graph-header">
+                    <h5>Distribuição do Rebanho</h5>
                 </div>
-                <div class="card-body">
-                    <canvas id="grafico-gmd" height="250"></canvas>
+                <div class="graph-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Categoria</th>
+                                    <th class="text-end">Qtd.</th>
+                                    <th class="text-end">%</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Bezerros</td>
+                                    <td class="text-end">150</td>
+                                    <td class="text-end">30%</td>
+                                </tr>
+                                <tr>
+                                    <td>Novilhas</td>
+                                    <td class="text-end">125</td>
+                                    <td class="text-end">25%</td>
+                                </tr>
+                                <tr>
+                                    <td>Bois</td>
+                                    <td class="text-end">100</td>
+                                    <td class="text-end">20%</td>
+                                </tr>
+                                <tr>
+                                    <td>Vacas</td>
+                                    <td class="text-end">125</td>
+                                    <td class="text-end">25%</td>
+                                </tr>
+                                <tr class="table-light">
+                                    <td><strong>Total</strong></td>
+                                    <td class="text-end"><strong>500</strong></td>
+                                    <td class="text-end"><strong>100%</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="distribution-bars p-3">
+                        <canvas id="grafico-distribuicao"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Segunda linha - Reprodução e Mortalidade -->
     <div class="row mt-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Taxa de Prenhez por Estação</h5>
+        <div class="col-lg-4">
+            <div class="graph-card">
+                <div class="graph-header">
+                    <h5>Distribuição por Categoria</h5>
                 </div>
-                <div class="card-body">
-                    <canvas id="grafico-prenhez" height="250"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Indicadores de Perdas</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="grafico-perdas" height="250"></canvas>
+                <div class="graph-body">
+                    <canvas id="grafico-categorias"></canvas>
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Terceira linha - Financeiro -->
-    <div class="row mt-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Custos Operacionais</h5>
+        <div class="col-lg-8">
+            <div class="graph-card">
+                <div class="graph-header">
+                    <h5>Resultado Financeiro</h5>
                 </div>
-                <div class="card-body">
-                    <canvas id="grafico-custos-operacionais" height="250"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Distribuição de Custos</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="grafico-distribuicao-custos" height="250"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quarta linha - Confinamento -->
-    <div class="row mt-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Desempenho Confinamento</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="grafico-confinamento" height="250"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Evolução do ROI</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="grafico-roi" height="250"></canvas>
+                <div class="graph-body">
+                    <canvas id="grafico-financeiro"></canvas>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<style>
+.dashboard-graphs {
+    margin-top: -1rem;
+}
+.graph-card {
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    height: 100%;
+}
+.graph-header {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.graph-header h5 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+.graph-body {
+    padding: 1rem;
+    height: 300px;
+}
+.graph-actions select {
+    width: 150px;
+}
+.table th, .table td {
+    padding: 0.5rem 1rem;
+}
+.distribution-bars {
+    height: 120px;
+}
+</style>
+
 <script>
-// Gráfico de Evolução do Peso
-const configPeso = {
-    type: 'line',
-    data: {
-        labels: {{ dados_graficos.evolucao_peso.labels|safe }},
-        datasets: [{
-            label: 'Peso (kg)',
-            data: {{ dados_graficos.evolucao_peso.data|safe }},
-            borderColor: '#007bff',
-            backgroundColor: '#007bff20',
-            tension: 0.1
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false
-    }
-};
+$(document).ready(function() {
+    // Gráfico de Evolução
+    new Chart(document.getElementById('grafico-evolucao').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+            datasets: [{
+                label: 'Peso Médio (kg)',
+                data: [380, 395, 410, 430, 445, 460, 480, 495, 510, 525, 540, 560],
+                borderColor: '#4e73df',
+                tension: 0.4,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false
+                }
+            }
+        }
+    });
 
-// Gráfico de GMD
-const configGMD = {
-    type: 'line',
-    data: {
-        labels: {{ dados_graficos.evolucao_gmd.labels|safe }},
-        datasets: [{
-            label: 'GMD (kg/dia)',
-            data: {{ dados_graficos.evolucao_gmd.data|safe }},
-            borderColor: '#28a745',
-            backgroundColor: '#28a74520',
-            tension: 0.1
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false
-    }
-};
+    // Gráfico de Distribuição (Barras horizontais)
+    new Chart(document.getElementById('grafico-distribuicao').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: ['Distribuição'],
+            datasets: [
+                {
+                    label: 'Bezerros',
+                    data: [30],
+                    backgroundColor: '#1cc88a',
+                    barPercentage: 1,
+                    categoryPercentage: 1
+                },
+                {
+                    label: 'Novilhas',
+                    data: [25],
+                    backgroundColor: '#4e73df',
+                    barPercentage: 1,
+                    categoryPercentage: 1
+                },
+                {
+                    label: 'Bois',
+                    data: [20],
+                    backgroundColor: '#36b9cc',
+                    barPercentage: 1,
+                    categoryPercentage: 1
+                },
+                {
+                    label: 'Vacas',
+                    data: [25],
+                    backgroundColor: '#f6c23e',
+                    barPercentage: 1,
+                    categoryPercentage: 1
+                }
+            ]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    display: false,
+                    max: 100
+                },
+                y: {
+                    stacked: true,
+                    display: false
+                }
+            }
+        }
+    });
 
-// Gráfico de Taxa de Prenhez
-const configPrenhez = {
-    type: 'bar',
-    data: {
-        labels: {{ dados_graficos.taxa_prenhez.labels|safe }},
-        datasets: [{
-            label: 'Taxa (%)',
-            data: {{ dados_graficos.taxa_prenhez.data|safe }},
-            backgroundColor: '#6f42c1'
-        }, {
-            label: 'Meta',
-            type: 'line',
-            data: Array(5).fill({{ dados_graficos.taxa_prenhez.meta }}),
-            borderColor: '#dc3545',
-            borderDash: [5, 5],
-            fill: false
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false
-    }
-};
+    // Gráfico de Categorias
+    new Chart(document.getElementById('grafico-categorias').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Bezerros', 'Novilhas', 'Bois', 'Vacas'],
+            datasets: [{
+                data: [30, 25, 20, 25],
+                backgroundColor: ['#1cc88a', '#4e73df', '#36b9cc', '#f6c23e']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
 
-// Gráfico de Perdas
-const configPerdas = {
-    type: 'bar',
-    data: {
-        labels: {{ dados_graficos.perdas_reproducao.labels|safe }},
-        datasets: [{
-            label: 'Taxa (%)',
-            data: {{ dados_graficos.perdas_reproducao.data|safe }},
-            backgroundColor: '#dc3545'
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false
-    }
-};
-
-// Gráfico de Custos Operacionais
-const configCustosOperacionais = {
-    type: 'line',
-    data: {
-        labels: {{ dados_graficos.custos_operacionais.labels|safe }},
-        datasets: [{
-            label: 'Receitas',
-            data: {{ dados_graficos.custos_operacionais.receitas|safe }},
-            borderColor: '#28a745',
-            backgroundColor: '#28a74520'
-        }, {
-            label: 'Despesas',
-            data: {{ dados_graficos.custos_operacionais.despesas|safe }},
-            borderColor: '#dc3545',
-            backgroundColor: '#dc354520'
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false
-    }
-};
-
-// Gráfico de Distribuição de Custos
-const configDistribuicaoCustos = {
-    type: 'pie',
-    data: {
-        labels: {{ dados_graficos.distribuicao_custos.labels|safe }},
-        datasets: [{
-            data: {{ dados_graficos.distribuicao_custos.data|safe }},
-            backgroundColor: ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6c757d']
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false
-    }
-};
-
-// Gráfico de Desempenho Confinamento
-const configConfinamento = {
-    type: 'bar',
-    data: {
-        labels: {{ dados_graficos.desempenho_confinamento.labels|safe }},
-        datasets: [{
-            label: 'Peso (kg)',
-            data: {{ dados_graficos.desempenho_confinamento.data|safe }},
-            backgroundColor: '#17a2b8'
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false
-    }
-};
-
-// Gráfico de ROI
-const configROI = {
-    type: 'line',
-    data: {
-        labels: {{ dados_graficos.evolucao_roi.labels|safe }},
-        datasets: [{
-            label: 'ROI (%)',
-            data: {{ dados_graficos.evolucao_roi.data|safe }},
-            borderColor: '#fd7e14',
-            backgroundColor: '#fd7e1420',
-            tension: 0.1
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false
-    }
-};
-
-// Inicialização dos gráficos
-window.addEventListener('load', function() {
-    new Chart(document.getElementById('grafico-peso'), configPeso);
-    new Chart(document.getElementById('grafico-gmd'), configGMD);
-    new Chart(document.getElementById('grafico-prenhez'), configPrenhez);
-    new Chart(document.getElementById('grafico-perdas'), configPerdas);
-    new Chart(document.getElementById('grafico-custos-operacionais'), configCustosOperacionais);
-    new Chart(document.getElementById('grafico-distribuicao-custos'), configDistribuicaoCustos);
-    new Chart(document.getElementById('grafico-confinamento'), configConfinamento);
-    new Chart(document.getElementById('grafico-roi'), configROI);
+    // Gráfico Financeiro Combinado
+    new Chart(document.getElementById('grafico-financeiro').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: ['Ago', 'Set', 'Out', 'Nov', 'Dez', 'Jan'],
+            datasets: [{
+                type: 'line',
+                label: 'Receitas',
+                data: [150000, 165000, 180000, 175000, 190000, 200000],
+                borderColor: '#1cc88a',
+                tension: 0.4,
+                fill: false,
+                yAxisID: 'y'
+            }, {
+                type: 'line',
+                label: 'Despesas',
+                data: [120000, 125000, 130000, 135000, 140000, 145000],
+                borderColor: '#e74a3b',
+                tension: 0.4,
+                fill: false,
+                yAxisID: 'y'
+            }, {
+                type: 'bar',
+                label: 'Lucro',
+                data: [30000, 40000, 50000, 40000, 50000, 55000],
+                backgroundColor: '#4e73df',
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Receitas e Despesas (R$)'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Lucro (R$)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            }
+        }
+    });
 });
 </script>

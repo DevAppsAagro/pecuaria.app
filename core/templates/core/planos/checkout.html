@@ -1,4 +1,4 @@
-{% extends 'core/base.html' %}
+{% extends 'base.html' %}
 
 {% block title %}Checkout{% endblock %}
 
@@ -20,8 +20,11 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_head %}
 <script src="https://cdn.eduzzcdn.com/sun/bridge/bridge.js" async type="module"></script>
+{% endblock %}
+
+{% block extra_js %}
 <script>
     (function () {
         const load = function () {

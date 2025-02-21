@@ -54,6 +54,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.FazendaAtualMiddleware',  # Adiciona o middleware da fazenda atual
+    'core.middleware.SubscriptionMiddleware',  # Middleware de verificação de assinatura
 ]
 
 ROOT_URLCONF = 'pecuaria_project.urls'
@@ -155,23 +156,67 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
-# Eduzz Settings
-EDUZZ_API_KEY = config('EDUZZ_API_KEY', default='')
-EDUZZ_PUBLIC_KEY = config('EDUZZ_PUBLIC_KEY', default='')
+# Configurações da Eduzz
+EDUZZ_API_URL = 'https://api.eduzz.com'  # URL base da API
+EDUZZ_PUBLIC_KEY = '10434573'
+EDUZZ_API_KEY = '4a2a8c627751ced4e0dfeb197d6aa10224ab8e97cb696c24109f931d160736ec'
 
-# ID da planilha na Eduzz
-EDUZZ_PLANILHA_ID = config('EDUZZ_PLANILHA_ID', default='')
+# URLs de retorno da Eduzz
+EDUZZ_RETURN_URL = 'https://pecuaria.app/assinatura/'
+EDUZZ_WEBHOOK_URL = 'https://pecuaria.app/api/eduzz/webhook/'
 
-# Produtos COM adesão (novos clientes)
-EDUZZ_SOFTWARE_MENSAL_ID = config('EDUZZ_SOFTWARE_MENSAL_ID', default='')
-EDUZZ_SOFTWARE_ANUAL_ID = config('EDUZZ_SOFTWARE_ANUAL_ID', default='')
+# IDs dos produtos na Eduzz
+EDUZZ_PLANILHA_ID = '2649739'
 
-# Produtos SEM adesão (clientes da planilha)
-EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID = config('EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID', default='')
-EDUZZ_SOFTWARE_ANUAL_SEM_ADESAO_ID = config('EDUZZ_SOFTWARE_ANUAL_SEM_ADESAO_ID', default='')
+# IDs dos Planos
+EDUZZ_SOFTWARE_MENSAL_ID_3F = '2655883'
+EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID_3F = '2658194'
+EDUZZ_SOFTWARE_ANUAL_ID_3F = '2655875'
+EDUZZ_SOFTWARE_ANUAL_SEM_ADESAO_ID_3F = '2658208'
+EDUZZ_SOFTWARE_CORTESIA_ID_3F = '2655876'
 
-# Produto cortesia
-EDUZZ_SOFTWARE_CORTESIA_ID = config('EDUZZ_SOFTWARE_CORTESIA_ID', default='')
+# Configuração de Logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'debug.log'),
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        '': {  # Root logger
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+        },
+        'core': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
 
 # Supabase Settings
 SUPABASE_URL = config('SUPABASE_URL')

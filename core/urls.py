@@ -259,6 +259,22 @@ urlpatterns = [
     path('planos/mensal/', views_eduzz.plano_mensal, name='plano_mensal'),
     path('planos/anual/', views_eduzz.plano_anual, name='plano_anual'),
     
+    # URLs de planos e assinatura
+    path('planos/', views_eduzz.planos_view, name='planos'),
+    path('assinatura/', views_eduzz.assinatura, name='assinatura'),
+    path('assinatura/alterar-plano/', views_eduzz.alterar_plano, name='alterar_plano'),
+    path('checkout/<str:plan_id>/', views_eduzz.checkout_plano, name='checkout_plano'),
+    path('webhook/eduzz/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
+    path('test-eduzz-connection/', views_eduzz.test_eduzz_connection, name='test_eduzz_connection'),
+    
+    # Eduzz
+    path('planos/', views_eduzz.planos, name='planos'),
+    path('plano-mensal/', views_eduzz.plano_mensal, name='plano_mensal'),
+    path('plano-anual/', views_eduzz.plano_anual, name='plano_anual'),
+    path('verificar-email/', views_eduzz.verificar_email, name='verificar_email'),
+    path('checkout/<str:plan_id>/', views_eduzz.checkout_plano, name='checkout_plano'),
+    path('sync-eduzz-sales/', views_eduzz.sync_eduzz_sales, name='sync_eduzz_sales'),
+    
     # Configurações - Raças
     path('configuracoes/racas/', views.raca_list, name='raca_list'),
     path('configuracoes/racas/nova/', views.raca_create, name='raca_create'),
@@ -334,4 +350,13 @@ urlpatterns = [
     
     # Adicionando URL para a página de verificação de email
     path('verificar-email/', views.verificar_email_view, name='verificar_email'),
+    
+    # URLs da Eduzz
+    path('planos/', views_eduzz.planos_view, name='planos'),
+    path('assinatura/', views_eduzz.assinatura, name='assinatura'),
+    path('checkout/<str:plan_id>/', views_eduzz.checkout_plano, name='checkout_plano'),
+    path('webhook/eduzz/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
+    path('api/eduzz/webhook/', views_eduzz.eduzz_webhook, name='eduzz_webhook'),
+    path('webhook/eduzz/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
+    path('test-eduzz-connection/', views_eduzz.test_eduzz_connection, name='test_eduzz_connection'),
 ]

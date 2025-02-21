@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PecuaristaPRO™ - Software de Gestão Pecuária</title>
+    <title>PecuaristaPRO™ - Software de Gestão Pecuária</title>
     {% include 'includes/favicon.html' %}
     <!-- jQuery primeiro -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -19,12 +19,35 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
-    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- DataTables -->
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css"/>
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css"/>
     
     <style>
+        .main-sidebar {
+            position: fixed !important;
+            height: 100vh;
+            z-index: 1035;
+        }
+
+        .main-header {
+            position: fixed;
+            right: 0;
+            left: 0;
+            z-index: 1034;
+        }
+
+        .content-wrapper {
+            margin-left: 250px;
+            padding-top: 57px;
+        }
+
+        .sidebar-collapse .content-wrapper {
+            margin-left: 4.6rem;
+        }
+
         .brand-link {
             padding: 0.8rem 0.5rem;
             min-height: 4rem;
@@ -32,28 +55,35 @@
             justify-content: center;
             align-items: center;
         }
+
         .brand-link img {
             height: 40px;
         }
+
         /* Logo grande visível por padrão */
         .logo-lg {
             display: block;
         }
+        
         .logo-sm {
             display: none;
         }
+
         /* Logo pequena apenas quando menu está colapsado */
         body.sidebar-collapse .logo-lg {
             display: none;
         }
+
         body.sidebar-collapse .logo-sm {
             display: block;
         }
+
         /* Logo grande quando hover ou menu aberto */
         body.sidebar-open .logo-lg,
         body:not(.sidebar-collapse) .logo-lg {
             display: block;
         }
+
         body.sidebar-open .logo-sm,
         body:not(.sidebar-collapse) .logo-sm {
             display: none;
@@ -94,13 +124,17 @@
             </ul>
         </nav>
 
-        <!-- Main Sidebar -->
-        <aside class="main-sidebar sidebar-dark-success elevation-4">
+        <!-- Main Sidebar Container -->
+        <aside class="main-sidebar sidebar-dark-primary elevation-4">
+            <!-- Brand Logo -->
             <a href="{% url 'dashboard' %}" class="brand-link text-center">
                 <img src="{% static 'img/menu-logo-B.svg' %}" alt="Logo Menu Aberto" class="logo-lg">
                 <img src="{% static 'img/menu-logo-A.svg' %}" alt="Logo Menu Fechado" class="logo-sm">
             </a>
+
+            <!-- Sidebar -->
             <div class="sidebar">
+                <!-- Sidebar Menu -->
                 <nav class="mt-2">
                     <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu">
                         <li class="nav-item">
@@ -294,28 +328,25 @@
 
         <!-- Content Wrapper -->
         <div class="content-wrapper">
+            <!-- Content Header (Page header) -->
             <section class="content-header">
                 <div class="container-fluid">
                     {% if messages %}
-                    <script>
-                    {% for message in messages %}
-                        Swal.fire({
-                            title: '{{ message }}',
-                            icon: '{{ message.tags }}',
-                            toast: true,
-                            position: 'top-end',
-                            showConfirmButton: false,
-                            timer: 3000
-                        })
-                    {% endfor %}
-                    </script>
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
                     {% endif %}
+                    {% block header %}{% endblock %}
                 </div>
             </section>
+
+            <!-- Main content -->
             <section class="content">
                 <div class="container-fluid">
-                    {% block content %}
-                    {% endblock %}
+                    {% block content %}{% endblock %}
                 </div>
             </section>
         </div>
@@ -339,18 +370,16 @@
         {% endblock %}
     {% endif %}
 
-    <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
+    <!-- Bootstrap 5 -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- AdminLTE App -->
+    <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
     <!-- DataTables -->
-    <script type="text/javascript" src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-    <script type="text/javascript" src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-    <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
-    <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
-    <!-- Custom JS -->
-    <script src="{% static 'js/menu-logo.js' %}"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -1,219 +1,415 @@
 import requests
 from django.conf import settings
-from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
+import pytz
+from typing import Optional, Dict, List, Any
 import logging
-import json
-from .models_eduzz import EduzzTransaction, ClienteLegado
+from django.utils import timezone
+from django.db import models
+from supabase import create_client, Client
+from django.contrib.auth.models import User
+from .models_eduzz import UserSubscription, ClientePlanilha, EduzzTransaction
+from dateutil import parser
 
-# Configurar logging mais detalhado
 logger = logging.getLogger(__name__)
+
+supabase_url: str = settings.SUPABASE_URL
+supabase_key: str = settings.SUPABASE_KEY
+supabase: Client = create_client(supabase_url, supabase_key)
 
 class EduzzAPI:
     def __init__(self):
-        self.public_key = settings.EDUZZ_PUBLIC_KEY
+        # Tenta obter das settings, senão usa valores padrão
+        self.base_url = settings.EDUZZ_API_URL
+        self.api_url = f"{settings.EDUZZ_API_URL}/api/1.1"  # Versão correta da API
         self.api_key = settings.EDUZZ_API_KEY
-        self.base_url = "https://api.eduzz.com"
-        
-        # Log das configurações
-        logger.info('='*50)
-        logger.info('Inicializando EduzzAPI')
-        logger.info('Base URL: %s', self.base_url)
-        logger.info('Public Key: %s', self.public_key[:5] + '...' if self.public_key else 'Não configurada')
-        logger.info('API Key: %s', self.api_key[:5] + '...' if self.api_key else 'Não configurada')
-        logger.info('='*50)
+        self.public_key = settings.EDUZZ_PUBLIC_KEY
+        self.origin_key = getattr(settings, 'EDUZZ_ORIGIN_KEY', "0d164417-4a93-4c80-b66a-b9e0f550781b")
+        self.access_token = getattr(settings, 'EDUZZ_ACCESS_TOKEN', "edzpap_QNsV8gHLcpO_YypKdhEn2FSf_kB_xndYrfEIMpjg-BAlTtFew8hlEmyPKpWigQvwhbixBSq5vaE759xQo3e")
 
-    def create_transaction(self, email, nome, produto_id, valor, tipo_produto):
-        """Cria uma nova transação na Eduzz"""
+    def _get_headers(self) -> Dict[str, str]:
+        """Retorna os headers com o token de acesso"""
+        return {
+            'publickey': self.public_key,
+            'apikey': self.api_key,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+
+    def _handle_response(self, response: requests.Response, error_message: str) -> Optional[Dict[str, Any]]:
+        """Processa a resposta da API e trata erros"""
         try:
-            logger.info('='*50)
-            logger.info('INICIANDO CRIAÇÃO DE TRANSAÇÃO')
-            logger.info('='*50)
-            
-            # Verifica se é cliente legado para aplicar desconto
-            cliente = ClienteLegado.objects.filter(email=email, ativo=True).first()
-            
-            # Log dos dados do cliente
-            logger.info('DADOS DO CLIENTE:')
-            logger.info('- Email: %s', email)
-            logger.info('- Nome: %s', nome)
-            logger.info('- Cliente legado: %s', 'Sim' if cliente else 'Não')
-            if cliente:
-                logger.info('- Detalhes do cliente legado:')
-                logger.info('  * ID: %s', cliente.id)
-                logger.info('  * Data cadastro: %s', cliente.data_cadastro)
-                logger.info('  * Ativo: %s', cliente.ativo)
+            response.raise_for_status()
+            data = response.json()
+            return data
+        except requests.exceptions.RequestException as e:
+            print(f"{error_message}: {str(e)}")
+            print(f"Status code: {response.status_code}")
+            print(f"Response: {response.text}")
+            return None
+        except Exception as e:
+            print(f"Erro inesperado: {str(e)}")
+            return None
 
-            # Log dos dados do produto
-            logger.info('DADOS DO PRODUTO:')
-            logger.info('- ID: %s', produto_id)
-            logger.info('- Tipo: %s', tipo_produto)
-            logger.info('- Valor: R$ %.2f', float(valor))
-
-            # Prepara os dados para a API da Eduzz
-            payload = {
-                "items": [{
-                    "product_id": produto_id,
-                    "amount": float(valor),
-                    "quantity": 1
-                }],
-                "customer": {
-                    "email": email,
-                    "name": nome
-                }
-            }
-
-            # Se for cliente legado, adiciona flag para desconto na adesão
-            if cliente:
-                payload["subscription"] = {
-                    "adhesion_free": True
-                }
-                logger.info('DESCONTO APLICADO: Cliente legado - adesão gratuita')
-
-            # Log do payload
-            logger.info('PAYLOAD PARA EDUZZ:')
-            logger.info(json.dumps(payload, indent=2))
-
-            # Log dos headers
-            headers = {
-                "public_key": self.public_key,
-                "api_key": self.api_key,
-                "Content-Type": "application/json"
-            }
-            logger.info('HEADERS:')
-            logger.info('- Content-Type: application/json')
-            logger.info('- Public Key: %s...', headers['public_key'][:5])
-            logger.info('- API Key: %s...', headers['api_key'][:5])
-
-            # Faz a requisição para a API da Eduzz
-            logger.info('ENVIANDO REQUISIÇÃO...')
-            response = requests.post(
-                f"{self.base_url}/checkout/create",
-                json=payload,
-                headers=headers
+    def _make_request(self, method: str, url: str, json: Dict[str, Any] = None) -> Optional[requests.Response]:
+        """Faz uma requisição para a API da Eduzz"""
+        try:
+            # Adiciona timeout para evitar espera infinita
+            response = requests.request(
+                method, 
+                url, 
+                json=json, 
+                headers=self._get_headers(),
+                timeout=30,  # 30 segundos de timeout
+                verify=True  # Verifica certificado SSL
             )
             
             # Log da resposta
-            logger.info('RESPOSTA DA EDUZZ:')
-            logger.info('- Status code: %s', response.status_code)
-            logger.info('- Headers: %s', dict(response.headers))
-            logger.info('- Content: %s', response.text)
+            logger.info(f"Request to Eduzz API: {method} {url}")
+            logger.info(f"Status code: {response.status_code}")
+            logger.info(f"Response: {response.text[:500]}")  # Limita o log a 500 caracteres
+            
+            return response
+            
+        except requests.exceptions.Timeout:
+            logger.error("Timeout ao conectar com a API da Eduzz")
+            return None
+        except requests.exceptions.SSLError:
+            logger.error("Erro de SSL ao conectar com a API da Eduzz")
+            return None
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Erro de conexão com a API da Eduzz: {str(e)}")
+            return None
+        except Exception as e:
+            logger.error(f"Erro inesperado ao conectar com a API da Eduzz: {str(e)}")
+            return None
+
+    def test_connection(self) -> Dict[str, Any]:
+        """Testa a conexão com a API da Eduzz"""
+        logger.info("Testando conexão com a API da Eduzz...")
+        
+        url = f"{self.api_url}/sale/get_sale_list"
+        logger.info(f"URL: {url}")
+        logger.info(f"Headers: {self._get_headers()}")
+        
+        response = self._make_request('GET', url)
+        
+        if not response:
+            return {
+                'success': False,
+                'error': 'Não foi possível conectar com a API da Eduzz.'
+            }
+        
+        if response.status_code == 401:
+            return {
+                'success': False,
+                'error': 'Token de acesso inválido.'
+            }
+        
+        try:
+            data = response.json()
+        except:
+            data = {'message': response.text}
+        
+        if response.status_code == 200:
+            return {
+                'success': True,
+                'message': 'Conexão estabelecida com sucesso!',
+                'data': data
+            }
+        
+        return {
+            'success': False,
+            'error': f'Erro ao conectar com a Eduzz. Status code: {response.status_code}',
+            'response': str(data)
+        }
+
+    def get_subscription_status(self, subscription_id: str) -> Optional[Dict[str, Any]]:
+        """Obtém o status da assinatura na Eduzz"""
+        url = f"{self.base_url}/subscriptions/v1/{subscription_id}"
+        response = requests.get(url, headers=self._get_headers())
+        return self._handle_response(response, "Erro ao consultar assinatura na Eduzz")
+
+    def create_subscription(self, user_email: str, plan_id: str) -> Optional[str]:
+        """Cria uma nova assinatura na Eduzz"""
+        url = f"{self.base_url}/subscriptions/v1"
+        data = {
+            "email": user_email,
+            "plan_id": plan_id
+        }
+        
+        response = requests.post(url, json=data, headers=self._get_headers())
+        result = self._handle_response(response, "Erro ao criar assinatura na Eduzz")
+        
+        if result and result.get('success'):
+            return result.get('data', {}).get('subscription_id')
+        return None
+
+    def cancel_subscription(self, subscription_id: str) -> bool:
+        """Cancela uma assinatura na Eduzz"""
+        url = f"{self.base_url}/subscriptions/v1/{subscription_id}/cancel"
+        response = requests.post(url, headers=self._get_headers())
+        result = self._handle_response(response, "Erro ao cancelar assinatura na Eduzz")
+        return bool(result and result.get('success'))
+
+    def get_payment_history(self, subscription_id: str) -> List[Dict[str, Any]]:
+        """Obtém o histórico de pagamentos de uma assinatura"""
+        url = f"{self.base_url}/subscriptions/v1/{subscription_id}/payments"
+        response = requests.get(url, headers=self._get_headers())
+        result = self._handle_response(response, "Erro ao obter histórico de pagamentos na Eduzz")
+        
+        if result and result.get('success'):
+            return result.get('data', [])
+        return []
+
+    def get_plans(self) -> List[Dict[str, Any]]:
+        """Obtém a lista de planos disponíveis na Eduzz"""
+        url = f"{self.base_url}/subscription/plans"
+        response = self._make_request('GET', url)
+        return response.json() if response else None
+
+    def create_checkout_url(self, plan_id: str, user_email: str, user_name: str, user_document: str = None) -> Optional[str]:
+        """Cria uma URL de checkout para um plano específico"""
+        url = f"{self.base_url}/subscription/checkout"
+        data = {
+            'plan_id': plan_id,
+            'customer_email': user_email,
+            'customer_name': user_name,
+            'customer_document': user_document,
+            'return_url': settings.EDUZZ_RETURN_URL,
+            'notification_url': settings.EDUZZ_WEBHOOK_URL
+        }
+        response = self._make_request('POST', url, json=data)
+        return response.json().get('checkout_url') if response else None
+
+    def get_subscription_invoices(self, subscription_id: str) -> List[Dict[str, Any]]:
+        """Obtém as faturas de uma assinatura"""
+        url = f"{self.base_url}/subscriptions/v1/{subscription_id}/invoices"
+        response = requests.get(url, headers=self._get_headers())
+        result = self._handle_response(response, "Erro ao obter faturas da assinatura na Eduzz")
+        
+        if result and result.get('success'):
+            return result.get('data', [])
+        return []
+
+    def update_subscription(self, subscription_id: str, data: Dict[str, Any]) -> bool:
+        """Atualiza uma assinatura existente"""
+        url = f"{self.base_url}/subscriptions/v1/{subscription_id}"
+        response = requests.put(url, json=data, headers=self._get_headers())
+        result = self._handle_response(response, "Erro ao atualizar assinatura na Eduzz")
+        return bool(result and result.get('success'))
+
+    def get_customer_purchases(self, email):
+        """Busca as compras de um cliente pelo email"""
+        # Tenta primeiro a API antiga
+        url = "https://api-prod.eduzz.com/api/1.1/sale/get_sale_list"
+        headers = self._get_headers()
+        params = {
+            'email': email,
+            'status': 3  # 3 = Aprovado
+        }
+        
+        try:
+            logger.info(f"Buscando compras do cliente {email} na API antiga...")
+            logger.info(f"URL: {url}")
+            logger.info(f"Headers: {headers}")
+            logger.info(f"Params: {params}")
+            
+            response = requests.get(url, headers=headers, params=params)
+            logger.info(f"Status code: {response.status_code}")
+            logger.info(f"Response: {response.text}")
             
             if response.status_code == 200:
                 data = response.json()
-                logger.info('TRANSAÇÃO CRIADA COM SUCESSO:')
-                logger.info('- Invoice ID: %s', data.get('invoice_id'))
-                logger.info('- Checkout URL: %s', data.get('checkout_url'))
-                
-                # Determina o plano baseado no produto_id
-                plano = 'mensal'
-                if produto_id == settings.EDUZZ_SOFTWARE_ANUAL_ID:
-                    plano = 'anual'
-                elif produto_id == settings.EDUZZ_SOFTWARE_CORTESIA_ID:
-                    plano = 'cortesia'
-                
-                # Cria o registro da transação
-                transaction = EduzzTransaction.objects.create(
-                    transaction_id=data['invoice_id'],
-                    email=email,
-                    nome=nome,
-                    status='pending',
-                    product_id=produto_id,
-                    plano=plano,
-                    valor_original=Decimal(str(valor)),
-                    valor_pago=Decimal('0.00'),
-                    is_legado=True if cliente else False,
-                    cliente_legado=cliente
-                )
-                
-                logger.info('TRANSAÇÃO SALVA NO BANCO:')
-                logger.info('- ID: %s', transaction.id)
-                logger.info('- Status: %s', transaction.status)
-                logger.info('='*50)
-                
-                return {
-                    'success': True,
-                    'checkout_url': data['checkout_url'],
-                    'transaction': transaction
-                }
+                if data.get('data'):
+                    logger.info(f"Compras encontradas na API antiga: {data}")
+                    return data.get('data', [])
+                    
+            # Se não encontrou na API antiga, tenta a nova API
+            url = f"{self.base_url}/accounts/v1/customers/search"
+            params = {'email': email}
             
-            error_msg = response.json().get('message', 'Erro ao criar transação')
-            logger.error('ERRO NA API DA EDUZZ:')
-            logger.error('- Mensagem: %s', error_msg)
-            logger.error('='*50)
-            return {
-                'success': False,
-                'error': error_msg
-            }
+            logger.info(f"Buscando compras do cliente {email} na API nova...")
+            logger.info(f"URL: {url}")
+            logger.info(f"Headers: {headers}")
+            logger.info(f"Params: {params}")
+            
+            response = requests.get(url, headers=headers, params=params)
+            logger.info(f"Status code: {response.status_code}")
+            logger.info(f"Response: {response.text}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('data'):
+                    logger.info(f"Compras encontradas na API nova: {data}")
+                    return data.get('data', [])
+            
+            logger.warning(f"Nenhuma compra encontrada para o cliente {email}")
+            return []
             
         except Exception as e:
-            logger.exception('ERRO INESPERADO:')
-            logger.error('- Tipo: %s', type(e).__name__)
-            logger.error('- Mensagem: %s', str(e))
-            logger.error('='*50)
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            logger.error(f"Erro ao buscar compras do cliente {email}: {str(e)}", exc_info=True)
+            return []
 
     def process_webhook(self, data):
-        """Processa webhooks recebidos da Eduzz"""
+        """Processa o webhook da Eduzz"""
         try:
-            logger.info('='*50)
-            logger.info('PROCESSANDO WEBHOOK')
-            logger.info('='*50)
+            logger.info("Recebendo webhook da Eduzz:")
+            logger.info(f"Dados: {data}")
             
-            # Log dos dados recebidos
-            logger.info('DADOS RECEBIDOS:')
-            logger.info(json.dumps(data, indent=2))
+            # Obtém os dados da transação
+            transaction_id = data.get('trans_cod')
+            product_id = data.get('product_cod')
+            status = data.get('trans_status')
+            email = data.get('cus_email')
+            name = data.get('cus_name')
+            phone = data.get('cus_tel')
+            customer_id = data.get('cus_cod')
+            valor_original = data.get('trans_value', 0)
+            valor_pago = data.get('trans_paid', 0)
+            data_pagamento = data.get('trans_paid_date')
             
-            transaction = EduzzTransaction.objects.filter(
-                transaction_id=data['invoice_id']
-            ).first()
-
-            if not transaction:
-                logger.error('TRANSAÇÃO NÃO ENCONTRADA:')
-                logger.error('- Invoice ID: %s', data['invoice_id'])
-                logger.error('='*50)
-                return False
-
-            # Log do status anterior
-            logger.info('STATUS ANTERIOR: %s', transaction.status)
-
-            # Atualiza o status da transação
-            transaction.status = data['status']
+            # Converte status da Eduzz para nosso formato
+            status_map = {
+                '1': 'pending',    # Pendente
+                '3': 'paid',       # Pago
+                '4': 'canceled',   # Cancelado
+                '6': 'refunded',   # Reembolsado
+                '7': 'pending',    # Aguardando reembolso
+            }
             
-            if data['status'] == 'paid':
-                transaction.data_pagamento = datetime.now()
-                transaction.valor_pago = Decimal(str(data.get('amount', '0')))
-                logger.info('PAGAMENTO CONFIRMADO:')
-                logger.info('- Valor pago: R$ %.2f', float(transaction.valor_pago))
-                logger.info('- Data: %s', transaction.data_pagamento)
-
-            transaction.save()
+            # Registra a transação
+            EduzzTransaction.objects.update_or_create(
+                transaction_id=transaction_id,
+                defaults={
+                    'email': email,
+                    'nome': name,
+                    'status': status_map.get(status, 'pending'),
+                    'product_id': product_id,
+                    'valor_original': valor_original,
+                    'valor_pago': valor_pago,
+                    'data_pagamento': parser.parse(data_pagamento) if data_pagamento else None,
+                    'webhook_data': data
+                }
+            )
             
-            logger.info('WEBHOOK PROCESSADO COM SUCESSO')
-            logger.info('- Novo status: %s', transaction.status)
-            logger.info('='*50)
+            logger.info(f"Transação {transaction_id} registrada com sucesso")
+            
+            if status == '3':  # 3 = Aprovado
+                # Verifica se é uma compra da planilha
+                if str(product_id) == settings.EDUZZ_PLANILHA_ID:
+                    # Registra no Supabase
+                    supabase.table('clienteplanilha').upsert({
+                        'email': email,
+                        'nome': name,
+                        'telefone': phone,
+                        'eduzz_customer_id': customer_id,
+                        'data_compra': timezone.now().isoformat()
+                    }).execute()
+                    
+                    # Registra também no Django
+                    ClientePlanilha.objects.get_or_create(
+                        email=email,
+                        defaults={
+                            'nome': name,
+                            'telefone': phone,
+                            'eduzz_customer_id': customer_id
+                        }
+                    )
+                    logger.info(f"Cliente {email} registrado como cliente da planilha")
+                    return True
+                
+                # Se não for uma compra da planilha, verifica se é uma assinatura
+                if str(product_id) in [
+                    settings.EDUZZ_SOFTWARE_MENSAL_ID_3F,
+                    settings.EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID_3F,
+                    settings.EDUZZ_SOFTWARE_ANUAL_ID_3F,
+                    settings.EDUZZ_SOFTWARE_ANUAL_SEM_ADESAO_ID_3F,
+                    settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F
+                ]:
+                    # Define o tipo de plano
+                    if str(product_id) in [settings.EDUZZ_SOFTWARE_MENSAL_ID_3F, settings.EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID_3F]:
+                        plan_type = 'mensal'
+                    else:
+                        plan_type = 'anual'
+                    
+                    # Registra no Supabase
+                    supabase.table('assinaturas_pendentes').upsert({
+                        'email': email,
+                        'nome': name,
+                        'telefone': phone,
+                        'eduzz_customer_id': customer_id,
+                        'eduzz_subscription_id': transaction_id,
+                        'plan_type': plan_type,
+                        'status': 'active',
+                        'start_date': timezone.now().isoformat(),
+                        'end_date': (timezone.now() + timedelta(days=365 if plan_type == 'anual' else 30)).isoformat(),
+                        'last_payment_date': timezone.now().isoformat(),
+                        'next_payment_date': (timezone.now() + timedelta(days=365 if plan_type == 'anual' else 30)).isoformat(),
+                        'is_legacy': str(product_id) in [
+                            settings.EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID_3F,
+                            settings.EDUZZ_SOFTWARE_ANUAL_SEM_ADESAO_ID_3F
+                        ]
+                    }).execute()
+                    
+                    # Tenta atualizar o usuário se ele já existir
+                    try:
+                        user = User.objects.get(email=email)
+                        UserSubscription.objects.update_or_create(
+                            user=user,
+                            defaults={
+                                'eduzz_subscription_id': transaction_id,
+                                'plan_type': plan_type,
+                                'status': 'active',
+                                'start_date': timezone.now(),
+                                'end_date': timezone.now() + timedelta(days=365 if plan_type == 'anual' else 30),
+                                'last_payment_date': timezone.now(),
+                                'next_payment_date': timezone.now() + timedelta(days=365 if plan_type == 'anual' else 30),
+                                'is_legacy': str(product_id) in [
+                                    settings.EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID_3F,
+                                    settings.EDUZZ_SOFTWARE_ANUAL_SEM_ADESAO_ID_3F
+                                ]
+                            }
+                        )
+                        logger.info(f"Assinatura do usuário {email} atualizada com sucesso")
+                    except User.DoesNotExist:
+                        logger.info(f"Usuário {email} ainda não existe, assinatura será vinculada no registro")
+                    
+                    return True
+            
             return True
             
         except Exception as e:
-            logger.exception('ERRO AO PROCESSAR WEBHOOK:')
-            logger.error('- Tipo: %s', type(e).__name__)
-            logger.error('- Mensagem: %s', str(e))
-            logger.error('='*50)
+            logger.error(f"Erro ao processar webhook: {str(e)}", exc_info=True)
             return False
 
-    def get_transaction_status(self, transaction_id):
-        """Consulta o status de uma transação específica"""
-        response = requests.get(
-            f"{self.base_url}/invoice/{transaction_id}",
-            headers={
-                "public_key": self.public_key,
-                "api_key": self.api_key
-            }
-        )
+    def get_all_sales(self) -> List[Dict[str, Any]]:
+        """Obtém todas as vendas da Eduzz"""
+        url = f"{self.api_url}/subscription/sales"
+        response = self._make_request('GET', url)
         
-        if response.status_code == 200:
-            return response.json()
-        return None
+        if not response:
+            return []
+            
+        try:
+            data = response.json()
+            sales = []
+            
+            for sale in data.get('data', []):
+                sale_data = {
+                    'email': sale.get('customer', {}).get('email'),
+                    'plan_id': sale.get('plan_id'),
+                    'status': sale.get('status'),
+                    'next_billing_date': sale.get('next_billing_date'),
+                    'subscription_id': sale.get('subscription_id'),
+                    'plan_type': sale.get('plan', {}).get('type'),
+                    'start_date': sale.get('start_date'),
+                    'end_date': sale.get('end_date'),
+                    'last_payment_date': sale.get('last_payment_date')
+                }
+                sales.append(sale_data)
+                
+            return sales
+        except Exception as e:
+            logger.error(f"Erro ao processar vendas da Eduzz: {str(e)}")
+            return []

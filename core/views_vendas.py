@@ -190,6 +190,42 @@ def criar_venda(request):
                     messages.error(request, mensagem)
                     raise ValueError(mensagem)
 
+                # Inicia uma transação para verificar e atualizar os animais
+                with transaction.atomic():
+                    # Verifica se todos os animais estão disponíveis antes de processar
+                    animais_disponiveis = Animal.objects.select_for_update().filter(
+                        id__in=animais_ids,
+                        usuario=request.user,
+                        situacao='ATIVO'
+                    )
+                    
+                    # Obtém os IDs dos animais que estão realmente disponíveis
+                    ids_disponiveis = set(animais_disponiveis.values_list('id', flat=True))
+                ids_solicitados = set(map(int, animais_ids))
+                
+                # Verifica se há animais não disponíveis
+                animais_nao_disponiveis = ids_solicitados - ids_disponiveis
+                
+                if animais_nao_disponiveis:
+                    # Obtém os brincos dos animais não disponíveis para mensagem mais detalhada
+                    brincos_nao_disponiveis = Animal.objects.filter(
+                        id__in=animais_nao_disponiveis
+                    ).values_list('brinco_visual', flat=True)
+                    
+                    mensagem = f'Os seguintes animais não estão disponíveis: {", ".join(brincos_nao_disponiveis)}'
+                    logger.error(mensagem)
+                    messages.error(request, mensagem)
+                    return render(request, 'core/vendas/form.html', {
+                        'form': form,
+                        'animais_disponiveis': animais_disponiveis,
+                        'fazendas': fazendas,
+                        'lotes': lotes,
+                        'fazenda_selecionada': fazenda_id,
+                        'lote_selecionado': lote_id,
+                        'compradores': compradores,
+                        'contas': contas
+                    })
+
                 with transaction.atomic():
                     # Primeiro, salva a venda
                     venda = form.save(commit=False)
@@ -203,28 +239,13 @@ def criar_venda(request):
                         messages.error(request, 'Erro ao criar venda. Por favor, tente novamente.')
                         raise ValueError('Venda não foi criada corretamente')
 
-                    # Processa os animais selecionados
-                    animais_ids = request.POST.getlist('animal')
-                    if not animais_ids:
-                        logger.error('Nenhum animal selecionado')
-                        messages.error(request, 'Selecione pelo menos um animal.')
-                        raise ValueError('Nenhum animal selecionado')
-
-                    # Calcula o valor total
+                    # Processa os animais já validados
                     valor_total = Decimal('0')
                     
-                    for animal_id in animais_ids:
+                    for animal in animais_disponiveis:
                         try:
-                            # Obtém o animal com lock para evitar condições de corrida
-                            animal = Animal.objects.select_for_update().get(
-                                id=animal_id, 
-                                usuario=request.user,
-                                situacao='ATIVO'  # Garante que o animal ainda está ativo
-                            )
-                            logger.debug(f'Processando animal {animal.brinco_visual} (ID: {animal.id})')
-                            
                             peso_atual = Decimal(str(get_peso_atual(animal)))
-                            logger.debug(f'Peso atual do animal: {peso_atual}')
+                            logger.debug(f'Peso atual do animal {animal.brinco_visual}: {peso_atual}')
                             
                             # Calcula o valor do animal
                             if form.cleaned_data['tipo_venda'] == 'KG':
@@ -234,7 +255,7 @@ def criar_venda(request):
                             
                             # Arredonda o valor para 2 casas decimais
                             valor = valor.quantize(Decimal('.01'))
-                            logger.debug(f'Valor calculado: {valor}')
+                            logger.debug(f'Valor calculado para o animal {animal.brinco_visual}: {valor}')
                             
                             # Cria e salva o objeto VendaAnimal
                             venda_animal = VendaAnimal(
@@ -244,19 +265,23 @@ def criar_venda(request):
                                 valor_kg=form.cleaned_data['valor_unitario'] if form.cleaned_data['tipo_venda'] == 'KG' else None,
                                 valor_total=valor
                             )
-                            venda_animal.save()  # Salva individualmente para chamar o método save()
+                            venda_animal.save()
+                            
+                            # Atualiza o status do animal para VENDIDO
+                            animal.situacao = 'VENDIDO'
+                            animal.save()
                             
                             valor_total += valor
-                        except Animal.DoesNotExist:
-                            logger.error(f'Animal {animal_id} não encontrado ou não está disponível')
-                            raise ValueError(f'Animal não encontrado ou não está mais disponível')
+                            logger.debug(f'Animal {animal.brinco_visual} processado com sucesso')
+                        except Exception as e:
+                            logger.error(f'Erro ao processar animal {animal.brinco_visual}: {str(e)}')
+                            raise
                     
-                    logger.info(f'Animais processados com sucesso')
+                    logger.info(f'Todos os animais processados com sucesso')
 
                     # Atualiza o valor total da venda
-                    venda.valor_total = valor_total
                     venda.save()
-                    logger.info(f'Valor total da venda atualizado: {valor_total}')
+                    logger.info(f'Valor total da venda: {venda.valor_total}')
 
                     # Se tiver data de pagamento, cria uma única parcela já paga
                     if venda.data_pagamento:
@@ -544,7 +569,13 @@ def historico_pagamentos_venda(request, parcela_id):
     }
     return render(request, 'core/vendas/historico_pagamentos.html', context)
 
-@login_required
+def get_peso_atual(animal):
+    """Retorna o peso atual do animal"""
+    ultimo_peso = Pesagem.objects.filter(animal=animal).order_by('-data').values('peso').first()
+    if ultimo_peso:
+        return ultimo_peso['peso']
+    return animal.primeiro_peso or 0
+
 def get_animais_por_lote(request):
     """Retorna lista de animais filtrados por fazenda e lote em formato JSON"""
     logger = logging.getLogger(__name__)
