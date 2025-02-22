@@ -3956,6 +3956,6 @@ def redefinir_senha_view(request, token=None):
     context = {
         'token': token,
         'SUPABASE_URL': settings.SUPABASE_URL,
-        'SUPABASE_KEY': settings.SUPABASE_ANON_KEY,
+        'SUPABASE_KEY': settings.SUPABASE_KEY,  # Corrigido de SUPABASE_ANON_KEY para SUPABASE_KEY
     }
     return render(request, 'registration/redefinir_senha.html', context)
