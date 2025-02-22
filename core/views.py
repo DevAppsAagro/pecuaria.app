@@ -3948,11 +3948,7 @@ class DespesasListView(LoginRequiredMixin, ListView):
         context['totais_status'] = totais_status
         
         return context
-def redefinir_senha_view(request):
+        
+def redefinir_senha_view(request, token=None):
     """View para redefinição de senha"""
-    if request.method == 'POST':
-        new_password = request.POST.get('password')
-        if update_password(request, new_password):
-            return redirect('login')
-        return redirect('redefinir_senha')
-    return render(request, 'registration/redefinir_senha.html')
+    return render(request, 'registration/redefinir_senha.html', {'token': token})

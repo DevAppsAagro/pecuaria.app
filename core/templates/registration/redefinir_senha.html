@@ -35,6 +35,7 @@
 </div>
 
 <script>
+// Modificar a parte do script que pega o token
 document.getElementById('resetForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -46,16 +47,16 @@ document.getElementById('resetForm').addEventListener('submit', async function(e
         return;
     }
 
-    // Pegar o token da URL
-    const hash = window.location.hash;
-    const params = new URLSearchParams(hash.substring(1));
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-    const expiresIn = params.get('expires_in');
-    const tokenType = params.get('token_type');
-
+    // Pegar o token JWT da URL
+    const token = window.location.pathname.split('/').pop();
+    
     try {
-        // Atualizar a senha usando o token
+        // Primeiro vamos verificar se o token é válido
+        const { data: { user }, error: verifyError } = await supabase.auth.getUser(token);
+        
+        if (verifyError) throw verifyError;
+
+        // Atualizar a senha
         const { error } = await supabase.auth.updateUser({
             password: password
         });
