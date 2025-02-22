@@ -3948,7 +3948,12 @@ class DespesasListView(LoginRequiredMixin, ListView):
         context['totais_status'] = totais_status
         
         return context
-        
+
 def redefinir_senha_view(request, token=None):
     """View para redefinição de senha"""
-    return render(request, 'registration/redefinir_senha.html', {'token': token})
+    context = {
+        'token': token,
+        'SUPABASE_URL': settings.SUPABASE_URL,
+        'SUPABASE_KEY': settings.SUPABASE_ANON_KEY,
+    }
+    return render(request, 'registration/redefinir_senha.html', context)

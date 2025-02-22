@@ -113,3 +113,18 @@ document.getElementById('toggleConfirmPassword').addEventListener('click', funct
 });
 </script>
 {% endblock %}
+
+{% extends 'base.html' %}
+
+{% block auth_content %}
+<!-- ... resto do código ... -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    const supabase = supabase.createClient('{{ SUPABASE_URL }}', '{{ SUPABASE_KEY }}');
+
+    document.getElementById('resetForm').addEventListener('submit', async function(e) {
+        // ... resto do código do script ...
+    });
+</script>
+{% endblock %}
