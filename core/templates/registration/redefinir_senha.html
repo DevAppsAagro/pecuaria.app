@@ -35,7 +35,6 @@
 </div>
 
 <script>
-// Modificar a parte do script que pega o token
 document.getElementById('resetForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -47,16 +46,29 @@ document.getElementById('resetForm').addEventListener('submit', async function(e
         return;
     }
 
-    // Pegar o token JWT da URL
-    const token = window.location.pathname.split('/').pop();
-    
     try {
-        // Primeiro vamos verificar se o token é válido
-        const { data: { user }, error: verifyError } = await supabase.auth.getUser(token);
+        // Tentar pegar o token de várias formas possíveis
+        let token = null;
         
-        if (verifyError) throw verifyError;
+        // Método 1: Da URL como parâmetro
+        const urlParams = new URLSearchParams(window.location.search);
+        token = urlParams.get('token');
+        
+        // Método 2: Do hash
+        if (!token) {
+            const hash = window.location.hash.substring(1);
+            const hashParams = new URLSearchParams(hash);
+            token = hashParams.get('access_token');
+        }
+        
+        // Método 3: Do caminho da URL
+        if (!token) {
+            token = window.location.pathname.split('/').pop();
+        }
 
-        // Atualizar a senha
+        console.log('Token encontrado:', token); // Para debug
+
+        // Tentar atualizar a senha
         const { error } = await supabase.auth.updateUser({
             password: password
         });
@@ -66,6 +78,7 @@ document.getElementById('resetForm').addEventListener('submit', async function(e
         alert('Senha atualizada com sucesso!');
         window.location.href = '{% url "login" %}';
     } catch (error) {
+        console.error('Erro completo:', error); // Para debug
         alert('Erro ao redefinir senha: ' + error.message);
     }
 });
