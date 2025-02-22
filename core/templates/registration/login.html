@@ -21,7 +21,7 @@
                         {% endfor %}
                     </div>
                     {% endif %}
-                    <form method="post">
+                    <form id="loginForm" method="post">
                         {% csrf_token %}
                         <div class="mb-3">
                             <label for="id_email" class="form-label text-start d-block">Email</label>
@@ -97,6 +97,41 @@ document.getElementById('togglePassword').addEventListener('click', function() {
         passwordInput.type = 'password';
         icon.classList.remove('bi-eye-slash');
         icon.classList.add('bi-eye');
+    }
+});
+
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('id_email').value;
+    const password = document.getElementById('id_password').value;
+    const rememberMe = document.getElementById('rememberMe').checked;
+    
+    try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+        
+        if (error) throw error;
+        
+        if (rememberMe) {
+            localStorage.setItem('rememberMe', 'true');
+        } else {
+            localStorage.removeItem('rememberMe');
+        }
+        
+        window.location.href = '{% url "dashboard" %}';
+    } catch (error) {
+        alert('Erro ao fazer login: ' + error.message);
+    }
+});
+
+// Verificar se o usuário escolheu "Lembrar de mim" anteriormente
+document.addEventListener('DOMContentLoaded', function() {
+    const rememberMe = localStorage.getItem('rememberMe');
+    if (rememberMe === 'true') {
+        document.getElementById('rememberMe').checked = true;
     }
 });
 </script>

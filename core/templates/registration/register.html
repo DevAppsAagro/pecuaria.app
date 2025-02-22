@@ -22,7 +22,7 @@
                         {% endfor %}
                     </div>
                     {% endif %}
-                    <form method="post">
+                    <form id="registerForm" method="post">
                         {% csrf_token %}
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -112,6 +112,40 @@ document.getElementById('togglePassword').addEventListener('click', function() {
         passwordInput.type = 'password';
         icon.classList.remove('bi-eye-slash');
         icon.classList.add('bi-eye');
+    }
+});
+
+document.getElementById('registerForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('id_email').value;
+    const password = document.getElementById('id_password').value;
+    const firstName = document.getElementById('id_first_name').value;
+    const lastName = document.getElementById('id_last_name').value;
+    
+    if (!document.getElementById('termsCheck').checked) {
+        alert('Você precisa aceitar os Termos de Uso e a Política de Privacidade');
+        return;
+    }
+    
+    try {
+        const { data, error } = await supabase.auth.signUp({
+            email: email,
+            password: password,
+            options: {
+                data: {
+                    first_name: firstName,
+                    last_name: lastName
+                }
+            }
+        });
+        
+        if (error) throw error;
+        
+        alert('Conta criada com sucesso! Por favor, verifique seu email para confirmar o cadastro.');
+        window.location.href = '{% url "login" %}';
+    } catch (error) {
+        alert('Erro ao criar conta: ' + error.message);
     }
 });
 </script>

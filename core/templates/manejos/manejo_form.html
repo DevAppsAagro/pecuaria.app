@@ -1,243 +1,430 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container-fluid mt-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Registro de Manejo</h3>
-                </div>
-                <div class="card-body">
-                    <form method="post" id="manejoForm" action="{% url 'manejo_create' %}">
-                        {% csrf_token %}
-                        
+<style>
+    /* Estilos para melhor visualização no curral */
+    body {
+        background-color: #f8f9fa;
+    }
+    
+    .form-control {
+        font-size: 1.2rem;
+        padding: 0.6rem;
+        border: 2px solid #333;
+    }
+    
+    .form-label {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .btn-manejo {
+        font-size: 1.2rem;
+        padding: 0.8rem 1.6rem;
+        margin: 0.4rem;
+    }
+    
+    .card {
+        border: 2px solid #333;
+        margin-bottom: 0.8rem;
+    }
+    
+    .card-header {
+        background-color: #333;
+        color: white;
+        padding: 0.8rem;
+    }
+
+    .card-header h3 {
+        font-size: 1.2rem;
+        margin: 0;
+    }
+    
+    .info-box {
+        background-color: #fff;
+        border: 2px solid #333;
+        padding: 0.8rem;
+        margin-bottom: 0.8rem;
+    }
+    
+    .info-text {
+        font-size: 1rem;
+        margin-bottom: 0.4rem;
+    }
+    
+    .checkbox-lg {
+        width: 20px;
+        height: 20px;
+        margin-right: 8px;
+    }
+    
+    .checkbox-label {
+        font-size: 1.1rem;
+        font-weight: bold;
+    }
+    
+    .section-divider {
+        border-left: 2px solid #333;
+        height: 100%;
+        padding-left: 0.8rem;
+    }
+
+    .mb-3 {
+        margin-bottom: 0.8rem !important;
+    }
+
+    .p-4 {
+        padding: 1rem !important;
+    }
+
+    h4 {
+        font-size: 1.1rem;
+        margin-bottom: 0.8rem;
+    }
+
+    h5 {
+        font-size: 1rem;
+        margin-bottom: 0.6rem;
+    }
+</style>
+
+<div class="container-fluid p-4" style="height: calc(100vh - 100px);">
+    <form method="post" id="manejoForm" action="{% url 'manejo_create' %}">
+        {% csrf_token %}
+        
+        <div class="row h-100">
+            <!-- Coluna da Esquerda - Informações do Animal -->
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h3><i class="fas fa-cow me-2"></i>Identificação do Animal</h3>
+                    </div>
+                    <div class="card-body">
                         <!-- Data do Manejo -->
-                        <div class="mb-4">
-                            <label for="data" class="form-label h5">Data do Manejo</label>
-                            <input type="date" class="form-control form-control-lg" id="data" name="data" required 
-                                   value="{% now 'Y-m-d' %}">
+                        <div class="mb-3">
+                            <label for="data" class="form-label">
+                                <i class="fas fa-calendar me-2"></i>Data
+                            </label>
+                            <input type="date" class="form-control" id="data" name="data" required value="{% now 'Y-m-d' %}">
                         </div>
 
-                        <!-- Animal -->
-                        <div class="mb-4">
-                            <label for="brinco" class="form-label h5">Brinco do Animal</label>
-                            <input type="text" class="form-control form-control-lg" id="brinco" name="brinco" 
-                                   placeholder="Digite o brinco visual ou eletrônico" required>
+                        <!-- Brinco -->
+                        <div class="mb-3">
+                            <label for="brinco" class="form-label">
+                                <i class="fas fa-tag me-2"></i>Brinco
+                            </label>
+                            <input type="text" class="form-control" id="brinco" name="brinco" 
+                                   placeholder="Digite o brinco" required>
                         </div>
 
                         <!-- Informações do Animal -->
-                        <div id="animalInfo" class="card mb-4" style="display: none;">
-                            <div class="card-body">
-                                <h5 class="card-title">Informações do Animal</h5>
-                                <div id="animalDetails" class="h6"></div>
-                                <div id="ultimaPesagem" class="mt-3" style="display: none;">
-                                    <hr>
-                                    <h5 class="card-title">Última Pesagem</h5>
-                                    <div id="pesagemDetails" class="h6"></div>
+                        <div id="animalInfo" class="info-box" style="display: none;">
+                            <h4><i class="fas fa-info-circle me-2"></i>Informações</h4>
+                            <div id="animalDetails">
+                                <p class="info-text"><strong>Brinco:</strong> <span id="animalBrinco"></span></p>
+                                <p class="info-text"><strong>Raça:</strong> <span id="animalRaca"></span></p>
+                                <p class="info-text"><strong>Categoria:</strong> <span id="animalCategoria"></span></p>
+                                <p class="info-text"><strong>Lote:</strong> <span id="animalLote"></span></p>
+                                <p class="info-text"><strong>Pasto:</strong> <span id="animalPasto"></span></p>
+                            </div>
+                            
+                            <div id="ultimaPesagem" class="mt-3" style="display: none;">
+                                <h4><i class="fas fa-weight me-2"></i>Última Pesagem</h4>
+                                <p class="info-text"><strong>Peso:</strong> <span id="ultimoPeso"></span> kg</p>
+                                <p class="info-text"><strong>Data:</strong> <span id="ultimaData"></span></p>
+                                <div id="gmdInfo" class="alert alert-info mt-2" style="display: none;">
+                                    <i class="fas fa-chart-line me-2"></i>
+                                    GMD: <span id="gmdValor"></span> kg/dia
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
 
-                        <!-- Pesagem -->
-                        <div class="mb-4">
-                            <label for="peso" class="form-label h5">Peso (kg)</label>
-                            <input type="number" class="form-control form-control-lg" id="peso" name="peso" step="0.01">
-                            <div id="gmdInfo" class="alert alert-info mt-2" style="display: none;">
-                                <i class="fas fa-chart-line me-2"></i>
-                                <span id="gmdText"></span>
+            <!-- Coluna da Direita - Manejos -->
+            <div class="col-md-8">
+                <div class="row h-100">
+                    <!-- Pesagem e Apartação -->
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h3><i class="fas fa-weight me-2"></i>Pesagem e Apartação</h3>
+                            </div>
+                            <div class="card-body">
+                                <!-- Peso -->
+                                <div class="mb-3">
+                                    <label for="peso" class="form-label">Peso (kg)</label>
+                                    <input type="number" class="form-control" id="peso" name="peso" step="0.01">
+                                </div>
+
+                                <!-- Apartação -->
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input checkbox-lg" type="checkbox" id="fazer_apartacao" name="fazer_apartacao">
+                                    <label class="form-check-label checkbox-label" for="fazer_apartacao">
+                                        Fazer Apartação
+                                    </label>
+                                </div>
+
+                                <div id="apartacao_campos" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="peso_referencia" class="form-label">Peso de Referência (kg)</label>
+                                        <input type="number" class="form-control" id="peso_referencia" name="peso_referencia" step="0.01">
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h5>Acima do Peso</h5>
+                                            <div class="mb-2">
+                                                <label for="lote_acima" class="form-label">Lote</label>
+                                                <select class="form-control" id="lote_acima" name="lote_acima">
+                                                    <option value="">Selecione</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label for="pasto_acima" class="form-label">Pasto</label>
+                                                <select class="form-control" id="pasto_acima" name="pasto_acima">
+                                                    <option value="">Selecione</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h5>Abaixo do Peso</h5>
+                                            <div class="mb-2">
+                                                <label for="lote_abaixo" class="form-label">Lote</label>
+                                                <select class="form-control" id="lote_abaixo" name="lote_abaixo">
+                                                    <option value="">Selecione</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label for="pasto_abaixo" class="form-label">Pasto</label>
+                                                <select class="form-control" id="pasto_abaixo" name="pasto_abaixo">
+                                                    <option value="">Selecione</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Checkbox para Manejo Sanitário -->
-                        <div class="form-check mb-4">
-                            <input class="form-check-input" type="checkbox" id="fazer_manejo" name="fazer_manejo">
-                            <label class="form-check-label h5 ms-2" for="fazer_manejo">
-                                Fazer também Manejo Sanitário?
-                            </label>
+                    <!-- Manejo Sanitário -->
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h3><i class="fas fa-syringe me-2"></i>Manejo Sanitário</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input checkbox-lg" type="checkbox" id="fazer_manejo" name="fazer_manejo">
+                                    <label class="form-check-label checkbox-label" for="fazer_manejo">
+                                        Fazer Manejo Sanitário
+                                    </label>
+                                </div>
+
+                                <div id="manejo_sanitario_campos" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="insumo" class="form-label">Insumo</label>
+                                        <input type="text" class="form-control" id="insumo" name="insumo">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="tipo_manejo" class="form-label">Tipo de Manejo</label>
+                                        <input type="text" class="form-control" id="tipo_manejo" name="tipo_manejo">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="dias_proximo" class="form-label">Dias p/ Próximo</label>
+                                        <input type="number" class="form-control" id="dias_proximo" name="dias_proximo">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="observacao" class="form-label">Observação</label>
+                                        <textarea class="form-control" id="observacao" name="observacao" rows="2"></textarea>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-
-                        <!-- Campos do Manejo Sanitário -->
-                        <div id="manejo_sanitario_campos" style="display: none;">
-                            <div class="mb-4">
-                                <label for="insumo" class="form-label h5">Insumo</label>
-                                <input type="text" class="form-control form-control-lg" id="insumo" name="insumo">
-                            </div>
-
-                            <div class="mb-4">
-                                <label for="tipo_manejo" class="form-label h5">Tipo de Manejo</label>
-                                <input type="text" class="form-control form-control-lg" id="tipo_manejo" name="tipo_manejo">
-                            </div>
-
-                            <div class="mb-4">
-                                <label for="dias_proximo" class="form-label h5">Dias para Próximo Manejo</label>
-                                <input type="number" class="form-control form-control-lg" id="dias_proximo" name="dias_proximo">
-                            </div>
-
-                            <div class="mb-4">
-                                <label for="observacao" class="form-label h5">Observação</label>
-                                <textarea class="form-control form-control-lg" id="observacao" name="observacao" rows="4"></textarea>
-                            </div>
-                        </div>
-
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg">Salvar Manejo</button>
-                            <button type="reset" class="btn btn-secondary btn-lg">Limpar Formulário</button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+
+        <!-- Botões fixos no rodapé -->
+        <div class="position-fixed bottom-0 start-0 w-100 bg-light p-3" style="border-top: 2px solid #333;">
+            <div class="d-flex justify-content-center gap-3">
+                <button type="submit" class="btn btn-primary btn-manejo">
+                    <i class="fas fa-save me-2"></i>Salvar Manejo
+                </button>
+                <button type="reset" class="btn btn-secondary btn-manejo">
+                    <i class="fas fa-undo me-2"></i>Limpar
+                </button>
+            </div>
+        </div>
+    </form>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('manejoForm');
+    const form = document.querySelector('form');
     const brincoInput = document.getElementById('brinco');
     const pesoInput = document.getElementById('peso');
-    const dataInput = document.getElementById('data');
     const animalInfo = document.getElementById('animalInfo');
-    const animalDetails = document.getElementById('animalDetails');
     const ultimaPesagem = document.getElementById('ultimaPesagem');
-    const pesagemDetails = document.getElementById('pesagemDetails');
     const gmdInfo = document.getElementById('gmdInfo');
-    const gmdText = document.getElementById('gmdText');
+    const dataInput = document.getElementById('data');
+    const dataOriginal = dataInput.value;
+    const fazerApartacao = document.getElementById('fazer_apartacao');
+    const apartacaoCampos = document.getElementById('apartacao_campos');
     const fazerManejo = document.getElementById('fazer_manejo');
     const manejoSanitarioCampos = document.getElementById('manejo_sanitario_campos');
-    let ultimaPesagemData = null;
-    let dataOriginal = dataInput.value; // Guardar a data original
-
-    // Formatar data para exibição
-    function formatarData(data) {
-        return new Date(data).toLocaleDateString('pt-BR');
+    
+    // Função para carregar os lotes
+    async function carregarLotes() {
+        try {
+            const response = await fetch('/api/lotes/');
+            const lotes = await response.json();
+            
+            const loteAcimaSelect = document.getElementById('lote_acima');
+            const loteAbaixoSelect = document.getElementById('lote_abaixo');
+            
+            // Limpar opções existentes
+            loteAcimaSelect.innerHTML = '<option value="">Manter Lote Atual</option>';
+            loteAbaixoSelect.innerHTML = '<option value="">Manter Lote Atual</option>';
+            
+            // Adicionar novas opções
+            lotes.forEach(lote => {
+                const option = document.createElement('option');
+                option.value = lote.id;
+                option.textContent = lote.nome;
+                
+                const optionClone = option.cloneNode(true);
+                
+                loteAcimaSelect.appendChild(option);
+                loteAbaixoSelect.appendChild(optionClone);
+            });
+        } catch (error) {
+            console.error('Erro ao carregar lotes:', error);
+        }
     }
-
-    // Formatar número com 3 casas decimais
-    function formatarNumero(numero) {
-        return Number(numero).toFixed(3);
-    }
-
-    // Calcular GMD
-    function calcularGMD() {
-        console.log('Calculando GMD...');
-        console.log('Última pesagem:', ultimaPesagemData);
-        console.log('Peso atual:', pesoInput.value);
-        console.log('Data atual:', dataInput.value);
-
-        if (!ultimaPesagemData || !pesoInput.value || !dataInput.value) {
-            console.log('Faltam dados para calcular GMD');
+    
+    // Função para carregar os pastos de um lote
+    async function carregarPastos(loteId, targetSelect) {
+        if (!loteId) {
+            targetSelect.innerHTML = '<option value="">Manter Pasto Atual</option>';
             return;
         }
-
-        const pesoAtual = parseFloat(pesoInput.value);
-        const pesoAnterior = ultimaPesagemData.peso;
-        const dataAnterior = new Date(ultimaPesagemData.data);
-        const dataAtual = new Date(dataInput.value);
         
-        console.log('Peso atual:', pesoAtual);
-        console.log('Peso anterior:', pesoAnterior);
-        console.log('Data anterior:', dataAnterior);
-        console.log('Data atual:', dataAtual);
-
-        if (!isNaN(pesoAtual) && dataAtual > dataAnterior) {
-            const diffDias = Math.round((dataAtual - dataAnterior) / (1000 * 60 * 60 * 24));
-            const gmd = (pesoAtual - pesoAnterior) / diffDias;
+        try {
+            const response = await fetch(`/api/pastos-por-lote/${loteId}/`);
+            const data = await response.json();
             
-            console.log('Diferença em dias:', diffDias);
-            console.log('GMD calculado:', gmd);
-
-            if (diffDias > 0) {
-                const ganhoTotal = pesoAtual - pesoAnterior;
-                gmdInfo.style.display = 'block';
-                gmdText.innerHTML = `
-                    <div class="mb-2">Peso anterior: <strong>${formatarNumero(pesoAnterior)} kg</strong> (${formatarData(dataAnterior)})</div>
-                    <div class="mb-2">Peso atual: <strong>${formatarNumero(pesoAtual)} kg</strong> (${formatarData(dataAtual)})</div>
-                    <div class="mb-2">Período: <strong>${diffDias} dias</strong></div>
-                    <div class="mb-2">Ganho total: <strong>${formatarNumero(ganhoTotal)} kg</strong></div>
-                    <div>GMD: <strong>${formatarNumero(gmd)} kg/dia</strong></div>
-                `;
-            } else {
-                console.log('Diferença de dias <= 0');
-                gmdInfo.style.display = 'none';
+            if (!data.success) {
+                throw new Error(data.error || 'Erro ao carregar pastos');
             }
-        } else {
-            console.log('Peso inválido ou data atual menor que anterior');
-            gmdInfo.style.display = 'none';
+            
+            // Limpar opções existentes
+            targetSelect.innerHTML = '<option value="">Manter Pasto Atual</option>';
+            
+            // Adicionar novas opções
+            data.pastos.forEach(pasto => {
+                const option = document.createElement('option');
+                option.value = pasto.id;
+                option.textContent = pasto.nome;
+                targetSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Erro ao carregar pastos:', error);
         }
     }
-
-    // Controlar visibilidade dos campos de manejo sanitário
+    
+    // Event listeners para os selects de lote
+    document.getElementById('lote_acima').addEventListener('change', function() {
+        const pastoSelect = document.getElementById('pasto_acima');
+        carregarPastos(this.value, pastoSelect);
+    });
+    
+    document.getElementById('lote_abaixo').addEventListener('change', function() {
+        const pastoSelect = document.getElementById('pasto_abaixo');
+        carregarPastos(this.value, pastoSelect);
+    });
+    
+    // Event listener para o checkbox de apartação
+    fazerApartacao.addEventListener('change', function() {
+        apartacaoCampos.style.display = this.checked ? 'block' : 'none';
+        if (this.checked) {
+            carregarLotes();
+        }
+    });
+    
+    // Event listener para o checkbox de manejo sanitário
     fazerManejo.addEventListener('change', function() {
         manejoSanitarioCampos.style.display = this.checked ? 'block' : 'none';
     });
-
-    // Recalcular GMD quando o peso ou data mudar
-    pesoInput.addEventListener('input', calcularGMD);
-    dataInput.addEventListener('change', calcularGMD);
-
-    // Buscar animal
-    brincoInput.addEventListener('blur', async function() {
+    
+    // Buscar animal quando o brinco for informado
+    brincoInput.addEventListener('change', async function() {
         const brinco = this.value.trim();
-        if (!brinco) return;
-
-        try {
-            console.log('Buscando animal:', brinco);
-            const response = await fetch(`/api/buscar_animal/${brinco}/`);
-            const data = await response.json();
-            console.log('Resposta da API:', data);
-
-            if (data.success) {
-                animalInfo.style.display = 'block';
-                animalDetails.innerHTML = `
-                    <p class="mb-2">Brinco Visual: <strong>${data.animal.brinco_visual}</strong></p>
-                    <p class="mb-2">Categoria: <strong>${data.animal.categoria}</strong></p>
-                    <p class="mb-0">Lote: <strong>${data.animal.lote}</strong></p>
-                `;
-
-                if (data.ultima_pesagem) {
-                    console.log('Última pesagem encontrada:', data.ultima_pesagem);
-                    ultimaPesagemData = data.ultima_pesagem;
-                    ultimaPesagem.style.display = 'block';
-                    const origem = data.ultima_pesagem.data === data.animal.data_entrada ? 'Peso de Entrada' : 'Última Pesagem';
-                    pesagemDetails.innerHTML = `
-                        <p class="mb-2">${origem}: <strong>${formatarNumero(data.ultima_pesagem.peso)} kg</strong></p>
-                        <p class="mb-0">Data: <strong>${formatarData(data.ultima_pesagem.data)}</strong></p>
-                    `;
-                    
-                    // Recalcular GMD se já houver peso atual
-                    calcularGMD();
-                } else {
-                    console.log('Animal não tem pesagem anterior');
-                    ultimaPesagem.style.display = 'none';
-                    ultimaPesagemData = null;
-                    gmdInfo.style.display = 'none';
-                }
-            } else {
-                console.log('Animal não encontrado');
-                animalInfo.style.display = 'none';
-                ultimaPesagem.style.display = 'none';
-                ultimaPesagemData = null;
-                gmdInfo.style.display = 'none';
-                alert('Animal não encontrado!');
-            }
-        } catch (error) {
-            console.error('Erro ao buscar animal:', error);
-            alert('Erro ao buscar animal');
-        }
-    });
-
-    // Envio do formulário
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        if (!document.getElementById('animalInfo').style.display === 'block') {
-            alert('Por favor, selecione um animal válido primeiro.');
+        if (!brinco) {
+            animalInfo.style.display = 'none';
+            ultimaPesagem.style.display = 'none';
+            gmdInfo.style.display = 'none';
             return;
         }
 
+        try {
+            const response = await fetch(`/api/buscar_animal/${brinco}/`);
+            const data = await response.json();
+            
+            if (data.success) {
+                document.getElementById('animalBrinco').textContent = data.animal.brinco || 'N/A';
+                document.getElementById('animalRaca').textContent = data.animal.raca || 'N/A';
+                document.getElementById('animalCategoria').textContent = data.animal.categoria || 'N/A';
+                document.getElementById('animalLote').textContent = data.animal.lote || 'N/A';
+                document.getElementById('animalPasto').textContent = data.animal.pasto || 'N/A';
+                
+                if (data.ultima_pesagem) {
+                    document.getElementById('ultimoPeso').textContent = data.ultima_pesagem.peso;
+                    document.getElementById('ultimaData').textContent = data.ultima_pesagem.data;
+                    ultimaPesagem.style.display = 'block';
+                    
+                    if (data.gmd) {
+                        document.getElementById('gmdValor').textContent = data.gmd.toFixed(3);
+                        gmdInfo.style.display = 'block';
+                    } else {
+                        gmdInfo.style.display = 'none';
+                    }
+                } else {
+                    ultimaPesagem.style.display = 'none';
+                    gmdInfo.style.display = 'none';
+                }
+                
+                animalInfo.style.display = 'block';
+            } else {
+                alert('Animal não encontrado: ' + (data.message || 'Nenhum animal encontrado com este brinco'));
+                animalInfo.style.display = 'none';
+                ultimaPesagem.style.display = 'none';
+                gmdInfo.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Erro ao buscar animal:', error);
+            alert('Erro ao buscar animal: ' + error.message);
+        }
+    });
+    
+    // Envio do formulário
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        if (animalInfo.style.display === 'none') {
+            alert('Por favor, selecione um animal válido primeiro.');
+            return;
+        }
+        
         try {
             const formData = new FormData(this);
             const response = await fetch(this.action, {
@@ -247,23 +434,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: formData
             });
-
+            
             const result = await response.json();
             if (result.success) {
-                // Limpar campos mantendo a data
+                // Limpar apenas os campos do animal e peso
                 brincoInput.value = '';
                 pesoInput.value = '';
                 animalInfo.style.display = 'none';
                 ultimaPesagem.style.display = 'none';
                 gmdInfo.style.display = 'none';
-
+                
+                // Não limpar os campos de apartação se estiver marcado
+                if (!fazerApartacao.checked) {
+                    // Limpar os campos de apartação apenas se não estiver usando
+                    document.getElementById('peso_referencia').value = '';
+                    document.getElementById('lote_acima').value = '';
+                    document.getElementById('lote_abaixo').value = '';
+                    document.getElementById('pasto_acima').value = '';
+                    document.getElementById('pasto_abaixo').value = '';
+                } else {
+                    // Se estiver fazendo apartação, recarregar os lotes
+                    carregarLotes();
+                }
+                
+                // Não limpar os campos de manejo sanitário se estiver marcado
                 if (!fazerManejo.checked) {
                     document.getElementById('insumo').value = '';
                     document.getElementById('tipo_manejo').value = '';
                     document.getElementById('dias_proximo').value = '';
-                    document.getElementById('observacao').value = '';
                 }
-
+                
                 alert('Manejo registrado com sucesso!');
             } else {
                 alert(result.message || 'Erro ao registrar manejo');
@@ -273,11 +473,16 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Erro ao registrar manejo: ' + error.message);
         }
     });
-
+    
     // Botão limpar
     document.querySelector('button[type="reset"]').addEventListener('click', function() {
         dataInput.value = dataOriginal; // Restaurar data original
     });
+    
+    // Carregar lotes inicialmente se apartação estiver marcada
+    if (fazerApartacao.checked) {
+        carregarLotes();
+    }
 });
 </script>
 {% endblock %}

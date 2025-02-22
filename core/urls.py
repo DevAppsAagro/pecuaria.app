@@ -16,6 +16,8 @@ from . import views_config
 from . import importacao_views
 from django.contrib.auth import views as auth_views
 from . import views_account  # Nova importação
+from . import views_auth
+from .views_auth import redefinir_senha_view
 from .views_fazenda import (
     salvar_coordenadas_benfeitoria,
     get_coordenadas_benfeitoria,
@@ -334,6 +336,7 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('auth/verify-email/', views.verificar_email_view, name='verify-email'),
     path('reset-password/', views.reset_password_view, name='reset_password'),
+    path('redefinir-senha/', redefinir_senha_view, name='redefinir_senha'),
     path('verify-email/', views.verificar_email_view, name='verify_email'),
     path('logout/', views.logout_view, name='logout'),
     path('aguardando-pagamento/', views.awaiting_payment, name='awaiting_payment'),
