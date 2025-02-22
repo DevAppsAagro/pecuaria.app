@@ -332,18 +332,20 @@ urlpatterns = [
     path('conta/perfil/', views_account.profile_view, name='profile'),
     
 # Auth URLs
-    path('auth/', include([
+        # Auth URLs
     path('login/', views.login_view, name='login'),
     path('register/', views.register_view, name='register'),
-    path('verify-email/', views.verificar_email_view, name='verify-email'),
+    path('auth/verify-email/', views.verificar_email_view, name='verify-email'),
     path('reset-password/', views.reset_password_view, name='reset_password'),
-    path('redefinir-senha/<str:token>/', views.redefinir_senha_view, name='redefinir_senha'),
+    path('auth/redefinir-senha/<str:token>/', views.redefinir_senha_view, name='redefinir_senha'),
+    path('verify-email/', views.verificar_email_view, name='verify_email'),
     path('logout/', views.logout_view, name='logout'),
-])),
+    path('aguardando-pagamento/', views.awaiting_payment, name='awaiting_payment'),
+    path('configuracoes/', views.configuracoes, name='configuracoes'),
 
 # Outras URLs
     path('aguardando-pagamento/', views.awaiting_payment, name='awaiting_payment'),
-path('configuracoes/', views.configuracoes, name='configuracoes'),
+    path('configuracoes/', views.configuracoes, name='configuracoes'),
     
     # APIs para o mapa
     path('fazenda/get_pastos/<int:fazenda_id>/', views_fazenda.get_pastos, name='get_pastos'),
