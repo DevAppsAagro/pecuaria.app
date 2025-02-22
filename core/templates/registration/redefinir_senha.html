@@ -3,128 +3,130 @@
 {% block auth_content %}
 <div class="container">
     <div class="row justify-content-center">
-        <div class="col-md-6 col-lg-4">
-            <div class="card mt-5">
-                <div class="card-body">
+        <div class="col-md-6 col-lg-5">
+            <!-- Logo Card -->
+            <div class="text-center mb-4">
+                <img src="/static/img/form-logo.png" alt="PecuaristaPRO™" class="img-fluid" style="max-width: 300px;">
+            </div>
+
+            <!-- Main Card -->
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
                     <h4 class="card-title text-center mb-4">Redefinir Senha</h4>
+                    <p class="text-muted text-center mb-4">Digite sua nova senha abaixo</p>
+
                     <form id="resetForm">
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <label for="password" class="form-label">Nova Senha</label>
                             <div class="input-group">
-                                <input type="password" class="form-control" id="password" required>
+                                <input type="password" class="form-control" id="password" required 
+                                       placeholder="Digite sua nova senha">
                                 <button class="btn btn-outline-secondary" type="button" id="togglePassword">
                                     <i class="bi bi-eye"></i>
                                 </button>
                             </div>
+                            <div class="form-text">Mínimo de 8 caracteres</div>
                         </div>
-                        <div class="mb-3">
+
+                        <div class="mb-4">
                             <label for="confirmPassword" class="form-label">Confirmar Senha</label>
                             <div class="input-group">
-                                <input type="password" class="form-control" id="confirmPassword" required>
+                                <input type="password" class="form-control" id="confirmPassword" required 
+                                       placeholder="Confirme sua nova senha">
                                 <button class="btn btn-outline-secondary" type="button" id="toggleConfirmPassword">
                                     <i class="bi bi-eye"></i>
                                 </button>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-primary w-100">Redefinir Senha</button>
+
+                        <button type="submit" class="btn btn-primary w-100 py-2 mb-3">
+                            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                            Redefinir Senha
+                        </button>
+
+                        <div class="text-center">
+                            <a href="{% url 'login' %}" class="text-decoration-none">Voltar para o login</a>
+                        </div>
                     </form>
                 </div>
+            </div>
+
+            <!-- Footer Card -->
+            <div class="text-center mt-4">
+                <img src="/static/img/logo.png" alt="LWL Solutions" class="img-fluid mb-2" style="max-width: 100px;">
+                <p class="text-muted small mb-0">LWL Solutions Ltda © 2020-2025</p>
+                <p class="text-muted small">CNPJ: 48.837.685/0001-51</p>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-document.getElementById('resetForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const password = document.getElementById('password').value;
-    const confirmPassword = document.getElementById('confirmPassword').value;
-    
-    if (password !== confirmPassword) {
-        alert('As senhas não coincidem');
-        return;
-    }
-
-    try {
-        // Tentar pegar o token de várias formas possíveis
-        let token = null;
-        
-        // Método 1: Da URL como parâmetro
-        const urlParams = new URLSearchParams(window.location.search);
-        token = urlParams.get('token');
-        
-        // Método 2: Do hash
-        if (!token) {
-            const hash = window.location.hash.substring(1);
-            const hashParams = new URLSearchParams(hash);
-            token = hashParams.get('access_token');
-        }
-        
-        // Método 3: Do caminho da URL
-        if (!token) {
-            token = window.location.pathname.split('/').pop();
-        }
-
-        console.log('Token encontrado:', token); // Para debug
-
-        // Tentar atualizar a senha
-        const { error } = await supabase.auth.updateUser({
-            password: password
-        });
-
-        if (error) throw error;
-
-        alert('Senha atualizada com sucesso!');
-        window.location.href = '{% url "login" %}';
-    } catch (error) {
-        console.error('Erro completo:', error); // Para debug
-        alert('Erro ao redefinir senha: ' + error.message);
-    }
-});
-
-// Toggle password visibility
-document.getElementById('togglePassword').addEventListener('click', function() {
-    const passwordInput = document.getElementById('password');
-    const icon = this.querySelector('i');
-    if (passwordInput.type === 'password') {
-        passwordInput.type = 'text';
-        icon.classList.remove('bi-eye');
-        icon.classList.add('bi-eye-slash');
-    } else {
-        passwordInput.type = 'password';
-        icon.classList.remove('bi-eye-slash');
-        icon.classList.add('bi-eye');
-    }
-});
-
-document.getElementById('toggleConfirmPassword').addEventListener('click', function() {
-    const passwordInput = document.getElementById('confirmPassword');
-    const icon = this.querySelector('i');
-    if (passwordInput.type === 'password') {
-        passwordInput.type = 'text';
-        icon.classList.remove('bi-eye');
-        icon.classList.add('bi-eye-slash');
-    } else {
-        passwordInput.type = 'password';
-        icon.classList.remove('bi-eye-slash');
-        icon.classList.add('bi-eye');
-    }
-});
-</script>
-{% endblock %}
-
-{% extends 'base.html' %}
-
-{% block auth_content %}
-<!-- ... resto do código ... -->
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
     const supabase = supabase.createClient('{{ SUPABASE_URL }}', '{{ SUPABASE_KEY }}');
 
+    // Toggle password visibility
+    function togglePasswordVisibility(inputId, buttonId) {
+        const input = document.getElementById(inputId);
+        const button = document.getElementById(buttonId);
+        const icon = button.querySelector('i');
+        
+        button.addEventListener('click', () => {
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        });
+    }
+
+    togglePasswordVisibility('password', 'togglePassword');
+    togglePasswordVisibility('confirmPassword', 'toggleConfirmPassword');
+
     document.getElementById('resetForm').addEventListener('submit', async function(e) {
-        // ... resto do código do script ...
+        e.preventDefault();
+        
+        const submitButton = this.querySelector('button[type="submit"]');
+        const spinner = submitButton.querySelector('.spinner-border');
+        
+        // Mostrar spinner e desabilitar botão
+        submitButton.disabled = true;
+        spinner.classList.remove('d-none');
+        
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        
+        if (password !== confirmPassword) {
+            alert('As senhas não coincidem');
+            submitButton.disabled = false;
+            spinner.classList.add('d-none');
+            return;
+        }
+
+        try {
+            let token = window.location.pathname.split('/').pop();
+            console.log('Token encontrado:', token);
+
+            const { error } = await supabase.auth.updateUser({
+                password: password
+            });
+
+            if (error) throw error;
+
+            alert('Senha atualizada com sucesso!');
+            window.location.href = '{% url "login" %}';
+        } catch (error) {
+            console.error('Erro completo:', error);
+            alert('Erro ao redefinir senha: ' + error.message);
+            
+            // Reativar botão e esconder spinner
+            submitButton.disabled = false;
+            spinner.classList.add('d-none');
+        }
     });
 </script>
 {% endblock %}

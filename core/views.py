@@ -3949,6 +3949,8 @@ class DespesasListView(LoginRequiredMixin, ListView):
         
         return context
 
+from django.conf import settings  # Adicione esta linha no topo do arquivo
+
 def redefinir_senha_view(request, token=None):
     """View para redefinição de senha"""
     context = {
