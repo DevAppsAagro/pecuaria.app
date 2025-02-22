@@ -1,88 +1,100 @@
 {% extends 'base.html' %}
-{% load static %}
 
-{% block content %}
-<div class="container mt-5">
+{% block auth_content %}
+<div class="container">
     <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
-            <div class="card shadow-sm">
-                <div class="card-body text-center p-5">
-                    <img src="{% static 'img/password-reset.svg' %}" alt="Redefinir Senha" class="mb-4" style="width: 120px;">
-                    
-                    <h2 class="mb-4">Redefinir sua Senha</h2>
-                    
-                    <form method="post" id="resetPasswordForm">
-                        {% csrf_token %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card mt-5">
+                <div class="card-body">
+                    <h4 class="card-title text-center mb-4">Redefinir Senha</h4>
+                    <form id="resetForm">
                         <div class="mb-3">
-                            <input type="password" class="form-control" id="password" name="password" placeholder="Nova Senha" required>
+                            <label for="password" class="form-label">Nova Senha</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="password" required>
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div class="mb-4">
-                            <input type="password" class="form-control" id="confirmPassword" name="confirm_password" placeholder="Confirmar Nova Senha" required>
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">Confirmar Senha</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="confirmPassword" required>
+                                <button class="btn btn-outline-secondary" type="button" id="toggleConfirmPassword">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
                         </div>
-
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-key me-2"></i>Redefinir Senha
-                            </button>
-                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Redefinir Senha</button>
                     </form>
-
-                    <div class="mt-4">
-                        <small class="text-muted">
-                            Lembrou sua senha? 
-                            <a href="{% url 'login' %}" class="text-decoration-none">Voltar para Login</a>
-                        </small>
-                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<style>
-.card {
-    border: none;
-    border-radius: 15px;
-}
-
-.btn {
-    border-radius: 8px;
-    padding: 12px;
-}
-
-.form-control {
-    padding: 12px;
-    border-radius: 8px;
-}
-</style>
-
 <script>
-document.getElementById('resetPasswordForm').addEventListener('submit', async function(e) {
+document.getElementById('resetForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
     
     if (password !== confirmPassword) {
-        alert('As senhas não coincidem!');
+        alert('As senhas não coincidem');
         return;
     }
-    
-    // Obter o token da URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-    
+
+    // Pegar o token da URL
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.substring(1));
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    const expiresIn = params.get('expires_in');
+    const tokenType = params.get('token_type');
+
     try {
-        const { data, error } = await supabase.auth.updateUser({
+        // Atualizar a senha usando o token
+        const { error } = await supabase.auth.updateUser({
             password: password
         });
-        
+
         if (error) throw error;
-        
+
         alert('Senha atualizada com sucesso!');
         window.location.href = '{% url "login" %}';
     } catch (error) {
-        alert('Erro ao atualizar senha: ' + error.message);
+        alert('Erro ao redefinir senha: ' + error.message);
+    }
+});
+
+// Toggle password visibility
+document.getElementById('togglePassword').addEventListener('click', function() {
+    const passwordInput = document.getElementById('password');
+    const icon = this.querySelector('i');
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+    } else {
+        passwordInput.type = 'password';
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
+    }
+});
+
+document.getElementById('toggleConfirmPassword').addEventListener('click', function() {
+    const passwordInput = document.getElementById('confirmPassword');
+    const icon = this.querySelector('i');
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+    } else {
+        passwordInput.type = 'password';
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
     }
 });
 </script>

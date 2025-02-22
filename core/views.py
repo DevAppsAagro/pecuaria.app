@@ -14,6 +14,7 @@ from django.db.models import Q, Count, Sum, Max, F, Value, DecimalField, Express
 from django.db.models.functions import Coalesce
 from django.db import transaction
 from datetime import datetime, date, timedelta
+from .auth_supabase import update_password
 import json
 import pandas as pd
 import numpy as np
@@ -3947,3 +3948,11 @@ class DespesasListView(LoginRequiredMixin, ListView):
         context['totais_status'] = totais_status
         
         return context
+def redefinir_senha_view(request):
+    """View para redefinição de senha"""
+    if request.method == 'POST':
+        new_password = request.POST.get('password')
+        if update_password(request, new_password):
+            return redirect('login')
+        return redirect('redefinir_senha')
+    return render(request, 'registration/redefinir_senha.html')

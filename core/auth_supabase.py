@@ -163,3 +163,20 @@ def verify_email(token):
         return True if response else False
     except Exception as e:
         return False
+def update_password(request, new_password):
+    """Atualiza a senha do usuário no Supabase"""
+    try:
+        response = supabase.auth.update_user({
+            "password": new_password
+        })
+        
+        if response.user:
+            messages.success(request, 'Senha atualizada com sucesso!')
+            return True
+        else:
+            messages.error(request, 'Erro ao atualizar senha.')
+            return False
+            
+    except Exception as e:
+        messages.error(request, f'Erro ao atualizar senha: {str(e)}')
+        return False
