@@ -627,22 +627,23 @@ def webhook_eduzz_legacy(request):
     Endpoint para receber notificações da Eduzz
     """
     try:
-        # Verifica a assinatura do webhook
-        signature = request.headers.get('X-Eduzz-Signature')
-        if not signature:
-            return JsonResponse({'error': 'Assinatura não encontrada'}, status=400)
+        # Verifica a assinatura do webhook em produção
+        if not settings.DEBUG:
+            signature = request.headers.get('X-Eduzz-Signature')
+            if not signature:
+                return JsonResponse({'error': 'Assinatura não encontrada'}, status=400)
 
-        # Calcula a assinatura esperada
-        payload = request.body
-        expected_signature = hmac.new(
-            settings.EDUZZ_API_KEY.encode(),
-            payload,
-            hashlib.sha256
-        ).hexdigest()
+            # Calcula a assinatura esperada
+            payload = request.body
+            expected_signature = hmac.new(
+                settings.EDUZZ_API_KEY.encode(),
+                payload,
+                hashlib.sha256
+            ).hexdigest()
 
-        # Verifica se a assinatura é válida
-        if not hmac.compare_digest(signature, expected_signature):
-            return JsonResponse({'error': 'Assinatura inválida'}, status=400)
+            # Verifica se a assinatura é válida
+            if not hmac.compare_digest(signature, expected_signature):
+                return JsonResponse({'error': 'Assinatura inválida'}, status=400)
 
         # Processa os dados do webhook
         data = json.loads(request.body)
