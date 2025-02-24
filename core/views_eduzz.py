@@ -408,7 +408,7 @@ def checkout_plano(request, plan_id):
     return render(request, 'core/planos/checkout.html', context)
 
 @csrf_exempt
-@require_http_methods(["POST", "GET"])
+@require_http_methods(["GET", "POST"])
 def webhook_eduzz(request):
     """
     Endpoint para receber notificações da Eduzz
@@ -416,8 +416,43 @@ def webhook_eduzz(request):
     logger.info(f"Webhook Eduzz - Método: {request.method}")
     logger.info(f"Headers: {request.headers}")
     
-    # Para testes, sempre retorna sucesso
-    if request.method == "GET" or len(request.body) == 0:
+    # Se for GET, retorna uma página HTML amigável
+    if request.method == "GET":
+        html_response = """
+        <html>
+        <head>
+            <title>Webhook Eduzz - PecuaristaPRO</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif;
+                    margin: 40px;
+                    line-height: 1.6;
+                }
+                .container {
+                    max-width: 600px;
+                    margin: 0 auto;
+                }
+                .success {
+                    color: #28a745;
+                    font-size: 24px;
+                    margin-bottom: 20px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Webhook Eduzz - PecuaristaPRO</h1>
+                <p class="success">✓ Endpoint ativo e funcionando</p>
+                <p>Este é o endpoint para receber notificações da Eduzz.</p>
+                <p>Para testar o webhook, envie uma requisição POST para esta URL.</p>
+            </div>
+        </body>
+        </html>
+        """
+        return HttpResponse(html_response, content_type='text/html')
+
+    # Se for POST sem corpo, retorna sucesso
+    if len(request.body) == 0:
         return JsonResponse({'status': 'success', 'message': 'Webhook URL válida'})
 
     try:
