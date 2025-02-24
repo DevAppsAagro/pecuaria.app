@@ -485,7 +485,7 @@ def webhook_eduzz(request):
             for item in items:
                 # Cria ou atualiza a transação
                 transaction = EduzzTransaction.objects.update_or_create(
-                    transaction_id=invoice_id,  
+                    transaction_id=invoice_id,
                     defaults={
                         'status': status,
                         'email': buyer.get('email'),
@@ -494,20 +494,41 @@ def webhook_eduzz(request):
                         'plano': 'cortesia' if item.get('productId') == settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F else 'mensal',
                         'valor_original': item.get('price', {}).get('value', 0),
                         'valor_pago': event_data.get('price', {}).get('paid', {}).get('value', 0),
-                        'data_pagamento': datetime.strptime(event_data.get('paidAt'), '%Y-%m-%dT%H:%M:%S.%fZ') if event_data.get('paidAt') else None,
+                        'data_pagamento': datetime.strptime(event_data.get('paidAt'), '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=pytz.UTC) if event_data.get('paidAt') else None,
                         'webhook_data': event_data
                     }
                 )
                 
-                # Se for uma compra da planilha e o status for pago
-                if str(item.get('productId')) == settings.EDUZZ_PLANILHA_ID and status == 'paid':
-                    ClientePlanilha.objects.create(
-                        nome=buyer.get('name'),
-                        email=buyer.get('email'),
-                        telefone=buyer.get('phone') or buyer.get('cellphone'),
-                        eduzz_customer_id=buyer.get('id')
-                    )
-
+                # Se for uma compra do software e o status for pago
+                if str(item.get('productId')) in [settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F, settings.EDUZZ_SOFTWARE_ID_3F] and status == 'paid':
+                    try:
+                        # Tenta encontrar o usuário pelo email
+                        user = User.objects.get(email=buyer.get('email'))
+                        
+                        # Calcula a data de expiração (30 dias a partir do pagamento)
+                        start_date = datetime.strptime(event_data.get('paidAt'), '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=pytz.UTC) if event_data.get('paidAt') else timezone.now()
+                        end_date = start_date + timedelta(days=30)
+                        
+                        # Atualiza ou cria a assinatura do usuário
+                        subscription, created = UserSubscription.objects.update_or_create(
+                            user=user,
+                            defaults={
+                                'eduzz_subscription_id': invoice_id,
+                                'plan_type': 'mensal',
+                                'status': 'active',
+                                'start_date': start_date,
+                                'end_date': end_date,
+                                'last_payment_date': start_date,
+                                'next_payment_date': end_date
+                            }
+                        )
+                        
+                        logger.info(f"Assinatura atualizada/criada para o usuário {user.email}")
+                    except User.DoesNotExist:
+                        logger.warning(f"Usuário não encontrado para o email {buyer.get('email')}")
+                    except Exception as e:
+                        logger.error(f"Erro ao atualizar assinatura: {str(e)}")
+        
         return JsonResponse({'status': 'success'})
 
     except Exception as e:
