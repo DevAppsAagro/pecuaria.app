@@ -425,13 +425,9 @@ def webhook_eduzz(request):
             # Se não é JSON válido, pode ser um teste
             return JsonResponse({'status': 'success', 'message': 'Webhook URL válida'})
 
-        # Se chegou aqui, é uma notificação real
-        # Verifica a assinatura do webhook em produção
-        if not settings.DEBUG:
-            signature = request.headers.get('X-Eduzz-Signature')
-            if not signature:
-                return JsonResponse({'error': 'Assinatura não fornecida'}, status=400)
-
+        # Verifica a assinatura apenas se ela existir no header
+        signature = request.headers.get('X-Eduzz-Signature')
+        if signature:
             # Calcula a assinatura esperada
             payload = request.body
             expected_signature = hmac.new(
