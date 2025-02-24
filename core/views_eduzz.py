@@ -10,7 +10,7 @@ import hashlib
 import logging
 import json
 from .eduzz_api import EduzzAPI
-from .models_eduzz import ClienteLegado, UserSubscription, ClientePlanilha, EduzzTransaction, EduzzContract
+from .models_eduzz import ClienteLegado, UserSubscription, ClientePlanilha, EduzzTransaction
 from datetime import datetime
 import pytz
 from django.contrib.auth.models import User
