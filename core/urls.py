@@ -331,8 +331,7 @@ urlpatterns = [
     # Conta
     path('conta/perfil/', views_account.profile_view, name='profile'),
     
-# Auth URLs
-        # Auth URLs
+    # Auth URLs
     path('login/', views.login_view, name='login'),
     path('register/', views.register_view, name='register'),
     path('auth/verify-email/', views.verificar_email_view, name='verify-email'),
@@ -343,7 +342,15 @@ urlpatterns = [
     path('aguardando-pagamento/', views.awaiting_payment, name='awaiting_payment'),
     path('configuracoes/', views.configuracoes, name='configuracoes'),
 
-# Outras URLs
+    # Eduzz URLs
+    path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='eduzz_webhook'),
+    path('api/eduzz/test/', views_eduzz.test_eduzz_connection, name='test_eduzz'),
+    path('api/eduzz/sync-sales/', views_eduzz.sync_eduzz_sales, name='sync_eduzz_sales'),
+    path('planos/', views_eduzz.planos_view, name='planos'),
+    path('planos/checkout/<str:plan_id>/', views_eduzz.checkout_plano, name='checkout_plano'),
+    path('planos/verificar-email/', views_eduzz.verificar_email, name='verificar_email_plano'),
+    
+    # Outras URLs
     path('aguardando-pagamento/', views.awaiting_payment, name='awaiting_payment'),
     path('configuracoes/', views.configuracoes, name='configuracoes'),
     

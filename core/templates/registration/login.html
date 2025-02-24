@@ -106,32 +106,86 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     const email = document.getElementById('id_email').value;
     const password = document.getElementById('id_password').value;
     const rememberMe = document.getElementById('rememberMe').checked;
+    const submitButton = this.querySelector('button[type="submit"]');
     
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Entrando...';
+
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
             email: email,
             password: password
         });
         
-        if (error) throw error;
+        if (error) {
+            let mensagemErro = 'Erro ao fazer login';
+            switch (error.message) {
+                case 'Invalid login credentials':
+                    mensagemErro = 'Email ou senha inválidos';
+                    break;
+                case 'Email not confirmed':
+                    mensagemErro = 'Por favor, confirme seu email antes de fazer login';
+                    break;
+                default:
+                    mensagemErro = `Erro ao conectar com o servidor: ${error.message}`;
+            }
+            throw new Error(mensagemErro);
+        }
+
+        if (!data || !data.session) {
+            throw new Error('Resposta inválida do servidor de autenticação');
+        }
         
+        // Store remember me preference
         if (rememberMe) {
             localStorage.setItem('rememberMe', 'true');
         } else {
             localStorage.removeItem('rememberMe');
         }
         
-        window.location.href = '{% url "dashboard" %}';
-    } catch (error) {
-        alert('Erro ao fazer login: ' + error.message);
-    }
-});
+        // Get CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        const response = await fetch('{% url "login" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: email,
+                session: data.session
+            })
+        });
 
-// Verificar se o usuário escolheu "Lembrar de mim" anteriormente
-document.addEventListener('DOMContentLoaded', function() {
-    const rememberMe = localStorage.getItem('rememberMe');
-    if (rememberMe === 'true') {
-        document.getElementById('rememberMe').checked = true;
+        let result;
+        try {
+            result = await response.json();
+        } catch (jsonError) {
+            console.error('Erro ao processar resposta JSON:', jsonError);
+            throw new Error('Erro ao processar resposta do servidor. Por favor, tente novamente.');
+        }
+
+        if (!response.ok || !result.success) {
+            console.error('Erro na resposta do servidor:', result);
+            throw new Error(result.message || 'Não foi possível completar o login. Por favor, tente novamente.');
+        }
+
+        const redirectUrl = new URLSearchParams(window.location.search).get('next') || '{% url "dashboard" %}';
+        window.location.href = redirectUrl;
+    } catch (error) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'alert alert-danger alert-dismissible fade show';
+        errorDiv.innerHTML = `
+            Erro ao fazer login: ${error.message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        const form = document.getElementById('loginForm');
+        form.insertBefore(errorDiv, form.querySelector('button[type="submit"]').parentElement);
+    } finally {
+        submitButton.disabled = false;
+        submitButton.innerHTML = 'Entrar';
     }
 });
 </script>

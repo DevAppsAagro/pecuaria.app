@@ -40,11 +40,33 @@ from .auth_supabase import register_with_email, login_with_email, reset_password
 
 def login_view(request):
     if request.method == 'POST':
+        if request.content_type == 'application/json':
+            try:
+                data = json.loads(request.body)
+                email = data.get('email')
+                session = data.get('session')
+                
+                print("[DEBUG] Dados recebidos:", data)
+                
+                if email and session:
+                    if login_with_email(request, email, None, session=session):
+                        return JsonResponse({'success': True, 'redirect': reverse('dashboard')})
+                    else:
+                        return JsonResponse({'success': False, 'message': 'Falha na autenticação'}, status=401)
+                return JsonResponse({'success': False, 'message': 'Dados inválidos'}, status=400)
+            except json.JSONDecodeError:
+                return JsonResponse({'success': False, 'message': 'JSON inválido'}, status=400)
+            
         email = request.POST.get('email')
         password = request.POST.get('password')
         
-        if login_with_email(request, email, password):
-            return redirect('dashboard')
+        if email and password:
+            if login_with_email(request, email, password):
+                return redirect('dashboard')
+            else:
+                messages.error(request, 'Email ou senha inválidos.')
+        else:
+            messages.error(request, 'Por favor, preencha todos os campos.')
             
     return render(request, 'registration/login.html')
 
@@ -52,12 +74,15 @@ def register_view(request):
     if request.method == 'POST':
         email = request.POST.get('email')
         password = request.POST.get('password')
-        first_name = request.POST.get('first_name', '')
-        last_name = request.POST.get('last_name', '')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        phone = request.POST.get('phone')
         
-        if register_with_email(request, email, password, first_name, last_name):
-            messages.success(request, 'Conta criada com sucesso! Por favor, verifique seu email.')
-            return redirect('login')
+        if email and password and first_name and last_name:
+            if register_with_email(request, email, password, first_name, last_name, phone):
+                return redirect('verificar_email')
+        else:
+            messages.error(request, 'Por favor, preencha todos os campos obrigatórios.')
             
     return render(request, 'registration/register.html')
 
@@ -2431,7 +2456,7 @@ def benfeitoria_create(request):
                 'vida_util': int(request.POST.get('vida_util')),
                 'data_aquisicao': request.POST.get('data_aquisicao'),
                 'fazenda_id': request.POST.get('fazenda'),
-                'usuario_id': request.user.id  # Usando o ID do usuário atual
+                'usuario': request.user
             }
             
             print("Data before coordinates:", data)  # Debug

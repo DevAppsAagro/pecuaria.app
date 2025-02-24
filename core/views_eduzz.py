@@ -10,7 +10,7 @@ import hashlib
 import logging
 import json
 from .eduzz_api import EduzzAPI
-from .models_eduzz import ClienteLegado, UserSubscription, ClientePlanilha
+from .models_eduzz import ClienteLegado, UserSubscription, ClientePlanilha, EduzzTransaction
 from datetime import datetime
 import pytz
 from django.contrib.auth.models import User
@@ -457,16 +457,18 @@ def webhook_eduzz(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
+@csrf_exempt
 def test_eduzz_connection(request):
-    """View para testar a conexão com a API da Eduzz"""
-    if not request.user.is_superuser:
-        return JsonResponse({'error': 'Acesso não autorizado'}, status=403)
-        
-    eduzz = EduzzAPI()
-    result = eduzz.test_connection()
-    
-    return JsonResponse(result)
+    """
+    Endpoint para testar a conexão com a API da Eduzz
+    """
+    try:
+        api = EduzzAPI()
+        result = api.test_connection()
+        return JsonResponse(result)
+    except Exception as e:
+        logger.error(f"Erro ao testar conexão com a Eduzz: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
 def assinatura(request):
@@ -617,3 +619,93 @@ def check_user_has_planilha(email):
             return True
             
     return False
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def webhook_eduzz_legacy(request):
+    """
+    Endpoint para receber notificações da Eduzz
+    """
+    try:
+        # Verifica a assinatura do webhook
+        signature = request.headers.get('X-Eduzz-Signature')
+        if not signature:
+            return JsonResponse({'error': 'Assinatura não encontrada'}, status=400)
+
+        # Calcula a assinatura esperada
+        payload = request.body
+        expected_signature = hmac.new(
+            settings.EDUZZ_API_KEY.encode(),
+            payload,
+            hashlib.sha256
+        ).hexdigest()
+
+        # Verifica se a assinatura é válida
+        if not hmac.compare_digest(signature, expected_signature):
+            return JsonResponse({'error': 'Assinatura inválida'}, status=400)
+
+        # Processa os dados do webhook
+        data = json.loads(request.body)
+        logger.info(f"Webhook recebido da Eduzz: {data}")
+
+        # Verifica se é uma compra da planilha
+        product_id = str(data.get('product_id'))
+        if product_id == settings.EDUZZ_PLANILHA_ID:
+            # Salva o cliente que comprou a planilha
+            cliente = ClientePlanilha.objects.create(
+                nome=data.get('cus_name'),
+                email=data.get('cus_email'),
+                telefone=data.get('cus_tel'),
+                transaction_code=data.get('trans_cod'),
+                status=data.get('trans_status'),
+                data_compra=data.get('trans_createdate')
+            )
+            logger.info(f"Cliente da planilha salvo: {cliente}")
+
+        # Salva a transação
+        transaction = EduzzTransaction.objects.create(
+            transaction_code=data.get('trans_cod'),
+            status=data.get('trans_status'),
+            customer_email=data.get('cus_email'),
+            customer_name=data.get('cus_name'),
+            product_id=product_id,
+            created_at=data.get('trans_createdate')
+        )
+        logger.info(f"Transação salva: {transaction}")
+
+        return JsonResponse({'status': 'success'})
+
+    except json.JSONDecodeError:
+        logger.error("Erro ao decodificar JSON do webhook")
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except Exception as e:
+        logger.error(f"Erro ao processar webhook: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def test_eduzz_connection_legacy(request):
+    """
+    Endpoint para testar a conexão com a API da Eduzz
+    """
+    try:
+        api = EduzzAPI()
+        result = api.test_connection()
+        return JsonResponse(result)
+    except Exception as e:
+        logger.error(f"Erro ao testar conexão com a Eduzz: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def sync_eduzz_sales_legacy(request):
+    """
+    Endpoint para sincronizar vendas da Eduzz
+    """
+    try:
+        api = EduzzAPI()
+        result = api.sync_sales()
+        return JsonResponse(result)
+    except Exception as e:
+        logger.error(f"Erro ao sincronizar vendas da Eduzz: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)

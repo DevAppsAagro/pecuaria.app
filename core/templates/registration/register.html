@@ -42,6 +42,13 @@
                             </div>
                         </div>
                         <div class="mb-3">
+                            <label for="id_phone" class="form-label">Telefone</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-phone"></i></span>
+                                <input type="tel" name="phone" class="form-control" id="id_phone" placeholder="(00) 00000-0000">
+                            </div>
+                        </div>
+                        <div class="mb-3">
                             <label for="id_password" class="form-label">Senha</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
@@ -118,34 +125,75 @@ document.getElementById('togglePassword').addEventListener('click', function() {
 document.getElementById('registerForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
+    const form = this;
+    const submitButton = form.querySelector('button[type="submit"]');
     const email = document.getElementById('id_email').value;
     const password = document.getElementById('id_password').value;
     const firstName = document.getElementById('id_first_name').value;
     const lastName = document.getElementById('id_last_name').value;
+    const phone = document.getElementById('id_phone').value;
     
     if (!document.getElementById('termsCheck').checked) {
-        alert('Você precisa aceitar os Termos de Uso e a Política de Privacidade');
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-warning alert-dismissible fade show';
+        alertDiv.innerHTML = `
+            Você precisa aceitar os Termos de Uso e a Política de Privacidade
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        form.insertBefore(alertDiv, submitButton.parentElement);
         return;
     }
     
     try {
-        const { data, error } = await supabase.auth.signUp({
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Criando conta...';
+        
+        console.log('Iniciando registro com Supabase...');
+        const { data, error } = await window.supabaseClient.auth.signUp({
             email: email,
             password: password,
             options: {
                 data: {
                     first_name: firstName,
-                    last_name: lastName
+                    last_name: lastName,
+                    phone: phone
                 }
             }
         });
         
-        if (error) throw error;
+        console.log('Resposta do Supabase:', { data, error });
         
-        alert('Conta criada com sucesso! Por favor, verifique seu email para confirmar o cadastro.');
-        window.location.href = '{% url "login" %}';
+        if (error) {
+            console.error('Erro do Supabase:', error);
+            throw error;
+        }
+        
+        if (data?.user) {
+            console.log('Usuário criado com sucesso:', data.user);
+            const successDiv = document.createElement('div');
+            successDiv.className = 'alert alert-success';
+            successDiv.innerHTML = 'Conta criada com sucesso! Por favor, verifique seu email para confirmar o cadastro.';
+            form.insertBefore(successDiv, submitButton.parentElement);
+            
+            setTimeout(() => {
+                console.log('Redirecionando para página de login...');
+                window.location.href = '{% url "login" %}';
+            }, 3000);
+        } else {
+            throw new Error('Resposta inválida do servidor');
+        }
     } catch (error) {
-        alert('Erro ao criar conta: ' + error.message);
+        console.error('Erro completo:', error);
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'alert alert-danger alert-dismissible fade show';
+        errorDiv.innerHTML = `
+            Erro ao criar conta: ${error.message || 'Erro desconhecido'}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        form.insertBefore(errorDiv, submitButton.parentElement);
+    } finally {
+        submitButton.disabled = false;
+        submitButton.innerHTML = 'Criar Conta';
     }
 });
 </script>

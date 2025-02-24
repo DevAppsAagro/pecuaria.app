@@ -159,18 +159,12 @@ LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
 # Configurações da Eduzz
-EDUZZ_API_URL = 'https://api.eduzz.com'  # URL base da API
-EDUZZ_PUBLIC_KEY = '10434573'
-EDUZZ_API_KEY = '4a2a8c627751ced4e0dfeb197d6aa10224ab8e97cb696c24109f931d160736ec'
-
-# URLs de retorno da Eduzz
-EDUZZ_RETURN_URL = 'https://pecuaria.app/assinatura/'
-EDUZZ_WEBHOOK_URL = 'https://pecuaria.app/api/eduzz/webhook/'
-
-# IDs dos produtos na Eduzz
-EDUZZ_PLANILHA_ID = '2649739'
-
-# IDs dos Planos
+EDUZZ_API_URL = config('EDUZZ_API_URL', default='https://api.eduzz.com')
+EDUZZ_API_KEY = config('EDUZZ_API_KEY', default='')
+EDUZZ_PUBLIC_KEY = config('EDUZZ_PUBLIC_KEY', default='')
+EDUZZ_PLANILHA_ID = config('EDUZZ_PLANILHA_ID', default='')  # ID do produto da planilha na Eduzz
+EDUZZ_WEBHOOK_URL = config('EDUZZ_WEBHOOK_URL', default='https://pecuarista.pro/api/eduzz/webhook/')
+EDUZZ_RETURN_URL = config('EDUZZ_RETURN_URL', default='https://pecuarista.pro/planos/')
 EDUZZ_SOFTWARE_MENSAL_ID_3F = '2655883'
 EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID_3F = '2658194'
 EDUZZ_SOFTWARE_ANUAL_ID_3F = '2655875'

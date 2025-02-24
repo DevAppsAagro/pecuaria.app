@@ -8,11 +8,14 @@ def auth_required(view_func):
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
         # Verificar se o usuário está autenticado via Supabase
-        auth_header = request.headers.get('Authorization')
+        supabase_access_token = request.session.get('supabase_access_token')
         
-        if not auth_header or not auth_header.startswith('Bearer '):
+        if not supabase_access_token:
             messages.error(request, 'Você precisa estar logado para acessar esta página.')
             return redirect(reverse('login'))
+            
+        # Adiciona o token ao header da requisição
+        request.META['HTTP_AUTHORIZATION'] = f'Bearer {supabase_access_token}'
             
         return view_func(request, *args, **kwargs)
     
