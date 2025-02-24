@@ -408,53 +408,70 @@ def checkout_plano(request, plan_id):
     return render(request, 'core/planos/checkout.html', context)
 
 @csrf_exempt
+@require_http_methods(["POST", "GET"])  # Aceita GET para o teste da Eduzz
 def webhook_eduzz(request):
     """
-    Webhook para receber notificações da Eduzz
+    Endpoint para receber notificações da Eduzz
     """
-    if request.method != 'POST':
-        return HttpResponse(status=405)
-    
+    # Se for um GET, retorna sucesso (para o teste da Eduzz)
+    if request.method == "GET":
+        return JsonResponse({'status': 'success', 'message': 'Webhook URL válida'})
+        
     try:
+        # Verifica a assinatura do webhook em produção
+        if not settings.DEBUG:
+            signature = request.headers.get('X-Eduzz-Signature')
+            if not signature:
+                return JsonResponse({'error': 'Assinatura não fornecida'}, status=400)
+
+            # Calcula a assinatura esperada
+            payload = request.body
+            expected_signature = hmac.new(
+                settings.EDUZZ_API_KEY.encode(),
+                payload,
+                hashlib.sha256
+            ).hexdigest()
+
+            # Verifica se a assinatura é válida
+            if not hmac.compare_digest(signature, expected_signature):
+                return JsonResponse({'error': 'Assinatura inválida'}, status=400)
+
+        # Processa os dados do webhook
         data = json.loads(request.body)
-        
+        logger.info(f"Webhook recebido da Eduzz: {data}")
+
         # Verifica se é uma compra da planilha
-        if data.get('product_id') == settings.EDUZZ_PLANILHA_ID:
-            # Salva o cliente da planilha
-            ClientePlanilha.objects.get_or_create(
-                email=data.get('customer_email'),
-                defaults={
-                    'nome': data.get('customer_name'),
-                    'telefone': data.get('customer_phone'),
-                    'eduzz_customer_id': data.get('customer_id')
-                }
+        product_id = str(data.get('product_id'))
+        if product_id == settings.EDUZZ_PLANILHA_ID:
+            # Salva o cliente que comprou a planilha
+            cliente = ClientePlanilha.objects.create(
+                nome=data.get('cus_name'),
+                email=data.get('cus_email'),
+                telefone=data.get('cus_tel'),
+                transaction_code=data.get('trans_cod'),
+                status=data.get('trans_status'),
+                data_compra=data.get('trans_createdate')
             )
-        
-        # Obtém o usuário pelo email
-        email = data.get('customer', {}).get('email')
-        if not email:
-            return JsonResponse({'error': 'Email não fornecido'}, status=400)
-        
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            return JsonResponse({'error': 'Usuário não encontrado'}, status=404)
-        
-        # Atualiza o perfil do usuário
-        usuario_eduzz = user.usuarioeduzz
-        usuario_eduzz.eduzz_id = data.get('customer', {}).get('id')
-        usuario_eduzz.subscription_id = data.get('subscription', {}).get('id')
-        usuario_eduzz.plano_id = data.get('subscription', {}).get('plan_id')
-        usuario_eduzz.status = data.get('subscription', {}).get('status')
-        usuario_eduzz.data_assinatura = timezone.now()
-        usuario_eduzz.data_expiracao = timezone.now() + timedelta(days=30)  # ou usar data do payload
-        usuario_eduzz.save()
-        
-        return JsonResponse({'success': True})
-        
+            logger.info(f"Cliente da planilha salvo: {cliente}")
+
+        # Salva a transação
+        transaction = EduzzTransaction.objects.create(
+            transaction_code=data.get('trans_cod'),
+            status=data.get('trans_status'),
+            customer_email=data.get('cus_email'),
+            customer_name=data.get('cus_name'),
+            product_id=product_id,
+            created_at=data.get('trans_createdate')
+        )
+        logger.info(f"Transação salva: {transaction}")
+
+        return JsonResponse({'status': 'success'})
+
     except json.JSONDecodeError:
+        logger.error("Erro ao decodificar JSON do webhook")
         return JsonResponse({'error': 'JSON inválido'}, status=400)
     except Exception as e:
+        logger.error(f"Erro ao processar webhook: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
 @csrf_exempt
