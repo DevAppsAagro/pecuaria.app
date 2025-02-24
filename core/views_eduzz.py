@@ -413,11 +413,19 @@ def webhook_eduzz(request):
     """
     Endpoint para receber notificações da Eduzz
     """
-    # Se for um GET, retorna sucesso (para o teste da Eduzz)
-    if request.method == "GET":
-        return JsonResponse({'status': 'success', 'message': 'Webhook URL válida'})
-        
     try:
+        # Se não tem corpo na requisição, é provavelmente um teste
+        if len(request.body) == 0:
+            return JsonResponse({'status': 'success', 'message': 'Webhook URL válida'})
+
+        try:
+            # Tenta decodificar o JSON
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            # Se não é JSON válido, pode ser um teste
+            return JsonResponse({'status': 'success', 'message': 'Webhook URL válida'})
+
+        # Se chegou aqui, é uma notificação real
         # Verifica a assinatura do webhook em produção
         if not settings.DEBUG:
             signature = request.headers.get('X-Eduzz-Signature')
@@ -436,9 +444,9 @@ def webhook_eduzz(request):
             if not hmac.compare_digest(signature, expected_signature):
                 return JsonResponse({'error': 'Assinatura inválida'}, status=400)
 
-        # Processa os dados do webhook
-        data = json.loads(request.body)
-        logger.info(f"Webhook recebido da Eduzz: {data}")
+        # Se é um teste da Eduzz com dados de exemplo
+        if data.get('test') == True or data.get('is_test') == True:
+            return JsonResponse({'status': 'success', 'message': 'Teste recebido com sucesso'})
 
         # Verifica se é uma compra da planilha
         product_id = str(data.get('product_id'))
@@ -467,9 +475,6 @@ def webhook_eduzz(request):
 
         return JsonResponse({'status': 'success'})
 
-    except json.JSONDecodeError:
-        logger.error("Erro ao decodificar JSON do webhook")
-        return JsonResponse({'error': 'JSON inválido'}, status=400)
     except Exception as e:
         logger.error(f"Erro ao processar webhook: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
@@ -523,6 +528,7 @@ def assinatura(request):
         }
         
         return render(request, 'core/assinatura.html', context)
+        
     except Exception as e:
         messages.error(request, f'Erro ao carregar dados da assinatura: {str(e)}')
         return redirect('planos')
