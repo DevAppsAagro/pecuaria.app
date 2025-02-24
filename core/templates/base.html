@@ -111,44 +111,27 @@
             </ul>
             <ul class="navbar-nav ml-auto">
                 <li class="nav-item dropdown">
-                    <a class="nav-link" data-toggle="dropdown" href="#" aria-expanded="false">
-                        <i class="bi bi-bell"></i>
-                        <span class="badge badge-warning navbar-badge">15</span>
+                    <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-person-circle"></i>
                     </a>
-                    <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
-                        <span class="dropdown-item dropdown-header">15 Notificações</span>
-                        <div class="dropdown-divider"></div>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-envelope mr-2"></i> 4 novas mensagens
-                            <span class="float-right text-muted text-sm">3 mins</span>
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-users mr-2"></i> 8 solicitações de amizade
-                            <span class="float-right text-muted text-sm">12 horas</span>
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-file mr-2"></i> 3 novos relatórios
-                            <span class="float-right text-muted text-sm">2 dias</span>
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <a href="#" class="dropdown-item dropdown-footer">Ver Todas as Notificações</a>
-                    </div>
-                </li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link" data-toggle="dropdown" href="#" aria-expanded="false">
-                        <i class="bi bi-gear"></i>
-                    </a>
-                    <div class="dropdown-menu dropdown-menu-right">
-                        <a href="#" class="dropdown-item">
-                            <i class="bi bi-person mr-2"></i> Meu Perfil
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <a href="{% url 'logout' %}" class="dropdown-item text-danger">
-                            <i class="bi bi-box-arrow-right mr-2"></i> Sair
-                        </a>
-                    </div>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li>
+                            <a href="{% url 'profile' %}" class="dropdown-item">
+                                <i class="bi bi-person me-2"></i> Meu Perfil
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'assinatura' %}" class="dropdown-item">
+                                <i class="bi bi-credit-card me-2"></i> Assinatura
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a href="{% url 'logout' %}" class="dropdown-item text-danger">
+                                <i class="bi bi-box-arrow-right me-2"></i> Sair
+                            </a>
+                        </li>
+                    </ul>
                 </li>
             </ul>
         </nav>
@@ -172,9 +155,9 @@
                                 <p>Dashboard</p>
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a href="#" class="nav-link">
-                                <i class="nav-icon bi bi-cash-coin"></i>
+                        <li class="nav-item {% if 'financeiro' in request.path or 'despesas' in request.path or 'compras' in request.path or 'vendas' in request.path or 'abates' in request.path or 'nao-operacional' in request.path or 'contatos' in request.path %}menu-open{% endif %}">
+                            <a href="#" class="nav-link {% if 'financeiro' in request.path or 'despesas' in request.path or 'compras' in request.path or 'vendas' in request.path or 'abates' in request.path or 'nao-operacional' in request.path or 'contatos' in request.path %}active{% endif %}">
+                                <i class="nav-icon bi bi-currency-dollar"></i>
                                 <p>
                                     Financeiro
                                     <i class="right fas fa-angle-left"></i>
@@ -182,27 +165,51 @@
                             </a>
                             <ul class="nav nav-treeview">
                                 <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Fluxo de Caixa</p>
+                                    <a href="{% url 'despesas_list' %}" class="nav-link {% if request.resolver_match.url_name == 'despesas_list' %}active{% endif %}">
+                                        <i class="bi bi-cash-stack nav-icon"></i>
+                                        <p>Despesas</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Contas a Pagar</p>
+                                    <a href="{% url 'compras_list' %}" class="nav-link {% if request.resolver_match.url_name == 'compras_list' %}active{% endif %}">
+                                        <i class="bi bi-cart nav-icon"></i>
+                                        <p>Compras</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Contas a Receber</p>
+                                    <a href="{% url 'lista_vendas' %}" class="nav-link {% if request.resolver_match.url_name == 'lista_vendas' %}active{% endif %}">
+                                        <i class="bi bi-tags nav-icon"></i>
+                                        <p>Vendas</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'abates_list' %}" class="nav-link {% if request.resolver_match.url_name == 'abates_list' %}active{% endif %}">
+                                        <i class="bi bi-scissors nav-icon"></i>
+                                        <p>Abates</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'lista_nao_operacional' %}" class="nav-link {% if request.resolver_match.url_name == 'lista_nao_operacional' %}active{% endif %}">
+                                        <i class="bi bi-wallet2 nav-icon"></i>
+                                        <p>Não Operacional</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'contatos_list' %}" class="nav-link {% if request.resolver_match.url_name == 'contatos_list' %}active{% endif %}">
+                                        <i class="bi bi-person-rolodex nav-icon"></i>
+                                        <p>Contatos</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'contas_bancarias_list' %}" class="nav-link {% if request.resolver_match.url_name == 'contas_bancarias_list' %}active{% endif %}">
+                                        <i class="bi bi-bank nav-icon"></i>
+                                        <p>Contas Bancárias</p>
                                     </a>
                                 </li>
                             </ul>
                         </li>
-                        <li class="nav-item">
-                            <a href="#" class="nav-link">
+                        <li class="nav-item {% if 'reproducao' in request.path %}menu-open{% endif %}">
+                            <a href="#" class="nav-link {% if 'reproducao' in request.path %}active{% endif %}">
                                 <i class="nav-icon bi bi-heart"></i>
                                 <p>
                                     Reprodução
@@ -211,56 +218,51 @@
                             </a>
                             <ul class="nav nav-treeview">
                                 <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Inseminação</p>
+                                    <a href="{% url 'estacao_monta_list' %}" class="nav-link {% if 'estacao-monta' in request.path %}active{% endif %}">
+                                        <i class="bi bi-calendar-event nav-icon"></i>
+                                        <p>Estação de Monta</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Diagnóstico</p>
+                                    <a href="{% url 'diagnostico_list' %}" class="nav-link {% if request.resolver_match.url_name == 'diagnostico_list' %}active{% endif %}">
+                                        <i class="bi bi-clipboard2-pulse nav-icon"></i>
+                                        <p>Diagnósticos</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Partos</p>
+                                    <a href="{% url 'concepcao_form' %}" class="nav-link {% if request.resolver_match.url_name == 'concepcao_form' %}active{% endif %}">
+                                        <i class="bi bi-plus-circle nav-icon"></i>
+                                        <p>Concepção</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'diagnostico_form' %}" class="nav-link {% if request.resolver_match.url_name == 'diagnostico_form' %}active{% endif %}">
+                                        <i class="bi bi-search nav-icon"></i>
+                                        <p>Novo Diagnóstico</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'resultado_form' %}" class="nav-link {% if request.resolver_match.url_name == 'resultado_form' %}active{% endif %}">
+                                        <i class="bi bi-clipboard-check nav-icon"></i>
+                                        <p>Resultados</p>
                                     </a>
                                 </li>
                             </ul>
                         </li>
                         <li class="nav-item">
-                            <a href="#" class="nav-link">
-                                <i class="nav-icon bi bi-clipboard2-pulse"></i>
-                                <p>
-                                    Sanitário
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
+                            <a href="{% url 'manejos' %}" class="nav-link {% if 'manejos' in request.path %}active{% endif %}">
+                                <i class="nav-icon bi bi-clipboard-check"></i>
+                                <p>Manejos</p>
                             </a>
-                            <ul class="nav nav-treeview">
-                                <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Vacinação</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Vermifugação</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Ocorrências</p>
-                                    </a>
-                                </li>
-                            </ul>
                         </li>
                         <li class="nav-item">
-                            <a href="#" class="nav-link">
+                            <a href="{% url 'animal_list' %}" class="nav-link {% if 'animais' in request.path %}active{% endif %}">
+                                <i class="nav-icon bi bi-clipboard2-pulse"></i>
+                                <p>Animais</p>
+                            </a>
+                        </li>
+                        <li class="nav-item {% if 'estoque' in request.path %}menu-open{% endif %}">
+                            <a href="#" class="nav-link {% if 'estoque' in request.path %}active{% endif %}">
                                 <i class="nav-icon bi bi-box-seam"></i>
                                 <p>
                                     Estoque
@@ -269,52 +271,127 @@
                             </a>
                             <ul class="nav nav-treeview">
                                 <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Produtos</p>
+                                    <a href="{% url 'estoque_list' %}" class="nav-link {% if request.resolver_match.url_name == 'estoque_list' %}active{% endif %}">
+                                        <i class="bi bi-box2 nav-icon"></i>
+                                        <p>Insumos</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Movimentações</p>
+                                    <a href="{% url 'entrada_list' %}" class="nav-link {% if request.resolver_match.url_name == 'entrada_list' %}active{% endif %}">
+                                        <i class="bi bi-box-arrow-in-down nav-icon"></i>
+                                        <p>Entradas</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'saida_list' %}" class="nav-link {% if request.resolver_match.url_name == 'saida_list' %}active{% endif %}">
+                                        <i class="bi bi-box-arrow-up nav-icon"></i>
+                                        <p>Saída</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'saida_nutricao_list' %}" class="nav-link {% if request.resolver_match.url_name == 'saida_nutricao_list' %}active{% endif %}">
+                                        <i class="bi bi-box-arrow-up nav-icon"></i>
+                                        <p>Saída Nutrição</p>
                                     </a>
                                 </li>
                             </ul>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if 'fazendas' in request.path %}active{% endif %}" href="#">
+                            <a href="{% url 'pasto_list' %}" class="nav-link {% if 'pastos' in request.path %}active{% endif %}">
+                                <i class="nav-icon bi bi-tree"></i>
+                                <p>Pastos</p>
+                            </a>
+                        </li>
+                        <li class="nav-item {% if 'fazendas' in request.path or 'maquinas' in request.path or 'benfeitorias' in request.path %}menu-open{% endif %}">
+                            <a href="#" class="nav-link {% if 'fazendas' in request.path or 'maquinas' in request.path or 'benfeitorias' in request.path %}active{% endif %}">
                                 <i class="nav-icon bi bi-house"></i>
                                 <p>
                                     Fazendas
-                                </p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#" class="nav-link">
-                                <i class="nav-icon bi bi-people"></i>
-                                <p>
-                                    Pessoas
                                     <i class="right fas fa-angle-left"></i>
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
                                 <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Funcionários</p>
+                                    <a href="{% url 'fazenda_list' %}" class="nav-link {% if request.resolver_match.url_name == 'fazenda_list' %}active{% endif %}">
+                                        <i class="bi bi-list-ul nav-icon"></i>
+                                        <p>Listar Fazendas</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Fornecedores</p>
+                                    <a href="{% url 'maquinas_list' %}" class="nav-link {% if request.resolver_match.url_name == 'maquinas_list' %}active{% endif %}">
+                                        <i class="bi bi-truck nav-icon"></i>
+                                        <p>Máquinas</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="#" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Clientes</p>
+                                    <a href="{% url 'benfeitorias_list' %}" class="nav-link {% if request.resolver_match.url_name == 'benfeitorias_list' %}active{% endif %}">
+                                        <i class="bi bi-building nav-icon"></i>
+                                        <p>Benfeitorias</p>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{% url 'lote_list' %}" class="nav-link {% if 'lotes' in request.path %}active{% endif %}">
+                                <i class="nav-icon bi bi-collection"></i>
+                                <p>Lotes</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{% url 'relatorios_list' %}" class="nav-link {% if 'relatorios' in request.path %}active{% endif %}">
+                                <i class="nav-icon bi bi-file-earmark-text"></i>
+                                <p>Relatórios</p>
+                            </a>
+                        </li>
+                        <li class="nav-item {% if 'configuracoes' in request.path %}menu-open{% endif %}">
+                            <a href="#" class="nav-link {% if 'configuracoes' in request.path %}active{% endif %}">
+                                <i class="nav-icon bi bi-gear"></i>
+                                <p>
+                                    Configurações
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="{% url 'raca_list' %}" class="nav-link {% if 'racas' in request.path %}active{% endif %}">
+                                        <i class="bi bi-tags nav-icon"></i>
+                                        <p>Raças</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'finalidade_lote_list' %}" class="nav-link {% if 'finalidades-lote' in request.path %}active{% endif %}">
+                                        <i class="bi bi-list-check nav-icon"></i>
+                                        <p>Finalidades de Lote</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'categoria_animal_list' %}" class="nav-link {% if 'categorias-animal' in request.path %}active{% endif %}">
+                                        <i class="bi bi-diagram-3 nav-icon"></i>
+                                        <p>Categorias de Animal</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'unidade-medida-list' %}" class="nav-link {% if 'unidades-medida' in request.path %}active{% endif %}">
+                                        <i class="bi bi-rulers nav-icon"></i>
+                                        <p>Unidades de Medida</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'motivo-morte-list' %}" class="nav-link {% if 'motivos-morte' in request.path %}active{% endif %}">
+                                        <i class="bi bi-exclamation-triangle nav-icon"></i>
+                                        <p>Motivos de Morte</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'variedade-capim-list' %}" class="nav-link {% if 'variedade-capim' in request.path %}active{% endif %}">
+                                        <i class="bi bi-flower1 nav-icon"></i>
+                                        <p>Variedades de Capim</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'categoria-custo-list' %}" class="nav-link {% if 'categorias-custo' in request.path %}active{% endif %}">
+                                        <i class="bi bi-cash nav-icon"></i>
+                                        <p>Categorias de Custo</p>
                                     </a>
                                 </li>
                             </ul>
