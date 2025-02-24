@@ -8,8 +8,11 @@ from django.utils import timezone
 from django.db import models
 from supabase import create_client, Client
 from django.contrib.auth.models import User
-from .models_eduzz import UserSubscription, ClientePlanilha, EduzzTransaction
+from .models_eduzz import UserSubscription, ClientePlanilha, EduzzTransaction, EduzzContract
 from dateutil import parser
+import hashlib
+import time
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -19,69 +22,40 @@ supabase: Client = create_client(supabase_url, supabase_key)
 
 class EduzzAPI:
     def __init__(self):
-        # Tenta obter das settings, senão usa valores padrão
-        self.base_url = settings.EDUZZ_API_URL
-        self.api_url = f"{settings.EDUZZ_API_URL}/api/1.1"  # Versão correta da API
-        self.api_key = settings.EDUZZ_API_KEY
-        self.public_key = settings.EDUZZ_PUBLIC_KEY
-        self.origin_key = getattr(settings, 'EDUZZ_ORIGIN_KEY', "0d164417-4a93-4c80-b66a-b9e0f550781b")
-        self.access_token = getattr(settings, 'EDUZZ_ACCESS_TOKEN', "edzpap_QNsV8gHLcpO_YypKdhEn2FSf_kB_xndYrfEIMpjg-BAlTtFew8hlEmyPKpWigQvwhbixBSq5vaE759xQo3e")
+        self.api_url = settings.EDUZZ_API_URL
+        self.access_token = settings.EDUZZ_ACCESS_TOKEN
 
     def _get_headers(self) -> Dict[str, str]:
         """Retorna os headers com o token de acesso"""
         return {
-            'publickey': self.public_key,
-            'apikey': self.api_key,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Authorization': f'Bearer {self.access_token}',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
         }
 
-    def _handle_response(self, response: requests.Response, error_message: str) -> Optional[Dict[str, Any]]:
-        """Processa a resposta da API e trata erros"""
-        try:
-            response.raise_for_status()
-            data = response.json()
-            return data
-        except requests.exceptions.RequestException as e:
-            print(f"{error_message}: {str(e)}")
-            print(f"Status code: {response.status_code}")
-            print(f"Response: {response.text}")
-            return None
-        except Exception as e:
-            print(f"Erro inesperado: {str(e)}")
-            return None
-
-    def _make_request(self, method: str, url: str, json: Dict[str, Any] = None) -> Optional[requests.Response]:
+    def _make_request(self, method: str, url: str, **kwargs) -> Optional[requests.Response]:
         """Faz uma requisição para a API da Eduzz"""
         try:
-            # Adiciona timeout para evitar espera infinita
-            response = requests.request(
-                method, 
-                url, 
-                json=json, 
-                headers=self._get_headers(),
-                timeout=30,  # 30 segundos de timeout
-                verify=True  # Verifica certificado SSL
-            )
+            headers = self._get_headers()
+            if 'headers' in kwargs:
+                headers.update(kwargs.pop('headers'))
             
-            # Log da resposta
-            logger.info(f"Request to Eduzz API: {method} {url}")
-            logger.info(f"Status code: {response.status_code}")
-            logger.info(f"Response: {response.text[:500]}")  # Limita o log a 500 caracteres
-            
+            response = requests.request(method, url, headers=headers, **kwargs)
+            response.raise_for_status()
             return response
-            
-        except requests.exceptions.Timeout:
-            logger.error("Timeout ao conectar com a API da Eduzz")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Erro na requisição para {url}: {str(e)}")
             return None
-        except requests.exceptions.SSLError:
-            logger.error("Erro de SSL ao conectar com a API da Eduzz")
-            return None
-        except requests.exceptions.ConnectionError as e:
-            logger.error(f"Erro de conexão com a API da Eduzz: {str(e)}")
+
+    def _handle_response(self, response: requests.Response, error_message: str) -> Optional[Dict[str, Any]]:
+        """Processa a resposta da API"""
+        try:
+            if response.status_code == 200:
+                return response.json()
+            logger.error(f"{error_message}: {response.status_code} - {response.text}")
             return None
         except Exception as e:
-            logger.error(f"Erro inesperado ao conectar com a API da Eduzz: {str(e)}")
+            logger.error(f"{error_message}: {str(e)}")
             return None
 
     def test_connection(self) -> Dict[str, Any]:
@@ -126,19 +100,19 @@ class EduzzAPI:
 
     def get_subscription_status(self, subscription_id: str) -> Optional[Dict[str, Any]]:
         """Obtém o status da assinatura na Eduzz"""
-        url = f"{self.base_url}/subscriptions/v1/{subscription_id}"
-        response = requests.get(url, headers=self._get_headers())
+        url = f"{self.api_url}/subscriptions/v1/{subscription_id}"
+        response = self._make_request('GET', url)
         return self._handle_response(response, "Erro ao consultar assinatura na Eduzz")
 
     def create_subscription(self, user_email: str, plan_id: str) -> Optional[str]:
         """Cria uma nova assinatura na Eduzz"""
-        url = f"{self.base_url}/subscriptions/v1"
+        url = f"{self.api_url}/subscriptions/v1"
         data = {
             "email": user_email,
             "plan_id": plan_id
         }
         
-        response = requests.post(url, json=data, headers=self._get_headers())
+        response = self._make_request('POST', url, json=data)
         result = self._handle_response(response, "Erro ao criar assinatura na Eduzz")
         
         if result and result.get('success'):
@@ -147,15 +121,15 @@ class EduzzAPI:
 
     def cancel_subscription(self, subscription_id: str) -> bool:
         """Cancela uma assinatura na Eduzz"""
-        url = f"{self.base_url}/subscriptions/v1/{subscription_id}/cancel"
-        response = requests.post(url, headers=self._get_headers())
+        url = f"{self.api_url}/subscriptions/v1/{subscription_id}/cancel"
+        response = self._make_request('POST', url)
         result = self._handle_response(response, "Erro ao cancelar assinatura na Eduzz")
         return bool(result and result.get('success'))
 
     def get_payment_history(self, subscription_id: str) -> List[Dict[str, Any]]:
         """Obtém o histórico de pagamentos de uma assinatura"""
-        url = f"{self.base_url}/subscriptions/v1/{subscription_id}/payments"
-        response = requests.get(url, headers=self._get_headers())
+        url = f"{self.api_url}/subscriptions/v1/{subscription_id}/payments"
+        response = self._make_request('GET', url)
         result = self._handle_response(response, "Erro ao obter histórico de pagamentos na Eduzz")
         
         if result and result.get('success'):
@@ -164,13 +138,13 @@ class EduzzAPI:
 
     def get_plans(self) -> List[Dict[str, Any]]:
         """Obtém a lista de planos disponíveis na Eduzz"""
-        url = f"{self.base_url}/subscription/plans"
+        url = f"{self.api_url}/subscription/plans"
         response = self._make_request('GET', url)
         return response.json() if response else None
 
     def create_checkout_url(self, plan_id: str, user_email: str, user_name: str, user_document: str = None) -> Optional[str]:
         """Cria uma URL de checkout para um plano específico"""
-        url = f"{self.base_url}/subscription/checkout"
+        url = f"{self.api_url}/subscription/checkout"
         data = {
             'plan_id': plan_id,
             'customer_email': user_email,
@@ -184,8 +158,8 @@ class EduzzAPI:
 
     def get_subscription_invoices(self, subscription_id: str) -> List[Dict[str, Any]]:
         """Obtém as faturas de uma assinatura"""
-        url = f"{self.base_url}/subscriptions/v1/{subscription_id}/invoices"
-        response = requests.get(url, headers=self._get_headers())
+        url = f"{self.api_url}/subscriptions/v1/{subscription_id}/invoices"
+        response = self._make_request('GET', url)
         result = self._handle_response(response, "Erro ao obter faturas da assinatura na Eduzz")
         
         if result and result.get('success'):
@@ -194,8 +168,8 @@ class EduzzAPI:
 
     def update_subscription(self, subscription_id: str, data: Dict[str, Any]) -> bool:
         """Atualiza uma assinatura existente"""
-        url = f"{self.base_url}/subscriptions/v1/{subscription_id}"
-        response = requests.put(url, json=data, headers=self._get_headers())
+        url = f"{self.api_url}/subscriptions/v1/{subscription_id}"
+        response = self._make_request('PUT', url, json=data)
         result = self._handle_response(response, "Erro ao atualizar assinatura na Eduzz")
         return bool(result and result.get('success'))
 
@@ -226,7 +200,7 @@ class EduzzAPI:
                     return data.get('data', [])
                     
             # Se não encontrou na API antiga, tenta a nova API
-            url = f"{self.base_url}/accounts/v1/customers/search"
+            url = f"{self.api_url}/accounts/v1/customers/search"
             params = {'email': email}
             
             logger.info(f"Buscando compras do cliente {email} na API nova...")
@@ -413,3 +387,84 @@ class EduzzAPI:
         except Exception as e:
             logger.error(f"Erro ao processar vendas da Eduzz: {str(e)}")
             return []
+
+    def import_past_sales(self):
+        """
+        Importa vendas anteriores da Eduzz usando a API de produtos
+        """
+        try:
+            # Busca o produto específico
+            url = f"{self.api_url}/myeduzz/v1/products/{settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F}/sales"
+            
+            params = {
+                'page': 1,
+                'per_page': 100
+            }
+            
+            logger.info(f"Fazendo requisição para: {url}")
+            logger.info(f"Headers: {self._get_headers()}")
+            logger.info(f"Params: {params}")
+            
+            response = requests.get(url, headers=self._get_headers(), params=params)
+            response.raise_for_status()
+            result = response.json()
+            
+            logger.info(f"Resposta da API: {result}")
+
+            if 'items' not in result:
+                logger.error(f"Erro ao buscar vendas: {result.get('message')}")
+                return 0
+
+            sales = result.get('items', [])
+            imported_count = 0
+
+            for sale in sales:
+                # Verifica se a venda está paga
+                if sale.get('status') != 'paid':
+                    continue
+
+                # Cria ou atualiza a transação
+                transaction, created = EduzzTransaction.objects.update_or_create(
+                    transaction_code=sale.get('id'),
+                    defaults={
+                        'status': 'paid',
+                        'customer_email': sale.get('customer', {}).get('email'),
+                        'customer_name': sale.get('customer', {}).get('name'),
+                        'product_id': settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F,
+                        'created_at': datetime.strptime(sale.get('createdAt'), '%Y-%m-%dT%H:%M:%S.%fZ')
+                    }
+                )
+
+                if created:
+                    imported_count += 1
+                    logger.info(f"Importada venda antiga: {transaction}")
+
+            logger.info(f"Importação concluída. {imported_count} vendas importadas.")
+            return imported_count
+
+        except Exception as e:
+            logger.error(f"Erro ao importar vendas antigas: {str(e)}")
+            logger.exception(e)  # Isso vai logar o traceback completo
+            return 0
+
+    def test_token(self):
+        """
+        Testa se o token de acesso está funcionando
+        """
+        try:
+            url = f"{self.api_url}/accounts/v1/me"
+            
+            logger.info(f"Testando token em: {url}")
+            logger.info(f"Headers: {self._get_headers()}")
+            
+            response = requests.get(url, headers=self._get_headers())
+            response.raise_for_status()
+            result = response.json()
+            
+            logger.info(f"Resposta da API: {result}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Erro ao testar token: {str(e)}")
+            logger.exception(e)
+            return None

@@ -500,7 +500,7 @@ def webhook_eduzz(request):
                 )
                 
                 # Se for uma compra do software e o status for pago
-                if str(item.get('productId')) in [settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F, settings.EDUZZ_SOFTWARE_ID_3F] and status == 'paid':
+                if str(item.get('productId')) in [settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F, settings.EDUZZ_SOFTWARE_MENSAL_ID_3F] and status == 'paid':
                     try:
                         # Tenta encontrar o usuário pelo email
                         user = User.objects.get(email=buyer.get('email'))

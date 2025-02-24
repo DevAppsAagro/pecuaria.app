@@ -160,16 +160,15 @@ LOGOUT_REDIRECT_URL = 'login'
 
 # Configurações da Eduzz
 EDUZZ_API_URL = config('EDUZZ_API_URL', default='https://api.eduzz.com')
-EDUZZ_API_KEY = config('EDUZZ_API_KEY', default='')
-EDUZZ_PUBLIC_KEY = config('EDUZZ_PUBLIC_KEY', default='')
-EDUZZ_PLANILHA_ID = config('EDUZZ_PLANILHA_ID', default='')  # ID do produto da planilha na Eduzz
+EDUZZ_ACCESS_TOKEN = config('EDUZZ_ACCESS_TOKEN', default='edzpap_uwevgLCGelKcojXp2MLMK1Sf_kB_xndYrfEIMpjg-BBbpdhew8hlEmyPKpWigQvwhbixBfItbVwSGFhQQkX')
+EDUZZ_SOFTWARE_CORTESIA_ID_3F = '2655876'  # ID do produto de cortesia
 EDUZZ_WEBHOOK_URL = config('EDUZZ_WEBHOOK_URL', default='https://app.pecuaristapro.com/api/eduzz/webhook/')
-EDUZZ_RETURN_URL = config('EDUZZ_RETURN_URL', default='https://app.pecuaristapro.com/planos/')
+EDUZZ_RETURN_URL = config('EDUZZ_RETURN_URL', default='https://app.pecuaristapro.com/api/eduzz/return/')
+EDUZZ_PLANILHA_ID = config('EDUZZ_PLANILHA_ID', default='')  # ID do produto da planilha na Eduzz
 EDUZZ_SOFTWARE_MENSAL_ID_3F = '2655883'
 EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID_3F = '2658194'
 EDUZZ_SOFTWARE_ANUAL_ID_3F = '2655875'
 EDUZZ_SOFTWARE_ANUAL_SEM_ADESAO_ID_3F = '2658208'
-EDUZZ_SOFTWARE_CORTESIA_ID_3F = '2655876'
 
 # Configuração de Logging
 LOGGING = {

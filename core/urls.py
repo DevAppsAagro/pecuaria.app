@@ -371,13 +371,8 @@ urlpatterns = [
     path('verificar-email/', views.verificar_email_view, name='verificar_email'),
     
     # URLs da Eduzz
-    path('planos/', views_eduzz.planos_view, name='planos'),
-    path('assinatura/', views_eduzz.assinatura, name='assinatura'),
-    path('checkout/<str:plan_id>/', views_eduzz.checkout_plano, name='checkout_plano'),
-    path('webhook/eduzz/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
-    path('api/eduzz/webhook/', views_eduzz.eduzz_webhook, name='eduzz_webhook'),
-    path('webhook/eduzz/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
-    path('test-eduzz-connection/', views_eduzz.test_eduzz_connection, name='test_eduzz_connection'),
+    path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
+    path('api/eduzz/return/', views_eduzz.eduzz_return, name='eduzz_return'),
     
     # Endpoints Eduzz
     path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),

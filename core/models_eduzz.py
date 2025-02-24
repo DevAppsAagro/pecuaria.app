@@ -89,6 +89,25 @@ class EduzzTransaction(models.Model):
             pass
         super().save(*args, **kwargs)
 
+class EduzzContract(models.Model):
+    """
+    Modelo para armazenar contratos da Eduzz
+    """
+    contract_id = models.CharField(max_length=100, unique=True)
+    status = models.CharField(max_length=50)
+    customer_email = models.EmailField()
+    customer_name = models.CharField(max_length=255)
+    plan_id = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Contrato {self.contract_id} - {self.customer_email}"
+
+    class Meta:
+        verbose_name = "Contrato Eduzz"
+        verbose_name_plural = "Contratos Eduzz"
+
 class UsuarioEduzz(models.Model):
     usuario = models.OneToOneField(User, on_delete=models.CASCADE)
     eduzz_id = models.CharField(max_length=100, blank=True, null=True)
