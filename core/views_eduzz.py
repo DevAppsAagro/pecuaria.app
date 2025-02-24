@@ -10,7 +10,7 @@ import hashlib
 import logging
 import json
 from .eduzz_api import EduzzAPI
-from .models_eduzz import ClienteLegado, UserSubscription, ClientePlanilha, EduzzTransaction
+from .models_eduzz import ClienteLegado, UserSubscription, ClientePlanilha, EduzzTransaction, EduzzContract
 from datetime import datetime
 import pytz
 from django.contrib.auth.models import User
@@ -412,6 +412,11 @@ def checkout_plano(request, plan_id):
 def webhook_eduzz(request):
     """
     Endpoint para receber notificações da Eduzz
+    Eventos suportados:
+    - myeduzz.contract_updated: Atualização de contrato
+    - myeduzz.contract_created: Criação de contrato
+    - myeduzz.invoice_*: Eventos relacionados a faturas
+    - myeduzz.commission_processed: Processamento de comissão
     """
     logger.info(f"Webhook Eduzz - Método: {request.method}")
     logger.info(f"Headers: {request.headers}")
@@ -451,10 +456,6 @@ def webhook_eduzz(request):
         """
         return HttpResponse(html_response, content_type='text/html')
 
-    # Se for POST sem corpo ou com corpo inválido, retorna sucesso
-    if len(request.body) == 0:
-        return JsonResponse({'status': 'success', 'message': 'Webhook URL válida'})
-
     try:
         # Tenta decodificar o JSON
         try:
@@ -463,54 +464,56 @@ def webhook_eduzz(request):
         except json.JSONDecodeError:
             return JsonResponse({'status': 'success', 'message': 'Webhook URL válida'})
 
-        # Se é um teste ou não tem assinatura, retorna sucesso
-        signature = request.headers.get('X-Eduzz-Signature')
-        if not signature or data.get('test') == True or data.get('is_test') == True:
+        # Se é um teste, retorna sucesso
+        if data.get('test') == True:
             return JsonResponse({'status': 'success', 'message': 'Teste recebido com sucesso'})
 
-        # Se tem assinatura, verifica
-        payload = request.body
-        expected_signature = hmac.new(
-            settings.EDUZZ_API_KEY.encode(),
-            payload,
-            hashlib.sha256
-        ).hexdigest()
-
-        # Verifica se a assinatura é válida
-        if not hmac.compare_digest(signature, expected_signature):
-            return JsonResponse({'error': 'Assinatura inválida'}, status=400)
-
-        # A partir daqui é uma notificação real
-        # Verifica se é uma compra da planilha
-        product_id = str(data.get('product_id'))
-        if product_id == settings.EDUZZ_PLANILHA_ID:
-            # Salva o cliente que comprou a planilha
-            cliente = ClientePlanilha.objects.create(
-                nome=data.get('cus_name'),
-                email=data.get('cus_email'),
-                telefone=data.get('cus_tel'),
-                transaction_code=data.get('trans_cod'),
-                status=data.get('trans_status'),
-                data_compra=data.get('trans_createdate')
-            )
-            logger.info(f"Cliente da planilha salvo: {cliente}")
-
-        # Salva a transação
-        transaction = EduzzTransaction.objects.create(
-            transaction_code=data.get('trans_cod'),
-            status=data.get('trans_status'),
-            customer_email=data.get('cus_email'),
-            customer_name=data.get('cus_name'),
-            product_id=product_id,
-            created_at=data.get('trans_createdate')
-        )
-        logger.info(f"Transação salva: {transaction}")
+        # Processa o evento
+        event_type = data.get('event')
+        event_data = data.get('data', {})
+        
+        if event_type and event_type.startswith('myeduzz.invoice_'):
+            # Eventos de fatura
+            invoice_id = event_data.get('id')
+            status = event_data.get('status')
+            buyer = event_data.get('buyer', {})
+            items = event_data.get('items', [])
+            
+            logger.info(f"Processando fatura - ID: {invoice_id}, Status: {status}")
+            
+            # Para cada item na fatura
+            for item in items:
+                # Cria ou atualiza a transação
+                transaction = EduzzTransaction.objects.update_or_create(
+                    transaction_id=invoice_id,  
+                    defaults={
+                        'status': status,
+                        'email': buyer.get('email'),
+                        'nome': buyer.get('name'),
+                        'product_id': item.get('productId'),
+                        'plano': 'cortesia' if item.get('productId') == settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F else 'mensal',
+                        'valor_original': item.get('price', {}).get('value', 0),
+                        'valor_pago': event_data.get('price', {}).get('paid', {}).get('value', 0),
+                        'data_pagamento': datetime.strptime(event_data.get('paidAt'), '%Y-%m-%dT%H:%M:%S.%fZ') if event_data.get('paidAt') else None,
+                        'webhook_data': event_data
+                    }
+                )
+                
+                # Se for uma compra da planilha e o status for pago
+                if str(item.get('productId')) == settings.EDUZZ_PLANILHA_ID and status == 'paid':
+                    ClientePlanilha.objects.create(
+                        nome=buyer.get('name'),
+                        email=buyer.get('email'),
+                        telefone=buyer.get('phone') or buyer.get('cellphone'),
+                        eduzz_customer_id=buyer.get('id')
+                    )
 
         return JsonResponse({'status': 'success'})
 
     except Exception as e:
         logger.error(f"Erro ao processar webhook: {str(e)}")
-        return JsonResponse({'status': 'success', 'message': 'Erro processado com sucesso'})
+        logger.exception(e)
+        return JsonResponse({'status': 'error', 'message': str(e)})
 
 @csrf_exempt
 def test_eduzz_connection(request):
@@ -766,3 +769,61 @@ def sync_eduzz_sales_legacy(request):
     except Exception as e:
         logger.error(f"Erro ao sincronizar vendas da Eduzz: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
+
+def eduzz_return(request):
+    """
+    Página de retorno após compra na Eduzz
+    """
+    html_response = """
+    <html>
+    <head>
+        <title>Bem-vindo ao PecuaristaPRO!</title>
+        <style>
+            body { 
+                font-family: Arial, sans-serif;
+                margin: 40px;
+                line-height: 1.6;
+                background-color: #f5f5f5;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                background: white;
+                padding: 40px;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            .success {
+                color: #28a745;
+                font-size: 24px;
+                margin-bottom: 20px;
+            }
+            .btn {
+                display: inline-block;
+                padding: 10px 20px;
+                background-color: #007bff;
+                color: white;
+                text-decoration: none;
+                border-radius: 5px;
+                margin-top: 20px;
+            }
+            .btn:hover {
+                background-color: #0056b3;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Bem-vindo ao PecuaristaPRO!</h1>
+            <p class="success">✓ Compra realizada com sucesso!</p>
+            <p>Obrigado por escolher o PecuaristaPRO. Estamos processando sua compra e em breve você receberá um email com as instruções de acesso.</p>
+            <p>Se você já tem uma conta, pode fazer login agora mesmo. Se ainda não tem, pode criar uma conta usando o mesmo email que usou na compra.</p>
+            <div>
+                <a href="/login" class="btn">Fazer Login</a>
+                <a href="/register" class="btn">Criar Conta</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return HttpResponse(html_response, content_type='text/html')
