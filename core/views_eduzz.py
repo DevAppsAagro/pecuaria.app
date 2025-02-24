@@ -531,29 +531,41 @@ def webhook_eduzz(request):
                             password=User.objects.make_random_password()
                         )
                         
-                        # Envia email de boas-vindas com instruções para definir a senha
-                        from django.core.mail import send_mail
-                        from django.template.loader import render_to_string
-                        from django.utils.html import strip_tags
-                        
-                        context = {
-                            'name': user.get_full_name() or user.username,
-                            'login_url': settings.BASE_URL + reverse('password_reset'),
-                            'email': user.email
-                        }
-                        
-                        html_message = render_to_string('emails/welcome_new_user.html', context)
-                        plain_message = strip_tags(html_message)
-                        
-                        send_mail(
-                            'Bem-vindo ao Pecuária.app - Complete seu cadastro',
-                            plain_message,
-                            settings.DEFAULT_FROM_EMAIL,
-                            [user.email],
-                            html_message=html_message
-                        )
-                        
-                        logger.info(f"Email de boas-vindas enviado para {user.email}")
+                        try:
+                            # Envia email de boas-vindas com instruções para definir a senha
+                            from django.core.mail import send_mail
+                            from django.template.loader import render_to_string
+                            from django.utils.html import strip_tags
+                            
+                            logger.info(f"Preparando email para {user.email}")
+                            
+                            context = {
+                                'name': user.get_full_name() or user.username,
+                                'login_url': settings.BASE_URL + reverse('password_reset'),
+                                'email': user.email,
+                                'base_url': settings.BASE_URL
+                            }
+                            
+                            logger.info(f"Renderizando template com contexto: {context}")
+                            
+                            html_message = render_to_string('emails/welcome_new_user.html', context)
+                            plain_message = strip_tags(html_message)
+                            
+                            logger.info(f"Configurações de email: HOST={settings.EMAIL_HOST}, PORT={settings.EMAIL_PORT}, USER={settings.EMAIL_HOST_USER}")
+                            
+                            send_mail(
+                                'Bem-vindo ao Pecuária.app - Complete seu cadastro',
+                                plain_message,
+                                settings.DEFAULT_FROM_EMAIL,
+                                [user.email],
+                                html_message=html_message,
+                                fail_silently=False
+                            )
+                            
+                            logger.info(f"Email de boas-vindas enviado com sucesso para {user.email}")
+                        except Exception as e:
+                            logger.error(f"Erro ao enviar email para {user.email}: {str(e)}")
+                            logger.exception("Detalhes do erro:")
                     
                     # Cria ou atualiza a assinatura
                     subscription = UserSubscription.objects.update_or_create(
