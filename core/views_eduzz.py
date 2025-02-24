@@ -499,35 +499,74 @@ def webhook_eduzz(request):
                     }
                 )
                 
-                # Se for uma compra do software e o status for pago
-                if str(item.get('productId')) in [settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F, settings.EDUZZ_SOFTWARE_MENSAL_ID_3F] and status == 'paid':
-                    try:
-                        # Tenta encontrar o usuário pelo email
-                        user = User.objects.get(email=buyer.get('email'))
+                # Se o status for paid, cria o usuário e a assinatura se não existirem
+                if status == 'paid':
+                    email = buyer.get('email')
+                    nome = buyer.get('name', '').split()
+                    first_name = nome[0] if nome else ''
+                    last_name = ' '.join(nome[1:]) if len(nome) > 1 else ''
+                    
+                    # Tenta encontrar o usuário pelo email
+                    user = User.objects.filter(email=email).first()
+                    
+                    # Se não encontrar, cria um novo usuário
+                    if not user:
+                        logger.info(f"Criando novo usuário para {email}")
+                        username = email.split('@')[0]
+                        base_username = username
+                        counter = 1
                         
-                        # Calcula a data de expiração (30 dias a partir do pagamento)
-                        start_date = datetime.strptime(event_data.get('paidAt'), '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=pytz.UTC) if event_data.get('paidAt') else timezone.now()
-                        end_date = start_date + timedelta(days=30)
+                        # Garante username único
+                        while User.objects.filter(username=username).exists():
+                            username = f"{base_username}{counter}"
+                            counter += 1
                         
-                        # Atualiza ou cria a assinatura do usuário
-                        subscription, created = UserSubscription.objects.update_or_create(
-                            user=user,
-                            defaults={
-                                'eduzz_subscription_id': invoice_id,
-                                'plan_type': 'mensal',
-                                'status': 'active',
-                                'start_date': start_date,
-                                'end_date': end_date,
-                                'last_payment_date': start_date,
-                                'next_payment_date': end_date
-                            }
+                        # Cria o usuário
+                        user = User.objects.create_user(
+                            username=username,
+                            email=email,
+                            first_name=first_name,
+                            last_name=last_name,
+                            # Gera uma senha aleatória que será alterada no primeiro acesso
+                            password=User.objects.make_random_password()
                         )
                         
-                        logger.info(f"Assinatura atualizada/criada para o usuário {user.email}")
-                    except User.DoesNotExist:
-                        logger.warning(f"Usuário não encontrado para o email {buyer.get('email')}")
-                    except Exception as e:
-                        logger.error(f"Erro ao atualizar assinatura: {str(e)}")
+                        # Envia email de boas-vindas com instruções para definir a senha
+                        from django.core.mail import send_mail
+                        from django.template.loader import render_to_string
+                        from django.utils.html import strip_tags
+                        
+                        context = {
+                            'name': user.get_full_name() or user.username,
+                            'login_url': settings.BASE_URL + reverse('password_reset'),
+                            'email': user.email
+                        }
+                        
+                        html_message = render_to_string('emails/welcome_new_user.html', context)
+                        plain_message = strip_tags(html_message)
+                        
+                        send_mail(
+                            'Bem-vindo ao Pecuária.app - Complete seu cadastro',
+                            plain_message,
+                            settings.DEFAULT_FROM_EMAIL,
+                            [user.email],
+                            html_message=html_message
+                        )
+                        
+                        logger.info(f"Email de boas-vindas enviado para {user.email}")
+                    
+                    # Cria ou atualiza a assinatura
+                    subscription = UserSubscription.objects.update_or_create(
+                        user=user,
+                        defaults={
+                            'subscription_type': 'cortesia' if item.get('productId') == settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F else 'mensal',
+                            'status': 'active',
+                            'start_date': timezone.now(),
+                            'end_date': timezone.now() + timedelta(days=30),  # 30 dias de acesso
+                            'eduzz_subscription_id': invoice_id
+                        }
+                    )
+                    logger.info(f"Assinatura criada/atualizada para {user.email}")
         
         return JsonResponse({'status': 'success'})
 

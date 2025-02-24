@@ -170,6 +170,18 @@ EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID_3F = '2658194'
 EDUZZ_SOFTWARE_ANUAL_ID_3F = '2655875'
 EDUZZ_SOFTWARE_ANUAL_SEM_ADESAO_ID_3F = '2658208'
 
+# Email settings
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Pecuária.app <noreply@pecuaristapro.com>')
+
+# Base URL for links in emails
+BASE_URL = config('BASE_URL', default='https://app.pecuaristapro.com')
+
 # Configuração de Logging
 LOGGING = {
     'version': 1,
@@ -207,15 +219,6 @@ LOGGING = {
 SUPABASE_URL = config('SUPABASE_URL')
 SUPABASE_KEY = config('SUPABASE_KEY')
 SUPABASE_SERVICE_KEY = config('SUPABASE_SERVICE_KEY')  # Para operações administrativas
-
-# Email settings para verificação
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
-EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
 
 # Storage settings
 SUPABASE_STORAGE_BUCKET = 'profile-photos'  # Bucket para fotos de perfil

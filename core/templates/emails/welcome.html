@@ -1,0 +1,68 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bem-vindo ao {{ product_name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header img {
+            max-width: 200px;
+            height: auto;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 40px;
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="{{ base_url }}{% static 'img/logo.svg' %}" alt="{{ product_name }}">
+    </div>
+
+    <h1>Bem-vindo(a) ao {{ product_name }}!</h1>
+
+    <p>Olá {{ name }},</p>
+
+    <p>Ficamos muito felizes em ter você conosco! Sua compra foi confirmada com sucesso e agora você tem acesso completo ao {{ product_name }}.</p>
+
+    <p>Para começar a usar o sistema, basta acessar o link abaixo usando seu email ({{ email }}):</p>
+
+    <p style="text-align: center;">
+        <a href="{{ login_url }}" class="button">Acessar o Sistema</a>
+    </p>
+
+    <p>Se você tiver alguma dúvida ou precisar de ajuda, não hesite em entrar em contato conosco através do email {{ support_email }}.</p>
+
+    <p>Atenciosamente,<br>
+    Equipe {{ product_name }}</p>
+
+    <div class="footer">
+        <p>Este é um email automático, por favor não responda.</p>
+    </div>
+</body>
+</html>

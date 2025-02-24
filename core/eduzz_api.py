@@ -270,6 +270,38 @@ class EduzzAPI:
             logger.info(f"Transação {transaction_id} registrada com sucesso")
             
             if status == '3':  # 3 = Aprovado
+                # Envia email com link de acesso
+                from django.core.mail import send_mail
+                from django.template.loader import render_to_string
+                from django.utils.html import strip_tags
+                from django.conf import settings
+
+                # Monta o contexto do email
+                context = {
+                    'name': name,
+                    'login_url': settings.BASE_URL + '/conta/login/',
+                    'email': email,
+                    'product_name': 'Pecuária.app',
+                    'support_email': settings.DEFAULT_FROM_EMAIL
+                }
+
+                # Renderiza o template do email
+                html_message = render_to_string('emails/welcome.html', context)
+                plain_message = strip_tags(html_message)
+
+                # Envia o email
+                try:
+                    send_mail(
+                        subject='Bem-vindo ao Pecuária.app - Acesse sua conta',
+                        message=plain_message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[email],
+                        html_message=html_message
+                    )
+                    logger.info(f"Email de boas-vindas enviado para {email}")
+                except Exception as e:
+                    logger.error(f"Erro ao enviar email de boas-vindas para {email}: {str(e)}")
+
                 # Verifica se é uma compra da planilha
                 if str(product_id) == settings.EDUZZ_PLANILHA_ID:
                     # Registra no Supabase

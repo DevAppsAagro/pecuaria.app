@@ -1,0 +1,80 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete seu cadastro no Pecuária.app</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header img {
+            max-width: 200px;
+            height: auto;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 40px;
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+        }
+        .important {
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="{{ base_url }}{% static 'img/logo.svg' %}" alt="Pecuária.app">
+    </div>
+
+    <h1>Complete seu cadastro no Pecuária.app</h1>
+
+    <p>Olá {{ name }},</p>
+
+    <p>Sua compra foi confirmada com sucesso! Para começar a usar o Pecuária.app, você precisa criar sua senha de acesso.</p>
+
+    <div class="important">
+        <p><strong>Dados de acesso:</strong></p>
+        <p>Email: {{ email }}</p>
+    </div>
+
+    <p>Clique no botão abaixo para definir sua senha:</p>
+
+    <p style="text-align: center;">
+        <a href="{{ login_url }}" class="button">Criar Senha de Acesso</a>
+    </p>
+
+    <p>Por questões de segurança, este link é válido por 24 horas. Se você não criar sua senha neste período, solicite um novo link de redefinição de senha na página de login.</p>
+
+    <p>Se tiver alguma dúvida ou precisar de ajuda, entre em contato com nosso suporte.</p>
+
+    <p>Bem-vindo ao Pecuária.app!</p>
+
+    <div class="footer">
+        <p>Este é um email automático, por favor não responda.</p>
+    </div>
+</body>
+</html>
