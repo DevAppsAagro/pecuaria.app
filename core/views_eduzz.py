@@ -377,7 +377,7 @@ def checkout_plano(request, plan_id):
     if not user_email:
         messages.error(request, 'Email não fornecido')
         return redirect('planos')
-    
+
     # Verifica se o usuário já tem a planilha
     has_planilha = check_user_has_planilha(user_email)
     
@@ -451,7 +451,7 @@ def webhook_eduzz(request):
         """
         return HttpResponse(html_response, content_type='text/html')
 
-    # Se for POST sem corpo, retorna sucesso
+    # Se for POST sem corpo ou com corpo inválido, retorna sucesso
     if len(request.body) == 0:
         return JsonResponse({'status': 'success', 'message': 'Webhook URL válida'})
 
@@ -461,30 +461,24 @@ def webhook_eduzz(request):
             data = json.loads(request.body)
             logger.info(f"Dados recebidos: {data}")
         except json.JSONDecodeError:
-            # Se não é JSON válido, assume que é teste
             return JsonResponse({'status': 'success', 'message': 'Webhook URL válida'})
 
-        # Se tem assinatura, verifica
+        # Se é um teste ou não tem assinatura, retorna sucesso
         signature = request.headers.get('X-Eduzz-Signature')
-        if signature:
-            # Calcula a assinatura esperada
-            payload = request.body
-            expected_signature = hmac.new(
-                settings.EDUZZ_API_KEY.encode(),
-                payload,
-                hashlib.sha256
-            ).hexdigest()
-
-            # Verifica se a assinatura é válida
-            if not hmac.compare_digest(signature, expected_signature):
-                return JsonResponse({'error': 'Assinatura inválida'}, status=400)
-        else:
-            # Se não tem assinatura, assume que é teste
+        if not signature or data.get('test') == True or data.get('is_test') == True:
             return JsonResponse({'status': 'success', 'message': 'Teste recebido com sucesso'})
 
-        # Se é um teste da Eduzz com dados de exemplo
-        if data.get('test') == True or data.get('is_test') == True:
-            return JsonResponse({'status': 'success', 'message': 'Teste recebido com sucesso'})
+        # Se tem assinatura, verifica
+        payload = request.body
+        expected_signature = hmac.new(
+            settings.EDUZZ_API_KEY.encode(),
+            payload,
+            hashlib.sha256
+        ).hexdigest()
+
+        # Verifica se a assinatura é válida
+        if not hmac.compare_digest(signature, expected_signature):
+            return JsonResponse({'error': 'Assinatura inválida'}, status=400)
 
         # A partir daqui é uma notificação real
         # Verifica se é uma compra da planilha
