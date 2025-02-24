@@ -30,6 +30,13 @@ from . import views_eduzz  # Nova importação
 urlpatterns = [
     # Dashboard
     path('', views_dashboard.dashboard, name='dashboard'),
+    
+    # Eduzz Webhooks
+    path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
+    path('api/eduzz/test/', views_eduzz.test_eduzz_connection, name='test_eduzz'),
+    path('api/eduzz/sync-sales/', views_eduzz.sync_eduzz_sales, name='sync_eduzz_sales'),
+    
+    # Dashboard
     path('dashboard/atualizar/', views_dashboard.atualizar_dashboard, name='atualizar_dashboard'),
     
     # Página em desenvolvimento
@@ -343,8 +350,6 @@ urlpatterns = [
     path('configuracoes/', views.configuracoes, name='configuracoes'),
 
     # Eduzz URLs
-    path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='eduzz_webhook'),
-    path('api/eduzz/test/', views_eduzz.test_eduzz_connection, name='test_eduzz'),
     path('planos/', views_eduzz.planos_view, name='planos'),
     path('planos/checkout/<str:plan_id>/', views_eduzz.checkout_plano, name='checkout_plano'),
     path('planos/verificar-email/', views_eduzz.verificar_email, name='verificar_email_plano'),
@@ -376,6 +381,6 @@ urlpatterns = [
     
     # Endpoints Eduzz
     path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
-    path('api/eduzz/test/', views_eduzz.test_eduzz_connection, name='test_eduzz_connection'),
+    path('api/eduzz/test/', views_eduzz.test_eduzz_connection, name='test_eduzz'),
     path('api/eduzz/sync-sales/', views_eduzz.sync_eduzz_sales, name='sync_eduzz_sales'),
 ]
