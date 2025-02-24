@@ -506,7 +506,7 @@ def webhook_eduzz(request):
                     first_name = nome[0] if nome else ''
                     last_name = ' '.join(nome[1:]) if len(nome) > 1 else ''
                     
-                    # Tenta encontrar o usuário pelo email
+                    # Tenta encontrar usuário pelo email
                     user = User.objects.filter(email=email).first()
                     
                     # Se não encontrar, cria um novo usuário
@@ -559,7 +559,7 @@ def webhook_eduzz(request):
                     subscription = UserSubscription.objects.update_or_create(
                         user=user,
                         defaults={
-                            'subscription_type': 'cortesia' if item.get('productId') == settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F else 'mensal',
+                            'plan_type': 'cortesia' if item.get('productId') == settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F else 'mensal',
                             'status': 'active',
                             'start_date': timezone.now(),
                             'end_date': timezone.now() + timedelta(days=30),  # 30 dias de acesso
