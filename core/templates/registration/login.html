@@ -45,7 +45,7 @@
                                 <input type="checkbox" class="form-check-input" id="rememberMe" name="remember_me">
                                 <label class="form-check-label" for="rememberMe">Lembrar de mim</label>
                             </div>
-                            <a href="{% url 'reset_password' %}" class="text-decoration-none">Esqueceu a senha?</a>
+                            <a href="#" onclick="resetPassword(event)" class="text-decoration-none">Esqueceu a senha?</a>
                         </div>
                         <div class="mb-3">
                             <button type="submit" class="btn btn-primary w-100">Entrar</button>
@@ -85,6 +85,29 @@
 
 {% block extra_js %}
 <script>
+async function resetPassword(e) {
+    e.preventDefault();
+    const email = document.getElementById('id_email').value;
+    
+    if (!email) {
+        alert('Por favor, digite seu email antes de solicitar a redefinição de senha.');
+        return;
+    }
+    
+    try {
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: 'https://app.pecuaristapro.com/auth/redefinir-senha'
+        });
+        
+        if (error) throw error;
+        
+        alert('Enviamos um email com instruções para redefinir sua senha. Por favor, verifique sua caixa de entrada.');
+        
+    } catch (error) {
+        alert('Erro ao solicitar redefinição de senha: ' + error.message);
+    }
+}
+
 document.getElementById('togglePassword').addEventListener('click', function() {
     const passwordInput = document.getElementById('id_password');
     const icon = this.querySelector('i');
