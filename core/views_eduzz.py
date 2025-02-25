@@ -483,6 +483,18 @@ def webhook_eduzz(request):
             
             # Para cada item na fatura
             for item in items:
+                product_id = str(item.get('productId'))
+                logger.info(f"Processando produto ID: {product_id}")
+
+                # Lista de IDs de produtos do Pecuária.app
+                pecuaria_products = [
+                    settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F,
+                    settings.EDUZZ_SOFTWARE_MENSAL_ID_3F,
+                    settings.EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID_3F,
+                    settings.EDUZZ_SOFTWARE_ANUAL_ID_3F,
+                    settings.EDUZZ_SOFTWARE_ANUAL_SEM_ADESAO_ID_3F
+                ]
+
                 # Cria ou atualiza a transação
                 transaction = EduzzTransaction.objects.update_or_create(
                     transaction_id=invoice_id,
@@ -490,17 +502,17 @@ def webhook_eduzz(request):
                         'status': status,
                         'email': buyer.get('email'),
                         'nome': buyer.get('name'),
-                        'product_id': item.get('productId'),
-                        'plano': 'cortesia' if item.get('productId') == settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F else 'mensal',
+                        'product_id': product_id,
+                        'plano': 'cortesia' if product_id == settings.EDUZZ_SOFTWARE_CORTESIA_ID_3F else 'mensal',
                         'valor_original': item.get('price', {}).get('value', 0),
                         'valor_pago': event_data.get('price', {}).get('paid', {}).get('value', 0),
                         'data_pagamento': datetime.strptime(event_data.get('paidAt'), '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=pytz.UTC) if event_data.get('paidAt') else None,
                         'webhook_data': event_data
                     }
                 )
-                
-                # Se o status for paid, cria o usuário e a assinatura se não existirem
-                if status == 'paid':
+
+                # Se for um produto do Pecuária.app e o status for paid
+                if product_id in pecuaria_products and status == 'paid':
                     email = buyer.get('email')
                     nome = buyer.get('name', '').split()
                     first_name = nome[0] if nome else ''
@@ -541,7 +553,7 @@ def webhook_eduzz(request):
                             
                             context = {
                                 'name': user.get_full_name() or user.username,
-                                'login_url': settings.BASE_URL + reverse('password_reset'),
+                                'login_url': settings.BASE_URL + reverse('account_reset_password'),
                                 'email': user.email,
                                 'base_url': settings.BASE_URL
                             }
