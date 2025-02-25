@@ -95,7 +95,7 @@ async function resetPassword(e) {
     }
     
     try {
-        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        const { data, error } = await window.supabaseClient.auth.resetPasswordForEmail(email, {
             redirectTo: 'https://app.pecuaristapro.com/auth/redefinir-senha'
         });
         
@@ -135,7 +135,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
         submitButton.disabled = true;
         submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Entrando...';
 
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
+        const { data, error } = await window.supabaseClient.auth.signInWithPassword({
             email: email,
             password: password
         });
