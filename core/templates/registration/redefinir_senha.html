@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block auth_content %}
+<div class="row g-0 min-vh-100">
+    <!-- Formulário -->
+    <div class="col-12 col-lg-6 d-flex flex-column">
+        <div class="flex-grow-1 d-flex align-items-center">
+            <div class="w-100 px-4">
+                <div class="mx-auto" style="max-width: 400px;">
+                    <div class="text-center mb-4">
+                        <img src="{% static 'img/form-logo.svg' %}" alt="PecuaristaPRO" style="height: 50px;" class="mb-3">
+                        <h4>Redefinir Senha</h4>
+                        <p class="text-muted">Digite sua nova senha</p>
+                    </div>
+                    {% if messages %}
+                    <div class="messages">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <form id="resetForm">
+                        <div class="mb-3">
+                            <label for="password" class="form-label text-start d-block">Nova Senha</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
+                                <input type="password" class="form-control" id="password" required>
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('password')">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label text-start d-block">Confirmar Senha</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
+                                <input type="password" class="form-control" id="confirmPassword" required>
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('confirmPassword')">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <button type="submit" class="btn btn-primary w-100" id="submitBtn">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                Alterar Senha
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Banner Lateral -->
+    <div class="col-lg-6 d-none d-lg-flex bg-dark">
+        <div class="w-100 d-flex align-items-center justify-content-center p-5">
+            <div class="text-center text-white" style="max-width: 600px;">
+                <img src="{% static 'img/banner-logo.svg' %}" alt="PecuaristaPRO" style="width: 600px; height: 200px;" class="mb-4">
+                <p class="lead">Gestão inteligente para sua fazenda</p>
+                <p class="opacity-75">Sistema completo para gestão de fazendas, controle de rebanho, financeiro e muito mais.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function togglePassword(id) {
+    const input = document.getElementById(id);
+    const button = input.nextElementSibling;
+    const icon = button.querySelector('i');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
+    }
+}
+
+document.getElementById('resetForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    const submitBtn = document.getElementById('submitBtn');
+    const spinner = submitBtn.querySelector('.spinner-border');
+    
+    if (password !== confirmPassword) {
+        alert('As senhas não conferem');
+        return;
+    }
+    
+    // Desabilita o botão e mostra o spinner
+    submitBtn.disabled = true;
+    spinner.classList.remove('d-none');
+    
+    try {
+        // Pega o token da URL
+        const token = window.location.pathname.split('/').pop();
+        
+        // Chama a API do Supabase para atualizar a senha
+        const { data, error } = await supabase.auth.updateUser({
+            password: password
+        });
+        
+        if (error) throw error;
+        
+        // Redireciona para a página de login com mensagem de sucesso
+        window.location.href = '/login?message=password_reset_success';
+        
+    } catch (error) {
+        alert('Erro ao redefinir senha: ' + error.message);
+        
+        // Reabilita o botão e esconde o spinner
+        submitBtn.disabled = false;
+        spinner.classList.add('d-none');
+    }
+});
+</script>
+{% endblock %}

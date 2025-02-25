@@ -14,17 +14,7 @@ from . import views_impressao
 from . import views_reproducao
 from . import views_config
 from . import importacao_views
-from django.contrib.auth import views as auth_views
 from . import views_account  # Nova importação
-from . import views_auth
-from .views_auth import redefinir_senha_view
-from .views_fazenda import (
-    salvar_coordenadas_benfeitoria,
-    get_coordenadas_benfeitoria,
-    get_benfeitorias_fazenda,
-    get_pastos,
-    get_cidade_fazenda,
-)
 from . import views_eduzz  # Nova importação
 
 urlpatterns = [
@@ -126,8 +116,8 @@ urlpatterns = [
     path('fazenda/all/benfeitorias/', views_fazenda.get_all_benfeitorias, name='get_all_benfeitorias'),
     path('fazenda/<int:fazenda_id>/cidade/', views_fazenda.get_cidade_fazenda, name='get_cidade_fazenda'),
     path('fazenda/get_benfeitorias/<int:fazenda_id>/', views_fazenda.get_benfeitorias_fazenda, name='get_benfeitorias_fazenda'),
-    path('fazenda/benfeitoria/coordenadas/salvar/', salvar_coordenadas_benfeitoria, name='salvar_coordenadas_benfeitoria'),
-    path('fazenda/benfeitoria/coordenadas/<int:benfeitoria_id>/', get_coordenadas_benfeitoria, name='get_coordenadas_benfeitoria'),
+    path('fazenda/benfeitoria/coordenadas/salvar/', views_fazenda.salvar_coordenadas_benfeitoria, name='salvar_coordenadas_benfeitoria'),
+    path('fazenda/benfeitoria/coordenadas/<int:benfeitoria_id>/', views_fazenda.get_coordenadas_benfeitoria, name='get_coordenadas_benfeitoria'),
     
     # Estoque
     path('estoque/', views_estoque.estoque_list, name='estoque_list'),
@@ -258,7 +248,7 @@ urlpatterns = [
     path('api/lotes-por-fazenda/<int:fazenda_id>/', views.get_lotes_por_fazenda, name='api_lotes_por_fazenda'),
     
     # Eduzz Integration
-    path('api/eduzz/webhook/', views_eduzz.eduzz_webhook, name='eduzz_webhook'),
+    path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
     path('api/eduzz/checkout/', views_eduzz.create_checkout, name='eduzz_checkout'),
     path('eduzz/checkout/', views_eduzz.checkout_page, name='eduzz_checkout_page'),
     
@@ -342,13 +332,9 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('register/', views.register_view, name='register'),
     path('auth/verify-email/', views.verificar_email_view, name='verify-email'),
-    path('reset-password/', views.reset_password_view, name='reset_password'),
     path('auth/redefinir-senha/<str:token>/', views.redefinir_senha_view, name='redefinir_senha'),
     path('verify-email/', views.verificar_email_view, name='verify_email'),
-    path('logout/', views.logout_view, name='logout'),
-    path('aguardando-pagamento/', views.awaiting_payment, name='awaiting_payment'),
-    path('configuracoes/', views.configuracoes, name='configuracoes'),
-
+    
     # Eduzz URLs
     path('planos/', views_eduzz.planos_view, name='planos'),
     path('planos/checkout/<str:plan_id>/', views_eduzz.checkout_plano, name='checkout_plano'),
