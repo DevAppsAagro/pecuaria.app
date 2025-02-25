@@ -14,10 +14,15 @@ from . import views_impressao
 from . import views_reproducao
 from . import views_config
 from . import importacao_views
-from . import views_account  # Nova importação
-from . import views_eduzz  # Nova importação
+from . import views_account
+from . import views_eduzz
+from . import auth_supabase
 
 urlpatterns = [
+    # Auth
+    path('auth/redefinir-senha/<str:token>/', auth_supabase.password_reset_confirm_view, name='password_reset_confirm'),
+    path('auth/update-password/', auth_supabase.update_password_view, name='update_password'),
+    
     # Dashboard
     path('', views_dashboard.dashboard, name='dashboard'),
     

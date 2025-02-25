@@ -2,9 +2,11 @@ from django.conf import settings
 from supabase import create_client, Client
 from django.contrib.auth.models import User
 from django.contrib.auth import login
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.contrib import messages
 from .models_eduzz import UserSubscription, ClientePlanilha
+from django.http import JsonResponse
+import json
 
 supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
@@ -252,3 +254,52 @@ def update_password(request, new_password):
     except Exception as e:
         messages.error(request, f'Erro ao atualizar senha: {str(e)}')
         return False
+
+def password_reset_confirm_view(request, token):
+    """View para processar o token de redefinição de senha"""
+    try:
+        # Verificar se o token é válido
+        response = supabase.auth.verify_otp({
+            "token": token,
+            "type": "recovery"
+        })
+        
+        if response.user:
+            # Token válido, mostrar formulário de nova senha
+            return render(request, 'registration/new_password.html', {
+                'token': token,
+                'email': response.user.email
+            })
+        else:
+            messages.error(request, 'Link de redefinição de senha inválido ou expirado.')
+            return redirect('login')
+            
+    except Exception as e:
+        messages.error(request, 'Erro ao verificar o token de redefinição de senha.')
+        return redirect('login')
+
+def update_password_view(request):
+    """View para atualizar a senha do usuário via API"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Método não permitido'}, status=405)
+        
+    try:
+        data = json.loads(request.body)
+        new_password = data.get('password')
+        
+        if not new_password:
+            return JsonResponse({'success': False, 'message': 'Senha não fornecida'}, status=400)
+            
+        # Atualizar senha no Supabase
+        response = supabase.auth.update_user({
+            "password": new_password
+        })
+        
+        if response.user:
+            messages.success(request, 'Senha atualizada com sucesso!')
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'message': 'Erro ao atualizar senha'})
+            
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})
