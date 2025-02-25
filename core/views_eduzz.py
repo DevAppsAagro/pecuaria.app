@@ -553,7 +553,7 @@ def webhook_eduzz(request):
                             
                             context = {
                                 'name': user.get_full_name() or user.username,
-                                'login_url': settings.BASE_URL + reverse('account_reset_password'),
+                                'login_url': settings.BASE_URL + reverse('reset_password'),
                                 'email': user.email,
                                 'base_url': settings.BASE_URL
                             }
