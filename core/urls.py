@@ -16,12 +16,14 @@ from . import views_config
 from . import importacao_views
 from . import views_account
 from . import views_eduzz
+from . import views_stripe
 from . import auth_supabase
 
 urlpatterns = [
     # Auth
     path('auth/redefinir-senha/<str:token>/', auth_supabase.password_reset_confirm_view, name='password_reset_confirm'),
     path('auth/update-password/', auth_supabase.update_password_view, name='update_password'),
+    path('logout/', views.logout_view, name='logout'),
     
     # Dashboard
     path('', views_dashboard.dashboard, name='dashboard'),
@@ -235,6 +237,34 @@ urlpatterns = [
     # Configurações
     path('config/selecionar-fazenda/', views_config.selecionar_fazenda, name='selecionar_fazenda'),
     
+    # Eduzz Integration
+    path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
+    path('api/eduzz/test/', views_eduzz.test_eduzz_connection, name='test_eduzz'),
+    path('api/eduzz/sync-sales/', views_eduzz.sync_eduzz_sales, name='sync_eduzz_sales'),
+    path('api/eduzz/checkout/', views_eduzz.create_checkout, name='eduzz_checkout'),
+    path('api/eduzz/return/', views_eduzz.eduzz_return, name='eduzz_return'),
+    path('eduzz/checkout/', views_eduzz.checkout_page, name='eduzz_checkout_page'),
+    
+    # Eduzz Planos
+    path('planos/', views_eduzz.planos_view, name='planos'),
+    path('planos/verificar-email/', views_eduzz.verificar_email, name='verificar_email_plano'),
+    path('planos/mensal/', views_eduzz.plano_mensal, name='plano_mensal'),
+    path('planos/anual/', views_eduzz.plano_anual, name='plano_anual'),
+    path('checkout/<str:plan_id>/', views_eduzz.checkout_plano, name='checkout_plano'),
+    path('assinatura/', views_eduzz.assinatura, name='assinatura'),
+    path('assinatura/alterar-plano/', views_eduzz.alterar_plano, name='alterar_plano'),
+    
+    # Stripe Endpoints
+    path('stripe/plans/', views_stripe.planos, name='stripe_plans'),
+    path('stripe/checkout/<str:price_id>/', views_stripe.checkout_session, name='checkout_session'),
+    path('stripe/success/', views_stripe.stripe_success, name='stripe_success'),
+    path('stripe/cancel/', views_stripe.stripe_cancel, name='stripe_cancel'),
+    path('stripe/webhook/', views_stripe.webhook_stripe, name='webhook_stripe'),
+    path('stripe/webhook-check/', views_stripe.stripe_webhook_check, name='stripe_webhook_check'),
+    path('stripe/portal/', views_stripe.portal_stripe, name='stripe_customer_portal'),
+    path('stripe/cortesia/', views_stripe.cortesia, name='stripe_cortesia'),
+    path('planos-stripe/', views_stripe.planos, name='planos_stripe'),
+    
     # APIs
     path('api/get-cidade-coordenadas/', views.get_cidade_coordenadas, name='get_cidade_coordenadas'),
     path('api/buscar_animal/<str:brinco>/', views.buscar_animal, name='buscar_animal'),
@@ -251,33 +281,6 @@ urlpatterns = [
     # APIs para filtros dinâmicos
     path('api/pastos-por-fazenda/<int:fazenda_id>/', views.get_pastos_por_fazenda, name='api_pastos_por_fazenda'),
     path('api/lotes-por-fazenda/<int:fazenda_id>/', views.get_lotes_por_fazenda, name='api_lotes_por_fazenda'),
-    
-    # Eduzz Integration
-    path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
-    path('api/eduzz/checkout/', views_eduzz.create_checkout, name='eduzz_checkout'),
-    path('eduzz/checkout/', views_eduzz.checkout_page, name='eduzz_checkout_page'),
-    
-    # Planos e Checkout
-    path('planos/', views_eduzz.planos, name='planos'),
-    path('planos/verificar-email/', views_eduzz.verificar_email, name='verificar_email'),
-    path('planos/mensal/', views_eduzz.plano_mensal, name='plano_mensal'),
-    path('planos/anual/', views_eduzz.plano_anual, name='plano_anual'),
-    
-    # URLs de planos e assinatura
-    path('planos/', views_eduzz.planos_view, name='planos'),
-    path('assinatura/', views_eduzz.assinatura, name='assinatura'),
-    path('assinatura/alterar-plano/', views_eduzz.alterar_plano, name='alterar_plano'),
-    path('checkout/<str:plan_id>/', views_eduzz.checkout_plano, name='checkout_plano'),
-    path('webhook/eduzz/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
-    path('test-eduzz-connection/', views_eduzz.test_eduzz_connection, name='test_eduzz_connection'),
-    
-    # Eduzz
-    path('planos/', views_eduzz.planos, name='planos'),
-    path('plano-mensal/', views_eduzz.plano_mensal, name='plano_mensal'),
-    path('plano-anual/', views_eduzz.plano_anual, name='plano_anual'),
-    path('verificar-email/', views_eduzz.verificar_email, name='verificar_email'),
-    path('checkout/<str:plan_id>/', views_eduzz.checkout_plano, name='checkout_plano'),
-    path('sync-eduzz-sales/', views_eduzz.sync_eduzz_sales, name='sync_eduzz_sales'),
     
     # Configurações - Raças
     path('configuracoes/racas/', views.raca_list, name='raca_list'),
@@ -340,11 +343,6 @@ urlpatterns = [
     path('auth/redefinir-senha/<str:token>/', views.redefinir_senha_view, name='redefinir_senha'),
     path('verify-email/', views.verificar_email_view, name='verify_email'),
     
-    # Eduzz URLs
-    path('planos/', views_eduzz.planos_view, name='planos'),
-    path('planos/checkout/<str:plan_id>/', views_eduzz.checkout_plano, name='checkout_plano'),
-    path('planos/verificar-email/', views_eduzz.verificar_email, name='verificar_email_plano'),
-    
     # Outras URLs
     path('aguardando-pagamento/', views.awaiting_payment, name='awaiting_payment'),
     path('configuracoes/', views.configuracoes, name='configuracoes'),
@@ -360,13 +358,4 @@ urlpatterns = [
     
     # Adicionando URL para a página de verificação de email
     path('verificar-email/', views.verificar_email_view, name='verificar_email'),
-    
-    # URLs da Eduzz
-    path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
-    path('api/eduzz/return/', views_eduzz.eduzz_return, name='eduzz_return'),
-    
-    # Endpoints Eduzz
-    path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
-    path('api/eduzz/test/', views_eduzz.test_eduzz_connection, name='test_eduzz'),
-    path('api/eduzz/sync-sales/', views_eduzz.sync_eduzz_sales, name='sync_eduzz_sales'),
 ]

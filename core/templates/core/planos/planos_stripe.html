@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+<script src="https://js.stripe.com/v3/"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    {% if error %}
+    <div class="alert alert-danger">
+        <p>{{ error }}</p>
+    </div>
+    {% endif %}
+
+    <div class="text-center mb-5">
+        <h2 class="display-4">Escolha seu Plano</h2>
+        <p class="lead">Selecione o plano ideal para sua fazenda</p>
+        {% if user.is_authenticated %}
+        <p class="text-muted">Usuário: {{ user.email }}</p>
+        {% endif %}
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-2 g-4 justify-content-center">
+        <!-- Plano Mensal -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-secondary text-white text-center py-4">
+                    <h3 class="my-0 fw-normal">Plano Mensal</h3>
+                </div>
+                <div class="card-body">
+                    <h1 class="card-title pricing-card-title text-center mb-4">
+                        R$ 49,90
+                        <small class="text-muted fw-light">/mês</small>
+                    </h1>
+                    
+                    <ul class="list-unstyled mt-3 mb-4">
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Controle completo do rebanho
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Controle financeiro
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Relatórios gerenciais
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Acesso a todas as funcionalidades
+                        </li>
+                    </ul>
+                    
+                    <div class="text-center mt-4">
+                        <a href="{% url 'stripe_checkout' stripe_mensal_price_id %}" class="btn btn-lg btn-outline-primary w-100">
+                            Assinar Agora
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Plano Anual -->
+        <div class="col">
+            <div class="card h-100 shadow-sm border-primary">
+                <div class="card-header bg-primary text-white text-center py-4">
+                    <h3 class="my-0 fw-normal">Plano Anual</h3>
+                    <span class="badge bg-warning text-dark mt-2">Melhor Valor!</span>
+                </div>
+                <div class="card-body">
+                    <h1 class="card-title pricing-card-title text-center mb-4">
+                        R$ 39,90
+                        <small class="text-muted fw-light">/mês</small>
+                    </h1>
+                    <p class="text-center text-success fw-bold">Economize R$ 120,00 por ano!</p>
+                    
+                    <ul class="list-unstyled mt-3 mb-4">
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Controle completo do rebanho
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Controle financeiro
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Relatórios gerenciais
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            Acesso a todas as funcionalidades
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            <strong>Suporte prioritário</strong>
+                        </li>
+                    </ul>
+                    
+                    <div class="text-center mt-4">
+                        <a href="{% url 'stripe_checkout' stripe_anual_price_id %}" class="btn btn-lg btn-primary w-100">
+                            Assinar Agora
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-12 text-center">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h4>Experimente Grátis por 7 dias</h4>
+                    <p>Acesse todas as funcionalidades do sistema sem compromisso</p>
+                    <a href="{% url 'stripe_cortesia' %}" class="btn btn-success">Começar Período de Teste</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-5">
+        <p class="text-muted">
+            <i class="bi bi-shield-check"></i>
+            Pagamento 100% seguro via Stripe
+        </p>
+        <p class="text-muted small">
+            <i class="bi bi-lock"></i>
+            Suas informações de pagamento são processadas com segurança pela Stripe.
+            Não armazenamos seus dados de cartão.
+        </p>
+    </div>
+</div>
+{% endblock %}

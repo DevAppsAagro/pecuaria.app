@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-body text-center p-5">
+                    <div class="mb-4">
+                        <i class="bi bi-x-circle text-secondary" style="font-size: 5rem;"></i>
+                    </div>
+                    <h1 class="display-5 mb-4">Pagamento Cancelado</h1>
+                    <p class="lead mb-4">
+                        Seu processo de assinatura foi cancelado. Nenhum valor foi cobrado.
+                    </p>
+                    <p class="mb-5">
+                        Se você tiver alguma dúvida ou precisar de ajuda, por favor entre em contato conosco.
+                    </p>
+                    <div class="mt-4">
+                        <a href="{% url 'planos_stripe' %}" class="btn btn-primary btn-lg me-2">
+                            Voltar para Planos
+                        </a>
+                        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary btn-lg">
+                            Ir para o Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

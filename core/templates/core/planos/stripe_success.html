@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-success">
+                <div class="card-body text-center p-5">
+                    <div class="mb-4">
+                        <i class="bi bi-check-circle-fill text-success" style="font-size: 5rem;"></i>
+                    </div>
+                    <h1 class="display-5 mb-4">Pagamento Confirmado!</h1>
+                    <p class="lead mb-4">
+                        Sua assinatura foi criada com sucesso. Você já tem acesso a todas as 
+                        funcionalidades do Pecuarista Pro.
+                    </p>
+                    <div class="mt-5">
+                        <a href="{% url 'dashboard' %}" class="btn btn-primary btn-lg px-5">
+                            Ir para o Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Redireciona automaticamente após 3 segundos
+    setTimeout(function() {
+        window.location.href = "{% url 'dashboard' %}";
+    }, 3000);
+</script>
+{% endblock %}
