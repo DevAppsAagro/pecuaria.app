@@ -2,6 +2,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from .models_compras import Compra
 from .models import ContaBancaria
+from datetime import date
 
 class ParcelaCompra(models.Model):
     STATUS_CHOICES = [
@@ -32,28 +33,32 @@ class ParcelaCompra(models.Model):
     def valor_restante(self):
         return self.valor - self.valor_pago
 
-    def save(self, *args, **kwargs):
-        # Atualiza o status baseado nos pagamentos
-        from datetime import date
+    def atualizar_status(self):
+        """Atualiza o status da parcela com base nos pagamentos realizados"""
+        valor_pago = self.valor_pago
         
+        if valor_pago >= self.valor:
+            novo_status = 'PAGO'
+        elif valor_pago > 0:
+            novo_status = 'PARCIAL'
+        elif self.data_vencimento < date.today():
+            novo_status = 'VENCIDO'
+        else:
+            novo_status = 'PENDENTE'
+        
+        # Só atualiza se o status mudou para evitar recursão
+        if self.status != novo_status:
+            self.status = novo_status
+            models.Model.save(self, update_fields=['status'])
+
+    def save(self, *args, **kwargs):
         # Primeiro salva a parcela
         is_new = self.pk is None
         super().save(*args, **kwargs)
         
-        # Depois atualiza o status
-        if not is_new:  # Só atualiza o status se não for uma nova parcela
-            valor_pago = self.valor_pago
-            
-            if valor_pago >= self.valor:
-                self.status = 'PAGO'
-            elif valor_pago > 0:
-                self.status = 'PARCIAL'
-            elif self.data_vencimento < date.today():
-                self.status = 'VENCIDO'
-            else:
-                self.status = 'PENDENTE'
-                
-            super().save(update_fields=['status'])
+        # Depois atualiza o status se não for uma nova parcela
+        if not is_new and 'update_fields' not in kwargs:
+            self.atualizar_status()
 
 
 class PagamentoParcela(models.Model):
@@ -80,4 +85,4 @@ class PagamentoParcela(models.Model):
         self.clean()
         super().save(*args, **kwargs)
         # Atualiza o status da parcela
-        self.parcela.save()
+        self.parcela.atualizar_status()

@@ -157,6 +157,25 @@
     .dataTables_length select {
         padding-right: 30px !important;  /* Espaço para a seta */
     }
+    
+    /* Correção para dropdown não ser cortado pelo DataTable */
+    .dropdown-menu {
+        z-index: 1100 !important;
+        position: absolute !important;
+    }
+    
+    /* Garantir que o DataTable não corte elementos */
+    .dataTables_wrapper {
+        overflow: visible !important;
+    }
+    
+    .table-responsive {
+        overflow: visible !important;
+    }
+    
+    .dropdown-menu.show {
+        display: block !important;
+    }
 </style>
 {% endblock %}
 
@@ -442,7 +461,16 @@
                     orderable: false,
                     searchable: false
                 }
-            ]
+            ],
+            // Adicionar configuração para reposicionar os elementos do dropdown
+            drawCallback: function() {
+                $('.dropdown-menu').css('position', 'absolute');
+                $('.btn-group').on('show.bs.dropdown', function() {
+                    setTimeout(function() {
+                        $('.dropdown-menu.show').css('z-index', '1100');
+                    }, 10);
+                });
+            }
         });
 
         // Função para carregar subcategorias

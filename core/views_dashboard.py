@@ -88,21 +88,187 @@ def atualizar_dashboard(request):
     Endpoint para atualizar os dados do dashboard via AJAX
     """
     fazenda_id = request.GET.get('fazenda')
-    data_inicio = request.GET.get('data_inicio')
-    data_fim = request.GET.get('data_fim')
     
-    # Filtra por fazenda se especificado
+    # Inicializa resposta
+    data = {
+        'success': True,
+        'indicadores': {},
+        'pastos': [],
+        'benfeitorias': [],
+        'evolucao_rebanho': [],
+        'financeiro': [],
+        'animais_por_categoria': []
+    }
+    
+    # Obtém a fazenda selecionada se um ID foi fornecido
     if fazenda_id:
-        despesa_filter = {'itens__fazenda_destino_id': fazenda_id, 'usuario': request.user}
-        extrato_filter = {'conta__fazenda_id': fazenda_id, 'usuario': request.user}
+        try:
+            fazenda = Fazenda.objects.get(id=fazenda_id, usuario=request.user)
+            
+            # Dados dos pastos da fazenda
+            pastos = Pasto.objects.filter(fazenda=fazenda)
+            pastos_data = []
+            
+            for pasto in pastos:
+                # Conta o número de animais no pasto
+                qtd_animais = Animal.objects.filter(
+                    pasto_atual=pasto,
+                    status='ativo'
+                ).count()
+                
+                pastos_data.append({
+                    'id': pasto.id,
+                    'nome': pasto.nome,
+                    'area': pasto.area,
+                    'coordenadas': pasto.coordenadas,
+                    'qtd_animais': qtd_animais,
+                    'fazenda': {
+                        'id': fazenda.id,
+                        'nome': fazenda.nome
+                    }
+                })
+            
+            data['pastos'] = pastos_data
+            
+            # Dados das benfeitorias
+            benfeitorias = Benfeitoria.objects.filter(fazenda=fazenda)
+            benfeitorias_data = []
+            
+            for benfeitoria in benfeitorias:
+                benfeitorias_data.append({
+                    'id': benfeitoria.id,
+                    'nome': benfeitoria.nome,
+                    'coordenadas': benfeitoria.coordenadas,
+                    'valor_compra': float(benfeitoria.valor_compra),
+                    'data_aquisicao': benfeitoria.data_aquisicao.strftime('%d/%m/%Y') if benfeitoria.data_aquisicao else None
+                })
+            
+            data['benfeitorias'] = benfeitorias_data
+            
+            # Evolução do rebanho dos últimos 6 meses
+            hoje = datetime.now().date()
+            meses = []
+            for i in range(5, -1, -1):
+                mes_data = hoje.replace(day=1) - timedelta(days=i*30)
+                meses.append(mes_data)
+            
+            evolucao_data = []
+            
+            for mes in meses:
+                inicio_mes = mes.replace(day=1)
+                fim_mes = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                
+                # Contagem de nascimentos no mês
+                nascimentos = Animal.objects.filter(
+                    data_nascimento__range=[inicio_mes, fim_mes],
+                    fazenda_atual=fazenda
+                ).count()
+                
+                # Contagem de vendas no mês
+                vendas = ExtratoBancario.objects.filter(
+                    tipo='venda',
+                    data__range=[inicio_mes, fim_mes],
+                    conta__fazenda=fazenda
+                ).count()
+                
+                # Contagem de abates no mês
+                abates = ExtratoBancario.objects.filter(
+                    tipo='abate',
+                    data__range=[inicio_mes, fim_mes],
+                    conta__fazenda=fazenda
+                ).count()
+                
+                # Contagem de compras no mês
+                compras = Animal.objects.filter(
+                    data_compra__range=[inicio_mes, fim_mes],
+                    fazenda_atual=fazenda
+                ).count()
+                
+                evolucao_data.append({
+                    'mes': mes.strftime('%b/%Y'),
+                    'nascimentos': nascimentos,
+                    'vendas': vendas,
+                    'abates': abates,
+                    'compras': compras
+                })
+            
+            data['evolucao_rebanho'] = evolucao_data
+            
+            # Dados financeiros dos últimos 6 meses
+            financeiro_data = []
+            
+            for mes in meses:
+                inicio_mes = mes.replace(day=1)
+                fim_mes = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                
+                # Despesas do mês
+                despesas = Despesa.objects.filter(
+                    itens__fazenda_destino=fazenda,
+                    data_vencimento__range=[inicio_mes, fim_mes]
+                ).annotate(
+                    total_itens=Coalesce(Sum('itens__valor_total'), 0, output_field=DecimalField()),
+                    valor_total=F('total_itens') + F('multa_juros') - F('desconto')
+                ).distinct().aggregate(
+                    total=Sum('valor_total')
+                )['total'] or 0
+                
+                # Receitas do mês (vendas e abates)
+                receitas = ExtratoBancario.objects.filter(
+                    Q(tipo='venda') | Q(tipo='abate'),
+                    data__range=[inicio_mes, fim_mes],
+                    conta__fazenda=fazenda
+                ).aggregate(total=Sum('valor'))['total'] or 0
+                
+                # Se o valor for negativo (por causa do sinal), converte para positivo
+                receitas = abs(receitas)
+                
+                financeiro_data.append({
+                    'mes': mes.strftime('%b/%Y'),
+                    'despesas': float(despesas),
+                    'receitas': float(receitas)
+                })
+            
+            data['financeiro'] = financeiro_data
+            
+            # Animais por categoria
+            categorias = Animal.objects.filter(
+                fazenda_atual=fazenda,
+                status='ativo'
+            ).values('categoria_animal__nome').annotate(
+                total=Count('id')
+            ).order_by('categoria_animal__nome')
+            
+            # Calcula o total para percentual
+            total_animais = sum(categoria['total'] for categoria in categorias)
+            
+            categorias_data = []
+            for categoria in categorias:
+                percentual = round((categoria['total'] / total_animais * 100), 1) if total_animais > 0 else 0
+                categorias_data.append({
+                    'categoria_display': categoria['categoria_animal__nome'],
+                    'total': categoria['total'],
+                    'percentual': percentual
+                })
+            
+            data['animais_por_categoria'] = categorias_data
+            
+            # Filtra despesas e receitas para indicadores
+            despesa_filter = {'itens__fazenda_destino': fazenda, 'usuario': request.user}
+            extrato_filter = {'conta__fazenda': fazenda, 'usuario': request.user}
+        
+        except Fazenda.DoesNotExist:
+            data['success'] = False
+            data['message'] = 'Fazenda não encontrada'
+            return JsonResponse(data)
     else:
+        # Se não foi selecionada uma fazenda, usa todos os dados do usuário
         despesa_filter = {'usuario': request.user}
         extrato_filter = {'usuario': request.user}
     
     # Calcula os indicadores baseados nos filtros
     hoje = datetime.now().date()
-    inicio_mes = data_inicio if data_inicio else hoje.replace(day=1)
-    fim_mes = data_fim if data_fim else (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    inicio_mes = hoje.replace(day=1)
+    fim_mes = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
     
     # Despesas do período - soma valor_total dos itens + multa_juros - desconto
     despesas = Despesa.objects.filter(
@@ -125,13 +291,10 @@ def atualizar_dashboard(request):
     # Se o valor for negativo (por causa do sinal), converte para positivo
     receitas = abs(receitas)
     
-    data = {
-        'success': True,
-        'indicadores': {
-            'despesas': round(despesas, 2),
-            'receitas': round(receitas, 2),
-            'resultado': round(receitas - despesas, 2)
-        }
+    data['indicadores'] = {
+        'despesas': round(float(despesas), 2),
+        'receitas': round(float(receitas), 2),
+        'resultado': round(float(receitas - despesas), 2)
     }
     
     return JsonResponse(data)

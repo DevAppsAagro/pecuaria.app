@@ -105,6 +105,23 @@
         background-color: #dc3545;
         color: #fff !important;
     }
+
+    /* Animação para o botão de atualizar saldos */
+    @keyframes pulse-border {
+        0% {
+            box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7);
+        }
+        70% {
+            box-shadow: 0 0 0 10px rgba(0, 123, 255, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(0, 123, 255, 0);
+        }
+    }
+    
+    .btn-pulse {
+        animation: pulse-border 2s infinite;
+    }
 </style>
 {% endblock %}
 
@@ -157,14 +174,21 @@
         </div>
     </div>
 
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Contas Bancárias</h5>
+        <div>
+            <a href="{% url 'atualizar_saldos' %}" class="btn btn-outline-primary btn-sm me-2 btn-pulse">
+                <i class="fas fa-sync-alt"></i> Atualizar Saldos
+            </a>
+            <a href="{% url 'contas_bancarias_create' %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Nova Conta
+            </a>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">Contas Bancárias</h3>
-            <div class="card-tools">
-                <a href="{% url 'contas_bancarias_create' %}" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Nova Conta
-                </a>
-            </div>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -175,7 +199,8 @@
                             <th>Agência</th>
                             <th>Conta</th>
                             <th>Tipo</th>
-                            <th>Saldo</th>
+                            <th>Saldo Inicial</th>
+                            <th>Saldo Atual</th>
                             <th>Data Saldo</th>
                             <th>Status</th>
                             <th>Fazenda</th>
@@ -189,6 +214,7 @@
                             <td>{{ conta.agencia }}</td>
                             <td>{{ conta.conta }}</td>
                             <td>{{ conta.get_tipo_display }}</td>
+                            <td>R$ {{ conta.saldo_inicial|floatformat:2 }}</td>
                             <td>R$ {{ conta.saldo|floatformat:2 }}</td>
                             <td>{{ conta.data_saldo|date:"d/m/Y" }}</td>
                             <td>
@@ -232,9 +258,34 @@
         $('#contas-table').DataTable({
             responsive: true,
             language: {
-                url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
-            }
+                url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json',
+            },
+            ordering: true,
+            paging: true,
+            lengthChange: true,
+            info: true,
+            autoWidth: false
         });
+        
+        // Script para animação do botão de atualizar saldos
+        const btnAtualizar = $('.btn-pulse');
+        
+        // Parar a animação quando o botão for clicado
+        btnAtualizar.on('click', function() {
+            $(this).removeClass('btn-pulse');
+            // Armazenar a informação de que o usuário já clicou no botão
+            localStorage.setItem('atualizouSaldos', 'true');
+        });
+        
+        // Verificar se o usuário já clicou no botão anteriormente
+        if (localStorage.getItem('atualizouSaldos') === 'true') {
+            btnAtualizar.removeClass('btn-pulse');
+        } else {
+            // Se o usuário não clicar no botão, parar a animação após 30 segundos
+            setTimeout(function() {
+                btnAtualizar.removeClass('btn-pulse');
+            }, 30000); // 30 segundos
+        }
     });
 </script>
 {% endblock %}

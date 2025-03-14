@@ -115,7 +115,6 @@
                             <div class="text-xs text-gray-600">
                                 Peso Total: {{ estatisticas_detalhadas.ATIVO.peso_total|floatformat:2 }} kg<br>
                                 Peso Carcaça: {{ estatisticas_detalhadas.ATIVO.peso_carcaca|floatformat:2 }} kg<br>
-                                Arrobas: {{ estatisticas_detalhadas.ATIVO.peso_arroba|floatformat:2 }} @<br>
                                 Arrobas Carcaça: {{ estatisticas_detalhadas.ATIVO.peso_carcaca_arroba|floatformat:2 }} @<br>
                                 Rendimento Médio: {{ estatisticas_detalhadas.ATIVO.rendimento_medio|floatformat:2 }}%
                             </div>
@@ -142,8 +141,12 @@
                         <div class="inner">
                             <h3>{{ estatisticas.stats.VENDIDO.quantidade|default:"0" }}</h3>
                             <p>Vendidos</p>
-                            <p>Peso Total: {{ estatisticas.stats.VENDIDO.peso_total|floatformat:2 }} kg</p>
-                            <p>Arrobas: {{ estatisticas.stats.VENDIDO.peso_arroba|floatformat:2 }} @</p>
+                            <div class="text-xs text-gray-600">
+                                Peso Total: {{ estatisticas_detalhadas.VENDIDO.peso_total|floatformat:2 }} kg<br>
+                                Peso Carcaça: {{ estatisticas_detalhadas.VENDIDO.peso_carcaca|floatformat:2 }} kg<br>
+                                Arrobas Carcaça: {{ estatisticas_detalhadas.VENDIDO.peso_carcaca_arroba|floatformat:2 }} @<br>
+                                Rendimento Médio: {{ estatisticas_detalhadas.VENDIDO.rendimento_medio|floatformat:2 }}%
+                            </div>
                             {% if estatisticas.stats.VENDIDO.variacao != 0 %}
                             <div class="variation">
                                 {% if estatisticas.stats.VENDIDO.variacao > 0 %}
@@ -167,8 +170,13 @@
                         <div class="inner">
                             <h3>{{ estatisticas.stats.MORTO.quantidade|default:"0" }}</h3>
                             <p>Mortos</p>
-                            <p>Peso Total: {{ estatisticas.stats.MORTO.peso_total|floatformat:2 }} kg</p>
-                            <p>Arrobas: {{ estatisticas.stats.MORTO.peso_arroba|floatformat:2 }} @</p>
+                            <div class="text-xs text-gray-600">
+                                Peso Total: {{ estatisticas_detalhadas.MORTO.peso_total|floatformat:2 }} kg<br>
+                                Peso Carcaça: {{ estatisticas_detalhadas.MORTO.peso_carcaca|floatformat:2 }} kg<br>
+                                Arrobas Carcaça: {{ estatisticas_detalhadas.MORTO.peso_carcaca_arroba|floatformat:2 }} @<br>
+                                Rendimento Médio: {{ estatisticas_detalhadas.MORTO.rendimento_medio|floatformat:2 }}%<br>
+                                <span class="text-danger font-weight-bold">Prejuízo Total: R$ {{ estatisticas_detalhadas.MORTO.prejuizo_total|default:"0"|floatformat:2 }}</span>
+                            </div>
                             {% if estatisticas.stats.MORTO.variacao != 0 %}
                             <div class="variation">
                                 {% if estatisticas.stats.MORTO.variacao > 0 %}
@@ -195,7 +203,6 @@
                             <div class="text-xs text-gray-600">
                                 Peso Vivo: {{ estatisticas_detalhadas.ABATIDO.peso_total|floatformat:2 }} kg<br>
                                 Peso Carcaça: {{ estatisticas_detalhadas.ABATIDO.peso_carcaca|floatformat:2 }} kg<br>
-                                Arrobas Vivo: {{ estatisticas_detalhadas.ABATIDO.peso_arroba|floatformat:2 }} @<br>
                                 Arrobas Carcaça: {{ estatisticas_detalhadas.ABATIDO.peso_carcaca_arroba|floatformat:2 }} @<br>
                                 Rendimento: {{ estatisticas_detalhadas.ABATIDO.rendimento_medio|floatformat:2 }}%
                             </div>
@@ -322,6 +329,9 @@
                                 <a href="{% url 'animal_import' %}" class="btn btn-primary">
                                     <i class="fas fa-file-import"></i> Importar Animais
                                 </a>
+                                <a href="{% url 'morte_list' %}" class="btn btn-danger">
+                                    <i class="fas fa-skull-crossbones"></i> Registrar Morte
+                                </a>
                                 <div class="btn-group">
                                     <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                                         <i class="fas fa-tasks"></i> Ações em Massa
@@ -329,6 +339,8 @@
                                     <ul class="dropdown-menu">
                                         <li><a class="dropdown-item" href="#" data-action="move">Movimentar para Pasto</a></li>
                                         <li><a class="dropdown-item" href="#" data-action="move_lot">Movimentar para Lote</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item text-danger" href="#" data-action="delete"><i class="fas fa-trash"></i> Excluir Animais</a></li>
                                     </ul>
                                 </div>
                                 <div class="btn-group">
@@ -409,7 +421,7 @@
                                                     <li><a class="dropdown-item" href="{% url 'animal_detail' animal.pk %}"><i class="bi bi-eye"></i> Visualizar</a></li>
                                                     <li><a class="dropdown-item" href="{% url 'animal_edit' animal.pk %}"><i class="bi bi-pencil"></i> Editar</a></li>
                                                     <li><hr class="dropdown-divider"></li>
-                                                    <li><a class="dropdown-item text-danger" href="{% url 'animal_delete' animal.pk %}"><i class="bi bi-trash"></i> Excluir</a></li>
+                                                    <li><a class="dropdown-item text-danger delete-animal" href="#" data-id="{{ animal.pk }}" data-brinco="{{ animal.brinco_visual|escapejs }}"><i class="bi bi-trash"></i> Excluir</a></li>
                                                 </ul>
                                             </div>
                                         </td>
@@ -466,6 +478,46 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Modal de Confirmação de Exclusão -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="confirmDeleteModalLabel">Confirmar Exclusão</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p>Tem certeza que deseja excluir o animal <strong id="animalBrinco"></strong>?</p>
+        <p class="text-danger"><small>Esta ação não pode ser desfeita.</small></p>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <a href="#" id="confirmDeleteBtn" class="btn btn-sm btn-danger">Excluir</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Confirmação de Exclusão em Massa -->
+<div class="modal fade" id="confirmBulkDeleteModal" tabindex="-1" aria-labelledby="confirmBulkDeleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="confirmBulkDeleteModalLabel">Confirmar Exclusão em Massa</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p>Tem certeza que deseja excluir <strong id="selectedCount">0</strong> animais selecionados?</p>
+        <p class="text-danger"><small>Esta ação não pode ser desfeita.</small></p>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="confirmBulkDeleteBtn" class="btn btn-sm btn-danger">Excluir Selecionados</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- DataTables & Plugins -->
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
@@ -560,7 +612,20 @@
                 return;
             }
             
-            // Submeter o formulário
+            // Se for ação de exclusão, mostrar confirmação
+            if (action === 'delete') {
+                $('#selectedCount').text(selectedCount);
+                var bulkDeleteModal = new bootstrap.Modal(document.getElementById('confirmBulkDeleteModal'));
+                bulkDeleteModal.show();
+                return;
+            }
+            
+            // Para outras ações, submeter o formulário
+            $('#bulk-actions-form').submit();
+        });
+        
+        // Confirmar exclusão em massa
+        $('#confirmBulkDeleteBtn').click(function() {
             $('#bulk-actions-form').submit();
         });
 
@@ -579,6 +644,18 @@
         // Atualizar contador quando houver mudança nas checkboxes
         $('.animal-checkbox').change(updateSelectionCounter);
         $('#select-all').change(updateSelectionCounter);
+        
+        // Handler para link de exclusão individual
+        $('.delete-animal').on('click', function(e) {
+            e.preventDefault();
+            var animalId = $(this).data('id');
+            var brincoVisual = $(this).data('brinco');
+            
+            $('#animalBrinco').text(brincoVisual);
+            $('#confirmDeleteBtn').attr('href', '{% url "animal_delete" 0 %}'.replace('0', animalId));
+            var deleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+            deleteModal.show();
+        });
 
         // Inicializar contador
         updateSelectionCounter();

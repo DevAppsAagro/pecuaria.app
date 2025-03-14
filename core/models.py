@@ -109,11 +109,29 @@ class Animal(models.Model):
     fazenda_atual = models.ForeignKey(Fazenda, on_delete=models.PROTECT, verbose_name='Fazenda Atual')
     pasto_atual = models.ForeignKey('Pasto', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Pasto Atual')
     data_saida = models.DateField('Data de Saída', null=True, blank=True)
+    
+    # Campos de origem genética
+    mae = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Mãe', related_name='filhos')
+    ORIGEM_PATERNA_CHOICES = [
+        ('ANIMAL', 'Animal'),
+        ('SEMEN', 'Sêmen')
+    ]
+    tipo_origem_paterna = models.CharField('Tipo Origem Paterna', max_length=10, choices=ORIGEM_PATERNA_CHOICES, null=True, blank=True)
+    pai = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Pai', related_name='filhos_pai')
+    # O campo para sêmen será implementado posteriormente
+    
+    # Campo para registro de nascimento
+    estacao_monta = models.ForeignKey(EstacaoMonta, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Estação de Monta')
+    # codigo_semen = models.CharField('Código do Sêmen', max_length=50, null=True, blank=True)
+    
+    # Campos financeiros
     valor_compra = models.DecimalField('Valor de Compra (R$)', max_digits=10, decimal_places=2, null=True, blank=True)
     custo_fixo = models.DecimalField('Custo Fixo (R$)', max_digits=10, decimal_places=2, default=0)
     custo_variavel = models.DecimalField('Custo Variável (R$)', max_digits=10, decimal_places=2, default=0)
     valor_total = models.DecimalField('Valor Total (R$)', max_digits=10, decimal_places=2, default=0)
     valor_venda = models.DecimalField('Valor de Venda/Abate (R$)', max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    # Campos de peso
     primeiro_peso = models.DecimalField('Primeiro Peso (kg)', max_digits=7, decimal_places=2, null=True, blank=True)
     data_primeiro_peso = models.DateField('Data do Primeiro Peso', null=True, blank=True)
     
@@ -516,6 +534,10 @@ class Despesa(models.Model):
         return self.itens.aggregate(total=Sum('valor_total'))['total'] or Decimal('0.00')
     
     def valor_final(self):
+        # Se a despesa já foi paga, o valor total dos itens já incorpora o ajuste de multa/juros e desconto
+        if self.status == 'PAGO':
+            return self.valor_total()
+        # Caso contrário, calcula normalmente para despesas pendentes
         return self.valor_total() + self.multa_juros - self.desconto
     
     @property
@@ -596,8 +618,8 @@ class ItemDespesa(models.Model):
         self.valor_total = self.quantidade * self.valor_unitario
         super().save(*args, **kwargs)
         
-        # Faz o rateio após salvar
-        self.realizar_rateio()
+        # O rateio não será feito automaticamente aqui
+        # Será feito apenas quando a despesa for paga (via função pagar_despesa)
 
     def realizar_rateio(self):
         # Se for item de estoque, não faz rateio
@@ -639,8 +661,12 @@ class ItemDespesa(models.Model):
 
         # Se houver animais para ratear
         if animais and animais.exists():
+            # Removemos qualquer rateio anterior relacionado a este item de despesa
+            RateioCusto.objects.filter(item_despesa=self).delete()
+            
+            # Utilizamos diretamente o valor_total do item (que já foi ajustado na função pagar_despesa)
             valor_por_animal = self.valor_total / animais.count()
-            print(f"Valor por animal: R$ {valor_por_animal}")
+            print(f"Valor do item: R$ {self.valor_total}, Valor por animal: R$ {valor_por_animal}")
             
             # Registra o rateio para cada animal
             for animal in animais:
@@ -794,6 +820,7 @@ class ContaBancaria(models.Model):
     agencia = models.CharField('Agência', max_length=20, blank=True, null=True)
     conta = models.CharField('Número da Conta', max_length=20, blank=True, null=True)
     tipo = models.CharField('Tipo de Conta', max_length=2, choices=TIPO_CHOICES, default='CC')
+    saldo_inicial = models.DecimalField('Saldo Inicial', max_digits=15, decimal_places=2, default=0)
     saldo = models.DecimalField('Saldo Atual', max_digits=15, decimal_places=2, default=0)
     data_saldo = models.DateField('Data do Saldo', default=timezone.now)
     ativa = models.BooleanField('Conta Ativa', default=True)
@@ -907,6 +934,90 @@ class ManejoSanitario(models.Model):
     
     def __str__(self):
         return f"{self.animal.brinco_visual} - {self.tipo_manejo} em {self.data}"
+        
+    def delete(self, *args, **kwargs):
+        # Salvar referência ao animal
+        animal = self.animal
+        data_manejo = self.data
+        
+        # Encontrar movimentações deste animal na data do manejo
+        movimentacoes = MovimentacaoAnimal.objects.filter(
+            animal=animal,
+            data_movimentacao=data_manejo
+        )
+        
+        # Verificar se existem movimentações a serem excluídas
+        if movimentacoes.exists():
+            # Buscar a movimentação anterior mais recente para lote (se existir movimentação de lote na data do manejo)
+            if movimentacoes.filter(tipo='LOTE').exists():
+                movimentacao_lote_anterior = MovimentacaoAnimal.objects.filter(
+                    animal=animal,
+                    tipo='LOTE',
+                    data_movimentacao__lt=data_manejo
+                ).order_by('-data_movimentacao').first()
+                
+                # Se encontrou movimentação anterior, restaura o lote do animal
+                if movimentacao_lote_anterior and movimentacao_lote_anterior.lote_destino:
+                    animal.lote = movimentacao_lote_anterior.lote_destino
+                
+            # Buscar a movimentação anterior mais recente para pasto (se existir movimentação de pasto na data do manejo)
+            if movimentacoes.filter(tipo='PASTO').exists():
+                movimentacao_pasto_anterior = MovimentacaoAnimal.objects.filter(
+                    animal=animal,
+                    tipo='PASTO',
+                    data_movimentacao__lt=data_manejo
+                ).order_by('-data_movimentacao').first()
+                
+                # Se encontrou movimentação anterior, restaura o pasto do animal
+                if movimentacao_pasto_anterior and movimentacao_pasto_anterior.pasto_destino:
+                    animal.pasto_atual = movimentacao_pasto_anterior.pasto_destino
+            
+            # Salvar as alterações no animal se houve alguma mudança
+            animal.save()
+            
+            # Excluir todas as movimentações da data do manejo
+            movimentacoes.delete()
+        
+        # Executar a deleção normal do objeto
+        super(ManejoSanitario, self).delete(*args, **kwargs)
+
+class RegistroMorte(models.Model):
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='registros_morte')
+    animal = models.ForeignKey('Animal', on_delete=models.CASCADE, related_name='registros_morte')
+    motivo = models.ForeignKey(MotivoMorte, on_delete=models.CASCADE, related_name='registros_morte')
+    data_morte = models.DateField()
+    observacao = models.TextField(blank=True, null=True)
+    prejuizo = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    data_registro = models.DateTimeField(auto_now_add=True)
+    data_atualizacao = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Registro de Morte'
+        verbose_name_plural = 'Registros de Morte'
+        ordering = ['-data_morte']
+
+    def __str__(self):
+        return f'Morte do animal {self.animal.brinco_visual} em {self.data_morte}'
+
+    def save(self, *args, **kwargs):
+        # Ao salvar um registro de morte, atualiza o status do animal para MORTO
+        atualizar_animal = False
+        if self.pk is None:  # Novo registro
+            atualizar_animal = True
+        super(RegistroMorte, self).save(*args, **kwargs)
+        
+        if atualizar_animal:
+            self.animal.situacao = 'MORTO'
+            self.animal.save(update_fields=['situacao'])
+
+    def delete(self, *args, **kwargs):
+        animal = self.animal
+        super(RegistroMorte, self).delete(*args, **kwargs)
+        
+        # Verifica se não existem outros registros de morte para este animal
+        if not RegistroMorte.objects.filter(animal=animal).exists():
+            animal.situacao = 'ATIVO'
+            animal.save(update_fields=['situacao'])
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)

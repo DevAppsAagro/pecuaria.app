@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from .models import Animal, Lote, Pesagem, RateioCusto, Fazenda, CategoriaCusto, Despesa
+from .models import Animal, Lote, Pesagem, RateioCusto, Fazenda, CategoriaCusto, Despesa, MovimentacaoNaoOperacional
 from .models_compras import Compra
 from .models_vendas import Venda
 from .models_abates import Abate
@@ -9,8 +9,11 @@ from .models_estoque import RateioMovimentacao
 from decimal import Decimal
 import json
 from django.db import models
-from datetime import datetime
+from datetime import datetime, date
 from django.utils import timezone
+from datetime import timedelta
+from django.db.models import Q, ExpressionWrapper, DecimalField
+from django.db.models import Sum
 
 @login_required
 def relatorios_view(request):
@@ -279,229 +282,472 @@ def relatorio_confinamento(request):
 
 @login_required
 def relatorio_dre(request):
+    """
+    Página do DRE (Demonstrativo de Resultados do Exercício)
+    """
+    # Obter fazendas do usuário para filtro
+    fazendas = Fazenda.objects.filter(usuario=request.user)
+    
+    # Filtros
+    data_inicial_str = request.GET.get('data_inicial')
+    data_final_str = request.GET.get('data_final')
+    fazenda_id = request.GET.get('fazenda_id')
+    
+    # Dados do relatório
+    dados_dre = None
+    if data_inicial_str and data_final_str:
+        # Processar filtros e obter dados do relatório (função atualizar_dre_dados)
+        try:
+            data_inicial = datetime.strptime(data_inicial_str, '%Y-%m-%d').date()
+            data_final = datetime.strptime(data_final_str, '%Y-%m-%d').date()
+            dados_dre = atualizar_dre_dados(request.user, data_inicial, data_final, fazenda_id)
+        except ValueError as e:
+            print(f"Erro ao processar datas: {e}")
+    
     context = {
-        'fazendas': Fazenda.objects.filter(usuario=request.user)
+        'fazendas': fazendas,
+        'dados_dre': dados_dre,
+        'filtros': {
+            'data_inicial': data_inicial_str,
+            'data_final': data_final_str,
+            'fazenda_id': fazenda_id,
+        }
     }
+    
     return render(request, 'Relatorios/dre.html', context)
+
+def atualizar_dre_dados(usuario, data_inicial, data_final, fazenda_id=None):
+    """
+    Função auxiliar para processar os dados do DRE
+    """
+    print(f"Período: {data_inicial} a {data_final}")
+
+    # PARTE 1: DADOS PARA RESULTADO OPERACIONAL
+    
+    # 1.1 RECEITAS OPERACIONAIS: Abates
+    # Busca direto na tabela Abate com filtro por data
+    receitas_abates = 0
+    if data_inicial and data_final:
+        filtro_abates = {'data__range': [data_inicial, data_final], 'usuario': usuario}
+        if fazenda_id:
+            # Filtro da fazenda é aplicado nos animais
+            abates = Abate.objects.filter(usuario=usuario, data__range=[data_inicial, data_final])
+            total_abate = 0
+            for abate in abates:
+                # Verifica a fazenda nos animais abatidos
+                for animal_abate in abate.animais.all():
+                    if animal_abate.animal.fazenda_atual_id == int(fazenda_id):
+                        total_abate += float(animal_abate.valor_total)
+            receitas_abates = float(total_abate)
+        else:
+            # Sem filtro de fazenda, computa o valor total dos abates manualmente
+            abates = Abate.objects.filter(
+                usuario=usuario, 
+                data__range=[data_inicial, data_final]
+            )
+            
+            total_abate = 0
+            for abate in abates:
+                # Calcular o total manualmente em vez de usar o property
+                abate_total = abate.animais.aggregate(total=Sum('valor_total'))['total'] or 0
+                total_abate += float(abate_total)
+                
+            receitas_abates = float(total_abate)
+
+    # 1.2 RECEITAS OPERACIONAIS: Vendas
+    # Busca direto na tabela Venda com filtro por data
+    receitas_vendas = 0
+    if data_inicial and data_final:
+        filtro_vendas = {'data__range': [data_inicial, data_final], 'usuario': usuario}
+        if fazenda_id:
+            # Filtro da fazenda é aplicado nos animais
+            vendas = Venda.objects.filter(usuario=usuario, data__range=[data_inicial, data_final])
+            total_venda = 0
+            for venda in vendas:
+                # Verifica a fazenda nos animais vendidos
+                for animal_venda in venda.animais.all():
+                    if animal_venda.animal.fazenda_atual_id == int(fazenda_id):
+                        total_venda += float(animal_venda.valor_total)
+            receitas_vendas = float(total_venda)
+        else:
+            # Sem filtro de fazenda, computa o valor total das vendas manualmente
+            vendas = Venda.objects.filter(
+                usuario=usuario, 
+                data__range=[data_inicial, data_final]
+            )
+            
+            total_venda = 0
+            for venda in vendas:
+                # Calcular o total manualmente em vez de usar o property
+                venda_total = venda.animais.aggregate(total=Sum('valor_total'))['total'] or 0
+                total_venda += float(venda_total)
+                
+            receitas_vendas = float(total_venda)
+    
+    # Total das receitas operacionais
+    receitas_totais = float(receitas_abates + receitas_vendas)
+    
+    # Converter para float para evitar problemas de tipo em operações posteriores
+    receitas_totais_float = float(receitas_totais)
+    receitas_abates_float = float(receitas_abates)
+    receitas_vendas_float = float(receitas_vendas)
+
+    # Percentuais das receitas
+    percentual_abate = (receitas_abates_float / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+    percentual_vendas = (receitas_vendas_float / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+
+    # 2. CUSTOS OPERACIONAIS
+    # 2.1 CUSTOS FIXOS (Despesas com categorias fixas)
+    # Busca através de ItemDespesa com filtro por tipo de categoria "FIXO"
+    filtro_despesas_fixas = {
+        'usuario': usuario,
+        'data_emissao__range': [data_inicial, data_final], 
+        'itens__categoria__tipo': 'fixo'  
+    }
+    if fazenda_id:
+        filtro_despesas_fixas['itens__fazenda_destino_id'] = fazenda_id
+
+    # Agrupar por categoria
+    custos_fixos_por_categoria = Despesa.objects.filter(**filtro_despesas_fixas).values(
+        'itens__categoria__nome', 'itens__categoria_id'
+    ).annotate(
+        total=Sum('itens__valor_total')
+    ).order_by('itens__categoria__nome')
+
+    # Detalhar as subcategorias
+    custos_fixos = []
+    total_custos_fixos = 0
+
+    for categoria in custos_fixos_por_categoria:
+        valor_categoria = float(categoria['total'])
+        total_custos_fixos += valor_categoria
+        
+        # Buscar subcategorias (itens de despesa agrupados)
+        filtro_subcategoria = {
+            'data_emissao__range': [data_inicial, data_final],
+            'usuario': usuario,
+            'itens__categoria_id': categoria['itens__categoria_id']
+        }
+        if fazenda_id:
+            filtro_subcategoria['itens__fazenda_destino_id'] = fazenda_id
+            
+        subcategorias = Despesa.objects.filter(**filtro_subcategoria).values(
+            'itens__subcategoria__nome'
+        ).annotate(
+            total=Sum('itens__valor_total')
+        ).order_by('-total')
+        
+        subcategorias_formatadas = []
+        for sub in subcategorias:
+            subcategorias_formatadas.append({
+                'nome': sub['itens__subcategoria__nome'],
+                'valor': float(sub['total']),
+                'percentual': (float(sub['total']) / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+            })
+        
+        # Adicionar categoria com suas subcategorias
+        custos_fixos.append({
+            'nome': categoria['itens__categoria__nome'],
+            'valor': float(valor_categoria),
+            'percentual': (float(valor_categoria) / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0,
+            'subcategorias': subcategorias_formatadas
+        })
+
+    # 2.2 CUSTOS VARIÁVEIS (Despesas com categorias variáveis)
+    # Busca através de ItemDespesa com filtro por tipo de categoria "VARIÁVEL"
+    filtro_despesas_variaveis = {
+        'usuario': usuario,
+        'data_emissao__range': [data_inicial, data_final], 
+        'itens__categoria__tipo': 'variavel'  
+    }
+    if fazenda_id:
+        filtro_despesas_variaveis['itens__fazenda_destino_id'] = fazenda_id
+
+    # Agrupar por categoria
+    custos_variaveis_por_categoria = Despesa.objects.filter(**filtro_despesas_variaveis).values(
+        'itens__categoria__nome', 'itens__categoria_id'
+    ).annotate(
+        total=Sum('itens__valor_total')
+    ).order_by('itens__categoria__nome')
+
+    # Detalhar as subcategorias
+    custos_variaveis = []
+    total_custos_variaveis = 0
+
+    for categoria in custos_variaveis_por_categoria:
+        valor_categoria = float(categoria['total'])
+        total_custos_variaveis += valor_categoria
+        
+        # Buscar subcategorias (itens de despesa agrupados)
+        filtro_subcategoria = {
+            'data_emissao__range': [data_inicial, data_final],
+            'usuario': usuario,
+            'itens__categoria_id': categoria['itens__categoria_id']
+        }
+        if fazenda_id:
+            filtro_subcategoria['itens__fazenda_destino_id'] = fazenda_id
+            
+        subcategorias = Despesa.objects.filter(**filtro_subcategoria).values(
+            'itens__subcategoria__nome'
+        ).annotate(
+            total=Sum('itens__valor_total')
+        ).order_by('-total')
+        
+        subcategorias_formatadas = []
+        for sub in subcategorias:
+            subcategorias_formatadas.append({
+                'nome': sub['itens__subcategoria__nome'],
+                'valor': float(sub['total']),
+                'percentual': (float(sub['total']) / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+            })
+        
+        # Adicionar categoria com suas subcategorias
+        custos_variaveis.append({
+            'nome': categoria['itens__categoria__nome'],
+            'valor': float(valor_categoria),
+            'percentual': (float(valor_categoria) / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0,
+            'subcategorias': subcategorias_formatadas
+        })
+        
+    # Total dos custos
+    total_custos_fixos = float(total_custos_fixos)
+    total_custos_variaveis = float(total_custos_variaveis)
+    total_geral_custos = float(total_custos_fixos + total_custos_variaveis)
+    
+    # Percentuais dos custos
+    percentual_custos_fixos = (total_custos_fixos / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+    percentual_custos_variaveis = (total_custos_variaveis / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+    percentual_geral_custos = (total_geral_custos / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+    
+    # 3. RESULTADO OPERACIONAL
+    receitas_totais = float(receitas_totais)
+    total_geral_custos = float(total_geral_custos)
+    resultado_operacional = float(receitas_totais - total_geral_custos)
+    percentual_resultado = (resultado_operacional / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+    
+    # PARTE 2: DADOS PARA INVESTIMENTOS E RESULTADOS NÃO OPERACIONAIS
+    
+    # 4. INVESTIMENTOS (Compra de animais e categorias de despesa do tipo "INVESTIMENTO")
+    # 4.1 COMPRA DE ANIMAIS
+    filtro_compras = {
+        'data__range': [data_inicial, data_final],
+        'usuario': usuario
+    }
+    if fazenda_id:
+        filtro_compras['fazenda_id'] = fazenda_id
+    
+    # Cálculo manual do total de compras de animais (valor_total é uma propriedade, não um campo)
+    compras = Compra.objects.filter(**filtro_compras)
+    total_compra_animais = 0
+    for compra in compras:
+        # Usando a mesma lógica da propriedade valor_total
+        compra_total = compra.animais.aggregate(total=Sum('valor_total'))['total'] or 0
+        total_compra_animais += float(compra_total)
+    
+    # Percentual de compra de animais em relação às receitas
+    percentual_compra_animais = (float(total_compra_animais) / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+    
+    # 4.2 OUTROS INVESTIMENTOS (Categorias de despesa marcadas como Investimento)
+    filtro_investimentos = {
+        'data_emissao__range': [data_inicial, data_final], 
+        'usuario': usuario,
+        'itens__categoria__tipo': 'investimento'  
+    }
+    if fazenda_id:
+        filtro_investimentos['itens__fazenda_destino_id'] = fazenda_id
+        
+    # Agrupar por categoria
+    investimentos_por_categoria = Despesa.objects.filter(**filtro_investimentos).values(
+        'itens__categoria__nome', 'itens__categoria_id'
+    ).annotate(
+        total=Sum('itens__valor_total')
+    ).order_by('itens__categoria__nome')
+    
+    # Detalhar as subcategorias dos investimentos
+    investimentos = []
+    total_investimentos_outros = 0
+    
+    # Item especial para compra de animais
+    if total_compra_animais > 0:
+        investimentos.append({
+            'nome': 'Compra de Animais',
+            'valor': float(total_compra_animais),
+            'percentual': percentual_compra_animais,
+            'subcategorias': []  
+        })
+    
+    for categoria in investimentos_por_categoria:
+        valor_categoria = float(categoria['total'])
+        total_investimentos_outros += float(valor_categoria)
+        
+        # Buscar subcategorias (itens de despesa agrupados)
+        filtro_subcategoria = {
+            'data_emissao__range': [data_inicial, data_final],
+            'usuario': usuario,
+            'itens__categoria_id': categoria['itens__categoria_id']
+        }
+        if fazenda_id:
+            filtro_subcategoria['itens__fazenda_destino_id'] = fazenda_id
+            
+        subcategorias = Despesa.objects.filter(**filtro_subcategoria).values(
+            'itens__subcategoria__nome'
+        ).annotate(
+            total=Sum('itens__valor_total')
+        ).order_by('-total')
+        
+        subcategorias_formatadas = []
+        for sub in subcategorias:
+            subcategorias_formatadas.append({
+                'nome': sub['itens__subcategoria__nome'],
+                'valor': float(sub['total']),
+                'percentual': (float(sub['total']) / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+            })
+        
+        # Adicionar categoria com suas subcategorias
+        investimentos.append({
+            'nome': categoria['itens__categoria__nome'],
+            'valor': float(valor_categoria),
+            'percentual': (float(valor_categoria) / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0,
+            'subcategorias': subcategorias_formatadas
+        })
+    
+    # Total dos investimentos
+    total_investimentos = float(total_compra_animais) + float(total_investimentos_outros)
+    percentual_investimentos = (total_investimentos / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+    
+    # 5. NÃO OPERACIONAL (Movimentações financeiras não operacionais)
+    filtro_nao_op = {
+        'data__range': [data_inicial, data_final],
+        'usuario': usuario
+    }
+    if fazenda_id:
+        filtro_nao_op['fazenda_id'] = fazenda_id
+    
+    # Receitas não operacionais (entradas)
+    receitas_nao_op = MovimentacaoNaoOperacional.objects.filter(
+        **filtro_nao_op, tipo='entrada'
+    ).aggregate(
+        total=Sum('valor')
+    )['total'] or 0
+    receitas_nao_op = float(receitas_nao_op)
+    
+    # Despesas não operacionais (saídas)
+    despesas_nao_op = MovimentacaoNaoOperacional.objects.filter(
+        **filtro_nao_op, tipo='saida'
+    ).aggregate(
+        total=Sum('valor')
+    )['total'] or 0
+    despesas_nao_op = float(despesas_nao_op)
+    
+    # Resultado não operacional
+    resultado_nao_op = float(receitas_nao_op) - float(despesas_nao_op)
+    
+    # Percentuais não operacionais
+    percentual_receitas_nao_op = (receitas_nao_op / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+    percentual_despesas_nao_op = (despesas_nao_op / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+    percentual_resultado_nao_op = (resultado_nao_op / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+    
+    # RESULTADO FINAL (EBITDA)
+    resultado_final = float(resultado_operacional) - float(total_investimentos) + float(resultado_nao_op)
+    percentual_resultado_final = (resultado_final / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0
+    
+    # Montar resposta
+    dados_dre = {
+        # 1. RECEITAS
+        'receitas_abates': receitas_abates,
+        'receitas_vendas': receitas_vendas,
+        'receitas_totais': receitas_totais,
+        'percentual_abate': percentual_abate,
+        'percentual_vendas': percentual_vendas,
+        
+        # 2. CUSTOS
+        'custos_fixos': custos_fixos,
+        'custos_variaveis': custos_variaveis,
+        'total_custos_fixos': float(total_custos_fixos),
+        'total_custos_variaveis': float(total_custos_variaveis),
+        'total_geral_custos': float(total_geral_custos),
+        'percentual_custos_fixos': percentual_custos_fixos,
+        'percentual_custos_variaveis': percentual_custos_variaveis,
+        'percentual_geral_custos': percentual_geral_custos,
+        
+        # 3. RESULTADO OPERACIONAL
+        'resultado_operacional': float(resultado_operacional),
+        'percentual_resultado': percentual_resultado,
+        
+        # 4. INVESTIMENTOS
+        'total_compra_animais': float(total_compra_animais),
+        'percentual_compra_animais': percentual_compra_animais,
+        'investimentos': investimentos,
+        'total_investimentos_outros': float(total_investimentos_outros),
+        'total_investimentos': float(total_investimentos),
+        'percentual_investimentos': percentual_investimentos,
+        
+        # 5. NÃO OPERACIONAL
+        'receitas_nao_op': float(receitas_nao_op),
+        'percentual_receitas_nao_op': percentual_receitas_nao_op,
+        'despesas_nao_op': float(despesas_nao_op),
+        'percentual_despesas_nao_op': percentual_despesas_nao_op,
+        'resultado_nao_op': float(resultado_nao_op),
+        'percentual_resultado_nao_op': percentual_resultado_nao_op,
+        
+        # RESULTADO FINAL
+        'resultado_final': resultado_final,
+        'percentual_resultado_final': percentual_resultado_final,
+    }
+    
+    return dados_dre
 
 @login_required
 def atualizar_dre(request):
-    try:
-        if request.method == 'POST':
-            # Verificar Content-Type
-            if request.content_type != 'application/json':
-                print("Content-Type inválido:", request.content_type)
-                return JsonResponse({'error': 'Content-Type deve ser application/json'}, status=400)
-
-            try:
-                # Tentar ler o corpo da requisição
-                body = request.body.decode('utf-8')
-                print("Body recebido:", body)
-                
-                # Tentar decodificar o JSON
-                data = json.loads(body)
-                print("Dados recebidos:", data)
-            except json.JSONDecodeError as e:
-                print("Erro ao decodificar JSON:", str(e))
-                print("Body recebido:", request.body)
-                return JsonResponse({'error': 'Dados inválidos'}, status=400)
-            except Exception as e:
-                print("Erro ao ler body:", str(e))
-                return JsonResponse({'error': 'Erro ao ler dados'}, status=400)
-
-            # Extrair e validar filtros
-            fazenda_id = data.get('fazenda')
-            data_inicial = data.get('data_inicial')
-            data_final = data.get('data_final')
-
-            print(f"Filtros: fazenda={fazenda_id}, data_inicial={data_inicial}, data_final={data_final}")
-
-            # Converter datas se fornecidas
-            if data_inicial:
-                try:
-                    data_inicial = datetime.strptime(data_inicial, '%Y-%m-%d').date()
-                except ValueError:
-                    return JsonResponse({'error': 'Data inicial inválida'}, status=400)
+    """
+    Função simplificada para obter dados do DRE diretamente das tabelas.
+    - Receitas: Vendas e Abates
+    - Custos: Fixos e Variáveis das Despesas
+    - Investimentos: Compra de animais e investimentos por categoria
+    - Não Operacional: Entradas e saídas não operacionais
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            print(f"Dados recebidos: {data}")
             
-            if data_final:
-                try:
-                    data_final = datetime.strptime(data_final, '%Y-%m-%d').date()
-                except ValueError:
-                    return JsonResponse({'error': 'Data final inválida'}, status=400)
-
-            # Se não houver data final, usar data atual
-            if not data_final:
-                data_final = timezone.now().date()
-
-            # Se não houver data inicial, usar primeiro dia do mês atual
-            if not data_inicial:
-                data_inicial = data_final.replace(day=1)
-
-            print(f"Datas processadas: inicial={data_inicial}, final={data_final}")
-
-            # Filtros base para todos os custos
-            filtros_base = {}
-            if fazenda_id:
-                filtros_base['itens__fazenda_destino_id'] = fazenda_id
-            if data_inicial and data_final:
-                filtros_base['data_emissao__range'] = [data_inicial, data_final]
-
-            print("Filtros base:", filtros_base)
-
+            # Parâmetros do filtro
+            fazenda_id = data.get('fazenda_id')
+            data_inicial_str = data.get('data_inicial')
+            data_final_str = data.get('data_final')
+            
+            # Validar e converter datas
+            if not data_inicial_str or not data_final_str:
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Datas inicial e final são obrigatórias'
+                })
+            
             try:
-                # Buscar categorias de custo do usuário
-                custos_fixos = []
-                categorias_fixas = CategoriaCusto.objects.filter(
-                    usuario=request.user,
-                    tipo='fixo'
-                ).prefetch_related('subcategorias')
-
-                print(f"Total de categorias fixas: {categorias_fixas.count()}")
-
-                for categoria in categorias_fixas:
-                    print(f"Processando categoria {categoria.nome}")
-                    
-                    valor_categoria = Despesa.objects.filter(
-                        usuario=request.user,
-                        itens__categoria=categoria,
-                        **filtros_base
-                    ).aggregate(
-                        total_geral=models.Sum('itens__valor_total')
-                    )['total_geral'] or 0
-
-                    print(f"Valor categoria {categoria.nome}: {valor_categoria}")
-
-                    subcategorias_data = []
-                    for subcategoria in categoria.subcategorias.all():
-                        print(f"  Processando subcategoria {subcategoria.nome}")
-                        
-                        valor_subcategoria = Despesa.objects.filter(
-                            usuario=request.user,
-                            itens__categoria=categoria,
-                            itens__subcategoria=subcategoria,
-                            **filtros_base
-                        ).aggregate(
-                            total_geral=models.Sum('itens__valor_total')
-                        )['total_geral'] or 0
-
-                        print(f"  Valor subcategoria {subcategoria.nome}: {valor_subcategoria}")
-
-                        subcategorias_data.append({
-                            'nome': subcategoria.nome,
-                            'valor': float(valor_subcategoria),
-                            'percentual': 0  # Será calculado depois
-                        })
-
-                    custos_fixos.append({
-                        'nome': categoria.nome,
-                        'valor': float(valor_categoria),
-                        'percentual': 0,  # Será calculado depois
-                        'subcategorias': subcategorias_data
-                    })
-
-                # Calcular receitas de abates
-                filtros_abates = {}
-                if fazenda_id:
-                    filtros_abates['animais__animal__fazenda_atual_id'] = fazenda_id
-                if data_inicial and data_final:
-                    filtros_abates['data__range'] = [data_inicial, data_final]
-
-                # Primeiro, pegar todos os abates que atendem aos filtros
-                abates = Abate.objects.filter(
-                    usuario=request.user,
-                    **filtros_abates
-                )
-
-                # Depois, calcular o valor total somando os valores dos animais
-                receitas_abates = abates.annotate(
-                    total_abate=models.Sum('animais__valor_total')
-                ).aggregate(
-                    total=models.Sum('total_abate')
-                )['total'] or 0
-
-                print(f"Receitas de abates: {receitas_abates}")
-
-                # Calcular receitas de vendas
-                filtros_vendas = {}
-                if fazenda_id:
-                    filtros_vendas['animais__animal__fazenda_atual_id'] = fazenda_id
-                if data_inicial and data_final:
-                    filtros_vendas['data__range'] = [data_inicial, data_final]
-
-                # Primeiro, pegar todas as vendas que atendem aos filtros
-                vendas = Venda.objects.filter(
-                    usuario=request.user,
-                    **filtros_vendas
-                )
-
-                # Depois, calcular o valor total somando os valores dos animais
-                receitas_vendas = vendas.annotate(
-                    total_venda=models.Sum(
-                        models.Case(
-                            models.When(
-                                tipo_venda='UN',
-                                then=models.F('valor_unitario') * models.Count('animais')
-                            ),
-                            models.When(
-                                tipo_venda='KG',
-                                then=models.F('valor_unitario') * models.Sum('animais__peso_vivo')
-                            ),
-                            default=0,
-                            output_field=models.DecimalField()
-                        )
-                    )
-                ).aggregate(
-                    total=models.Sum('total_venda')
-                )['total'] or 0
-
-                print(f"Receitas de vendas: {receitas_vendas}")
-
-                # Calcular totais
-                receitas_totais = float(receitas_abates) + float(receitas_vendas)
-                
-                response_data = {
-                    'receitas_vendas': float(receitas_vendas),
-                    'receitas_abates': float(receitas_abates),
-                    'receitas_totais': receitas_totais,
-                    'custos_fixos': custos_fixos,
-                    'custos_variaveis': [],
-                    'investimentos': [],
-                    'total_custos_fixos': sum(c['valor'] for c in custos_fixos),
-                    'total_custos_variaveis': 0.0,
-                    'total_investimentos': 0.0,
-                    'total_geral_custos': 0.0,
-                    'percentual_custos_fixos': 0.0,
-                    'percentual_custos_variaveis': 0.0,
-                    'percentual_investimentos': 0.0,
-                    'saldo_estoque': 0.0,
-                    'total_ativo': 0.0,
-                    'total_passivo': 0.0,
-                    'total_imobilizado': 0.0
-                }
-                
-                # Calcular percentuais se houver receita
-                if receitas_totais > 0:
-                    total_custos_fixos = response_data['total_custos_fixos']
-                    response_data['percentual_custos_fixos'] = round((total_custos_fixos / receitas_totais) * 100, 2)
-                    
-                    # Atualizar percentuais das categorias
-                    for categoria in custos_fixos:
-                        categoria['percentual'] = round((categoria['valor'] / receitas_totais) * 100, 2)
-                        for subcategoria in categoria['subcategorias']:
-                            subcategoria['percentual'] = round((subcategoria['valor'] / receitas_totais) * 100, 2)
-                
-                return JsonResponse(response_data)
-
-            except Exception as e:
-                print("Erro ao processar dados:", str(e))
-                import traceback
-                traceback.print_exc()
-                return JsonResponse({'error': f'Erro ao processar dados: {str(e)}'}, status=500)
-
-        else:
-            return JsonResponse({'error': 'Método não permitido'}, status=405)
-    except Exception as e:
-        print("Erro ao processar requisição:", str(e))
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'error': f'Erro ao processar requisição: {str(e)}'}, status=500)
+                data_inicial = datetime.strptime(data_inicial_str, '%Y-%m-%d').date()
+                data_final = datetime.strptime(data_final_str, '%Y-%m-%d').date()
+            except ValueError:
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Formato de data inválido'
+                })
+            
+            # Obter dados do DRE
+            dados_dre = atualizar_dre_dados(request.user, data_inicial, data_final, fazenda_id)
+            
+            # Adicionar campo de sucesso para a API
+            dados_dre['success'] = True
+            
+            return JsonResponse(dados_dre)
+            
+        except Exception as e:
+            print(f"Erro ao processar DRE: {e}")
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    else:
+        return JsonResponse({
+            'success': False,
+            'error': 'Método não permitido'
+        })

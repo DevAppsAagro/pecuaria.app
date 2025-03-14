@@ -4,10 +4,15 @@
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Lotes</h2>
-        <a href="{% url 'lote_create' %}" class="btn btn-primary">
-            <i class="bi bi-plus-lg"></i> Novo Lote
-        </a>
+        <div class="d-flex align-items-center">
+            <h2 class="me-3">Lotes</h2>
+            <a href="{% url 'lote_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Novo Lote
+            </a>
+        </div>
+        <div>
+            <!-- Espaço para outros controles futuros -->
+        </div>
     </div>
 
     {% if messages %}
@@ -17,6 +22,47 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         {% endfor %}
+    {% endif %}
+
+    <!-- Card de Resumo acima da tabela -->
+    {% if lotes %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between">
+                        <h5 class="card-title"><i class="bi bi-calculator me-2"></i>Resumo</h5>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted">Total de Lotes</h6>
+                                    <h3 class="mb-0">{{ lotes|length }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted">Por Finalidade</h6>
+                                    <div class="small">
+                                        {% regroup lotes|dictsort:"finalidade" by finalidade as finalidades %}
+                                            {% for finalidade in finalidades %}
+                                                <div class="d-flex justify-content-between">
+                                                    <span>{{ finalidade.grouper|default:"Sem finalidade" }}:</span>
+                                                    <strong>{{ finalidade.list|length }}</strong>
+                                                </div>
+                                            {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     {% endif %}
 
     <div class="card">
@@ -56,6 +102,13 @@
                             </tr>
                             {% endfor %}
                         </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="5" class="text-end">
+                                    <strong>Total de Lotes: {{ lotes|length }}</strong>
+                                </td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             {% else %}

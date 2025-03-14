@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from django.db.models import Sum, Count, F, Q, FloatField, DecimalField, Avg, Value
 from django.db.models.functions import Coalesce
 from decimal import Decimal
-from .models import Animal, Pesagem
+from .models import Animal, Pesagem, RegistroMorte
 from .models_abates import Abate, AbateAnimal
 from django.db.models import OuterRef, Subquery
 
@@ -20,11 +20,11 @@ def get_estatisticas_animais(request, queryset=None):
     hoje = date.today()
     um_ano_atras = hoje - timedelta(days=365)
 
-    # Inicializar dicionário de estatísticas com dados fictícios para mortos
+    # Inicializar dicionário de estatísticas
     stats = {
         'ATIVO': {'quantidade': 0, 'variacao': 0, 'peso_total': Decimal('0.00'), 'peso_arroba': Decimal('0.00')},
         'VENDIDO': {'quantidade': 0, 'variacao': 0, 'peso_total': Decimal('0.00'), 'peso_arroba': Decimal('0.00')},
-        'MORTO': {'quantidade': 2, 'variacao': -50, 'peso_total': Decimal('800.00'), 'peso_arroba': Decimal('53.33')},
+        'MORTO': {'quantidade': 0, 'variacao': 0, 'peso_total': Decimal('0.00'), 'peso_arroba': Decimal('0.00')},
         'ABATIDO': {'quantidade': 0, 'variacao': 0, 'peso_total': Decimal('0.00'), 'peso_arroba': Decimal('0.00')}
     }
 
@@ -33,8 +33,8 @@ def get_estatisticas_animais(request, queryset=None):
         animal=OuterRef('pk')
     ).order_by('-data').values('peso')[:1]
 
-    # Calcular estatísticas para cada status (exceto MORTO que já tem dados fictícios)
-    for status in ['ATIVO', 'VENDIDO', 'ABATIDO']:
+    # Calcular estatísticas para cada status
+    for status in ['ATIVO', 'VENDIDO', 'MORTO', 'ABATIDO']:
         # Contagem atual e peso total em uma única query
         stats_atuais = queryset.filter(situacao=status).aggregate(
             quantidade=Count('id'),
@@ -140,6 +140,30 @@ def get_estatisticas_detalhadas(request, queryset=None):
                 'peso_carcaca_arroba': peso_carcaca / Decimal('15.0'),
                 'rendimento_medio': rendimento * Decimal('100.0')  # Converte para percentual
             })
+    
+    # Para animais mortos, busca informações detalhadas incluindo prejuízo
+    animais_mortos = queryset.filter(situacao='MORTO')
+    if animais_mortos.exists():
+        # Buscar dados de morte em uma única query
+        mortes_info = (
+            RegistroMorte.objects
+            .filter(animal__in=animais_mortos)
+            .aggregate(
+                prejuizo_total=Coalesce(Sum('prejuizo'), Value(Decimal('0.00')), output_field=DecimalField(max_digits=10, decimal_places=2)),
+            )
+        )
+        
+        # Assume rendimento médio de 50% para cálculos
+        peso_vivo = stats['MORTO']['peso_total']
+        rendimento = Decimal('0.50')  # 50% fixo para animais mortos
+        peso_carcaca = peso_vivo * rendimento
+        
+        stats['MORTO'].update({
+            'peso_carcaca': peso_carcaca,
+            'peso_carcaca_arroba': peso_carcaca / Decimal('15.0'),
+            'rendimento_medio': rendimento * Decimal('100.0'),  # Converte para percentual
+            'prejuizo_total': mortes_info['prejuizo_total']
+        })
 
     # Para animais abatidos, busca informações detalhadas
     animais_abatidos = queryset.filter(situacao='ABATIDO')

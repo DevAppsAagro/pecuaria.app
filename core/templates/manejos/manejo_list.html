@@ -11,102 +11,88 @@
         </a>
     </div>
 
-    <div class="row">
-        <!-- Lista de Pesagens -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Pesagens</h3>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Animal</th>
-                                    <th>Peso</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for pesagem in pesagens %}
-                                <tr>
-                                    <td>{{ pesagem.data|date:"d/m/Y" }}</td>
-                                    <td>{{ pesagem.animal.brinco_visual }}</td>
-                                    <td>{{ pesagem.peso|floatformat:3 }} kg</td>
-                                    <td>
-                                        <div class="btn-group">
-                                            <button type="button" class="btn btn-sm btn-warning" 
-                                                    onclick="editarPesagem({{ pesagem.id }})">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-danger" 
-                                                    onclick="confirmarExclusao('{% url 'pesagem_delete' pesagem.id %}', 'pesagem')">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="4" class="text-center">Nenhuma pesagem registrada</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Histórico de Manejos</h3>
         </div>
-
-        <!-- Lista de Manejos Sanitários -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Manejos Sanitários</h3>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Animal</th>
-                                    <th>Tipo</th>
-                                    <th>Insumo</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for manejo in manejos %}
-                                <tr>
-                                    <td>{{ manejo.data|date:"d/m/Y" }}</td>
-                                    <td>{{ manejo.animal.brinco_visual }}</td>
-                                    <td>{{ manejo.tipo_manejo }}</td>
-                                    <td>{{ manejo.insumo }}</td>
-                                    <td>
-                                        <div class="btn-group">
-                                            <button type="button" class="btn btn-sm btn-warning" 
-                                                    onclick="editarManejo({{ manejo.id }})">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-danger" 
-                                                    onclick="confirmarExclusao('{% url 'manejo_delete' manejo.id %}', 'manejo')">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center">Nenhum manejo sanitário registrado</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped" id="manejoTable">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Animal</th>
+                            <th>Tipo de Manejo</th>
+                            <th>Peso (kg)</th>
+                            <th>Insumo</th>
+                            <th>Detalhes</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pesagem in pesagens %}
+                        <tr class="pesagem-row">
+                            <td>{{ pesagem.data|date:"d/m/Y" }}</td>
+                            <td>{{ pesagem.animal.brinco_visual }}</td>
+                            <td>Pesagem</td>
+                            <td>{{ pesagem.peso|floatformat:3 }}</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-sm btn-warning" 
+                                            data-id="{{ pesagem.id }}" data-action="edit-pesagem">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-danger" 
+                                            data-url="{% url 'pesagem_delete' pesagem.id %}" data-type="pesagem" data-action="delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        
+                        {% for manejo in manejos %}
+                        <tr class="manejo-row">
+                            <td>{{ manejo.data|date:"d/m/Y" }}</td>
+                            <td>{{ manejo.animal.brinco_visual }}</td>
+                            <td>{{ manejo.tipo_manejo }}</td>
+                            <td>-</td>
+                            <td>{{ manejo.insumo }}</td>
+                            <td>
+                                {% if manejo.observacao %}
+                                <button type="button" class="btn btn-sm btn-info" 
+                                        data-bs-toggle="tooltip" data-bs-placement="top" 
+                                        title="{{ manejo.observacao }}">
+                                    <i class="fas fa-info-circle"></i>
+                                </button>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-sm btn-warning" 
+                                            data-id="{{ manejo.id }}" data-action="edit-manejo">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-danger" 
+                                            data-url="{% url 'manejo_delete' manejo.id %}" data-type="manejo" data-action="delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        
+                        {% if not pesagens and not manejos %}
+                        <tr>
+                            <td colspan="7" class="text-center">Nenhum manejo registrado</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -213,10 +199,129 @@
 {% block extra_js %}
 <script>
 let deleteUrl = '';
-let deleteType = '';
-const modalPesagem = new bootstrap.Modal(document.getElementById('editarPesagemModal'));
-const modalManejo = new bootstrap.Modal(document.getElementById('editarManejoModal'));
-const modalDelete = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+
+// Função de fallback para tabelas básicas
+function setupBasicTable(tableId) {
+    var table = $('#' + tableId);
+    
+    // Adicionamos classes básicas de estilo
+    table.addClass('table table-bordered table-striped table-hover');
+    
+    // Configuramos largura da tabela
+    table.css('width', '100%');
+    
+    // Adicionamos um campo de filtro simples
+    var tableContainer = table.parent();
+    var filterDiv = $('<div class="mb-3"><label>Pesquisar: <input type="text" class="form-control" id="' + tableId + '_filter"></label></div>');
+    tableContainer.prepend(filterDiv);
+    
+    // Implementamos a funcionalidade de pesquisa básica
+    $('#' + tableId + '_filter').on('keyup', function() {
+        var value = $(this).val().toLowerCase();
+        $('#' + tableId + ' tbody tr').filter(function() {
+            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+        });
+    });
+    
+    // Adicionamos ordenação básica nos cabeçalhos
+    $('#' + tableId + ' th').css('cursor', 'pointer').click(function() {
+        var table = $(this).parents('table').eq(0);
+        var rows = table.find('tr:gt(0)').toArray().sort(comparer($(this).index()));
+        this.asc = !this.asc;
+        if (!this.asc) {
+            rows = rows.reverse();
+        }
+        for (var i = 0; i < rows.length; i++) {
+            table.append(rows[i]);
+        }
+    });
+    
+    // Função auxiliar para ordenação
+    function comparer(index) {
+        return function(a, b) {
+            var valA = getCellValue(a, index), valB = getCellValue(b, index);
+            return $.isNumeric(valA) && $.isNumeric(valB) ? valA - valB : valA.localeCompare(valB);
+        };
+    }
+    
+    // Função auxiliar para obter valor da célula
+    function getCellValue(row, index) {
+        return $(row).children('td').eq(index).text();
+    }
+    
+    console.log("Tabela básica configurada para " + tableId);
+}
+
+$(document).ready(function() {
+    var tableId = 'manejoTable';
+    var useDataTables = true;
+    
+    try {
+        // Tentamos remover qualquer inicialização anterior
+        if ($.fn.dataTable.isDataTable('#' + tableId)) {
+            $('#' + tableId).DataTable().destroy();
+        }
+        
+        // Se DataTables estiver disponível, tentamos inicializar
+        if ($.fn.DataTable && useDataTables) {
+            console.log("Tentando inicializar DataTables para " + tableId);
+            
+            setTimeout(function() {
+                try {
+                    // Inicialização ultra-simplificada
+                    $('#' + tableId).DataTable({
+                        "paging": true,
+                        "searching": true,
+                        "ordering": true,
+                        "info": true,
+                        "order": [[0, 'desc']]
+                    });
+                    console.log("DataTable inicializado com sucesso para " + tableId);
+                } catch (e) {
+                    console.error("Erro ao inicializar DataTable:", e);
+                    // Fallback para tabela básica
+                    $('#' + tableId + '_wrapper').remove();
+                    $('#' + tableId).removeClass('dataTable').show();
+                    setupBasicTable(tableId);
+                }
+            }, 1000);
+        } else {
+            // Se DataTable não estiver disponível, utilizamos a versão básica
+            console.log("DataTable não disponível, utilizando tabela básica para " + tableId);
+            setupBasicTable(tableId);
+        }
+    } catch (e) {
+        console.error("Erro geral na configuração da tabela:", e);
+        // Garantimos que a tabela continue utilizável
+        setupBasicTable(tableId);
+    }
+});
+
+// Inicializa tooltips
+$(document).ready(function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    
+    // Inicializa os modais
+    window.modalPesagem = new bootstrap.Modal(document.getElementById('editarPesagemModal'));
+    window.modalManejo = new bootstrap.Modal(document.getElementById('editarManejoModal'));
+    window.deleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+    
+    // Atribuir event listeners para ações
+    $('[data-action="edit-pesagem"]').click(function() {
+        editarPesagem($(this).data('id'));
+    });
+    
+    $('[data-action="edit-manejo"]').click(function() {
+        editarManejo($(this).data('id'));
+    });
+    
+    $('[data-action="delete"]').click(function() {
+        confirmarExclusao($(this).data('url'), $(this).data('type'));
+    });
+});
 
 async function editarPesagem(id) {
     try {
@@ -327,21 +432,23 @@ async function salvarManejo() {
 function confirmarExclusao(url, tipo) {
     deleteUrl = url;
     deleteType = tipo;
-    modalDelete.show();
+    deleteModal.show();
 }
 
 async function excluirRegistro() {
     try {
         const response = await fetch(deleteUrl, {
-            method: 'DELETE',
+            method: 'POST',
             headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'csrfmiddlewaretoken=' + document.querySelector('[name=csrfmiddlewaretoken]').value
         });
         
         const result = await response.json();
         if (result.success) {
-            modalDelete.hide();
+            deleteModal.hide();
             window.location.reload();
         } else {
             alert(result.message || `Erro ao excluir ${deleteType}`);

@@ -1,368 +1,380 @@
 {% extends 'base.html' %}
+{% block title %}DRE{% endblock %}
+
+{% block head %}
+    <!-- Adicionar referência ao Toastr CSS e JS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <!-- Biblioteca para exportação PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* Estilos específicos para o relatório DRE - Interface compacta */
+        .table-sm td, .table-sm th {
+            padding: 0.25rem 0.5rem;
+        }
+        .small {
+            font-size: 90%;
+        }
+        .toggle-icon {
+            cursor: pointer;
+            margin-right: 5px;
+            font-size: 0.8rem;
+        }
+        .detalhes-categoria {
+            display: none;
+        }
+    </style>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container-fluid p-2">
     <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h4 class="mb-0">Demonstração do Resultado do Exercício (DRE)</h4>
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+            <h5 class="mb-0">DRE</h5>
             <div>
-                <button class="btn btn-light" onclick="exportarPDF()">
-                    <i class="bi bi-file-pdf"></i> Exportar PDF
+                <button type="button" class="btn btn-light btn-sm" onclick="exportarPDF()">
+                    <i class="fas fa-file-pdf"></i> PDF
                 </button>
             </div>
         </div>
-        <div class="card-body">
+        <div class="card-body p-2">
             <!-- Filtros -->
-            <div class="row mb-4">
-                <div class="col-md-3">
-                    <label class="form-label">Período</label>
-                    <select class="form-select" id="periodo">
-                        <option value="mensal">Mensal</option>
-                        <option value="trimestral">Trimestral</option>
-                        <option value="anual">Anual</option>
-                    </select>
+            <form method="get" action="" id="filtroForm">
+                <div class="row g-2 mb-2">
+                    <div class="col-md-3 mb-1">
+                        <label class="form-label small mb-1">Data Inicial</label>
+                        <input type="date" class="form-control form-control-sm" id="data_inicial" name="data_inicial" value="{{ request.GET.data_inicial }}">
+                    </div>
+                    <div class="col-md-3 mb-1">
+                        <label class="form-label small mb-1">Data Final</label>
+                        <input type="date" class="form-control form-control-sm" id="data_final" name="data_final" value="{{ request.GET.data_final }}">
+                    </div>
+                    <div class="col-md-3 mb-1">
+                        <label class="form-label small mb-1">Fazenda</label>
+                        <select class="form-select form-select-sm" id="fazenda" name="fazenda">
+                            <option value="">Todas</option>
+                            {% for fazenda in fazendas %}
+                                <option value="{{ fazenda.id }}" {% if request.GET.fazenda|add:"0" == fazenda.id %}selected{% endif %}>{{ fazenda.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end mb-1">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-sync-alt"></i> Atualizar
+                        </button>
+                    </div>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">Fazenda</label>
-                    <select class="form-select" id="fazenda">
-                        <option value="">Todas as Fazendas</option>
-                        {% for fazenda in fazendas %}
-                            <option value="{{ fazenda.id }}">{{ fazenda.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Data Inicial</label>
-                    <input type="date" class="form-control" id="data_inicial">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Data Final</label>
-                    <input type="date" class="form-control" id="data_final">
-                </div>
-            </div>
-
-            <!-- Relatório DRE -->
-            <div class="table-responsive">
-                <table class="table table-bordered">
+            </form>
+            
+            <!-- Verifica se existem filtros aplicados -->
+            {% if request.GET.data_inicial and request.GET.data_final %}
+            <!-- Conteúdo do relatório -->
+            <div id="report-content" class="table-responsive">
+                <table class="table table-bordered table-sm small">
                     <thead class="table-light">
                         <tr>
                             <th>Descrição</th>
-                            <th class="text-end">Valor (R$)</th>
-                            <th class="text-end">%</th>
+                            <th class="text-end" style="width: 25%">Valor (R$)</th>
+                            <th class="text-end" style="width: 15%">%</th>
                         </tr>
                     </thead>
                     <tbody>
                         <!-- Receitas -->
-                        <tr class="table-primary">
-                            <td colspan="3"><strong>1. RECEITAS</strong></td>
+                        <tr class="table-success">
+                            <td class="fw-bold">1. RECEITAS OPERACIONAIS</td>
+                            <td class="text-end fw-bold">{% if dados_dre %}R$ {{ dados_dre.receitas_totais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.receitas_totais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">100%</td>
                         </tr>
                         <tr>
-                            <td>Receitas de Vendas de Animais</td>
-                            <td class="text-end">{{ receitas_vendas|default:"0.00" }}</td>
-                            <td class="text-end">{{ percentual_vendas|default:"0.00" }}%</td>
+                            <td>Vendas de Animais</td>
+                            <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.receitas_vendas|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.receitas_vendas|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_vendas|floatformat:2 }}{% else %}0{% endif %}%</td>
                         </tr>
                         <tr>
-                            <td>Receitas de Abates</td>
-                            <td class="text-end">{{ receitas_abate|default:"0.00" }}</td>
-                            <td class="text-end">{{ percentual_abate|default:"0.00" }}%</td>
+                            <td>Abates</td>
+                            <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.receitas_abates|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.receitas_abates|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_abate|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        <tr class="fw-bold">
+                            <td>TOTAL RECEITAS</td>
+                            <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.receitas_totais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.receitas_totais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">100%</td>
                         </tr>
 
-                        <!-- Custos e Despesas -->
+                        <!-- CUSTOS E DESPESAS -->
                         <tr class="table-danger">
-                            <td colspan="3"><strong>2. CUSTOS E DESPESAS</strong></td>
+                            <td class="fw-bold">2. CUSTOS E DESPESAS OPERACIONAIS</td>
+                            <td class="text-end fw-bold">{% if dados_dre %}R$ {{ dados_dre.total_geral_custos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.total_geral_custos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">{% if dados_dre %}{{ dados_dre.percentual_geral_custos|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        <!-- Custos Fixos -->
+                        <tr>
+                            <td class="fw-bold">
+                                <span class="toggle-icon" onclick="toggleDetails('custos-fixos')">
+                                    <i class="fas fa-plus-square" id="icon-custos-fixos"></i>
+                                </span>
+                                2.1 Custos Fixos
+                            </td>
+                            <td class="text-end"></td>
+                            <td class="text-end"></td>
+                        </tr>
+                        <!-- Detalhamento dos custos fixos aqui -->
+                        <tbody id="custos-fixos" class="detalhes-categoria">
+                        {% if dados_dre and dados_dre.custos_fixos %}
+                            {% for categoria in dados_dre.custos_fixos %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <span class="toggle-icon" onclick="toggleDetails('cf-cat-{{ forloop.counter }}')">
+                                            <i class="fas fa-plus-square" id="icon-cf-cat-{{ forloop.counter }}"></i>
+                                        </span>
+                                        {{ categoria.nome }}
+                                    </td>
+                                    <td class="text-end">R$ {{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                    <td class="text-end">{{ categoria.percentual|floatformat:2 }}%</td>
+                                </tr>
+                                {% if categoria.subcategorias %}
+                                    <tbody id="cf-cat-{{ forloop.counter }}" class="detalhes-categoria">
+                                    {% for subcategoria in categoria.subcategorias %}
+                                        <tr>
+                                            <td class="ps-5 small">- {{ subcategoria.nome }}</td>
+                                            <td class="text-end small">R$ {{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                            <td class="text-end small">{{ subcategoria.percentual|floatformat:2 }}%</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                        </tbody>
+                        <tr class="fw-bold">
+                            <td>Total Custos Fixos</td>
+                            <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.total_custos_fixos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.total_custos_fixos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_custos_fixos|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        <!-- Custos Variáveis -->
+                        <tr>
+                            <td class="fw-bold">
+                                <span class="toggle-icon" onclick="toggleDetails('custos-variaveis')">
+                                    <i class="fas fa-plus-square" id="icon-custos-variaveis"></i>
+                                </span>
+                                2.2 Custos Variáveis
+                            </td>
+                            <td class="text-end"></td>
+                            <td class="text-end"></td>
+                        </tr>
+                        <!-- Detalhamento dos custos variáveis aqui -->
+                        <tbody id="custos-variaveis" class="detalhes-categoria">
+                        {% if dados_dre and dados_dre.custos_variaveis %}
+                            {% for categoria in dados_dre.custos_variaveis %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <span class="toggle-icon" onclick="toggleDetails('cv-cat-{{ forloop.counter }}')">
+                                            <i class="fas fa-plus-square" id="icon-cv-cat-{{ forloop.counter }}"></i>
+                                        </span>
+                                        {{ categoria.nome }}
+                                    </td>
+                                    <td class="text-end">R$ {{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                    <td class="text-end">{{ categoria.percentual|floatformat:2 }}%</td>
+                                </tr>
+                                {% if categoria.subcategorias %}
+                                    <tbody id="cv-cat-{{ forloop.counter }}" class="detalhes-categoria">
+                                    {% for subcategoria in categoria.subcategorias %}
+                                        <tr>
+                                            <td class="ps-5 small">- {{ subcategoria.nome }}</td>
+                                            <td class="text-end small">R$ {{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                            <td class="text-end small">{{ subcategoria.percentual|floatformat:2 }}%</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                        </tbody>
+                        <tr class="fw-bold">
+                            <td>TOTAL CUSTOS OPERACIONAIS</td>
+                            <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.total_geral_custos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.total_geral_custos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_geral_custos|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+
+                        <!-- RESULTADO OPERACIONAL -->
+                        <tr class="table-primary">
+                            <td class="fw-bold">3. RESULTADO OPERACIONAL</td>
+                            <td class="text-end fw-bold">{% if dados_dre %}R$ {{ dados_dre.resultado_operacional|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.resultado_operacional|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">{% if dados_dre %}{{ dados_dre.percentual_resultado|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+
+                        <!-- INVESTIMENTOS -->
+                        <tr class="table-warning">
+                            <td class="fw-bold">4. INVESTIMENTOS</td>
+                            <td class="text-end fw-bold">{% if dados_dre %}R$ {{ dados_dre.total_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.total_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">{% if dados_dre %}{{ dados_dre.percentual_investimentos|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        <!-- Investimento em Compra de Animais -->
+                        <tr>
+                            <td class="ps-4 fw-bold">4.1 Compra de Animais</td>
+                            <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.total_compra_animais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.total_compra_animais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_dre and dados_dre.percentual_compra_animais %}{{ dados_dre.percentual_compra_animais|floatformat:2 }}{% else %}0{% endif %}%</td>
                         </tr>
                         
-                        <!-- Custos Fixos -->
-                        <tr class="table-warning">
-                            <td colspan="3"><strong>2.1 CUSTOS FIXOS</strong></td>
-                        </tr>
-                        <tbody id="custos_fixos_container">
-                        {% for categoria in custos_fixos %}
+                        <!-- Outros Investimentos -->
                         <tr>
-                            <td style="padding-left: 20px;"><strong>{{ categoria.nome }}</strong></td>
-                            <td class="text-end">{{ categoria.valor|default:"0.00" }}</td>
-                            <td class="text-end">{{ categoria.percentual|default:"0.00" }}%</td>
+                            <td class="ps-4 fw-bold">
+                                <span class="toggle-icon" onclick="toggleDetails('outros-investimentos')">
+                                    <i class="fas fa-plus-square" id="icon-outros-investimentos"></i>
+                                </span>
+                                4.2 Outros Investimentos
+                            </td>
+                            <td class="text-end"></td>
+                            <td class="text-end"></td>
                         </tr>
-                            {% for subcategoria in categoria.subcategorias %}
-                            <tr>
-                                <td style="padding-left: 40px;">{{ subcategoria.nome }}</td>
-                                <td class="text-end">{{ subcategoria.valor|default:"0.00" }}</td>
-                                <td class="text-end">{{ subcategoria.percentual|default:"0.00" }}%</td>
-                            </tr>
+                        
+                        <!-- Detalhamento dos outros investimentos -->
+                        <tbody id="outros-investimentos" class="detalhes-categoria">
+                        {% if dados_dre and dados_dre.investimentos %}
+                            {% for categoria in dados_dre.investimentos %}
+                                <tr>
+                                    <td class="ps-5">
+                                        <span class="toggle-icon" onclick="toggleDetails('inv-cat-{{ forloop.counter }}')">
+                                            <i class="fas fa-plus-square" id="icon-inv-cat-{{ forloop.counter }}"></i>
+                                        </span>
+                                        {{ categoria.nome }}
+                                    </td>
+                                    <td class="text-end">R$ {{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                    <td class="text-end">{{ categoria.percentual|floatformat:2 }}%</td>
+                                </tr>
+                                {% if categoria.subcategorias %}
+                                    <tbody id="inv-cat-{{ forloop.counter }}" class="detalhes-categoria">
+                                    {% for subcategoria in categoria.subcategorias %}
+                                        <tr>
+                                            <td class="ps-5 small">- {{ subcategoria.nome }}</td>
+                                            <td class="text-end small">R$ {{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                            <td class="text-end small">{{ subcategoria.percentual|floatformat:2 }}%</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                {% endif %}
                             {% endfor %}
-                        {% endfor %}
+                        {% endif %}
                         </tbody>
-                        <tr class="table-warning">
-                            <td><strong>Total Custos Fixos</strong></td>
-                            <td class="text-end" id="custos_fixos_total"><strong>{{ total_custos_fixos|default:"0.00" }}</strong></td>
-                            <td class="text-end" id="custos_fixos_percentual"><strong>{{ percentual_custos_fixos|default:"0.00" }}%</strong></td>
+                        <tr class="fw-bold">
+                            <td>Total Investimentos</td>
+                            <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.total_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.total_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_investimentos|floatformat:2 }}{% else %}0{% endif %}%</td>
                         </tr>
 
-                        <!-- Custos Variáveis -->
+                        <!-- NÃO OPERACIONAL -->
                         <tr class="table-info">
-                            <td colspan="3"><strong>2.2 CUSTOS VARIÁVEIS</strong></td>
-                        </tr>
-                        {% for categoria in custos_variaveis %}
-                        <tr>
-                            <td style="padding-left: 20px;"><strong>{{ categoria.nome }}</strong></td>
-                            <td class="text-end">{{ categoria.valor|default:"0.00" }}</td>
-                            <td class="text-end">{{ categoria.percentual|default:"0.00" }}%</td>
-                        </tr>
-                            {% for subcategoria in categoria.subcategorias %}
-                            <tr>
-                                <td style="padding-left: 40px;">{{ subcategoria.nome }}</td>
-                                <td class="text-end">{{ subcategoria.valor|default:"0.00" }}</td>
-                                <td class="text-end">{{ subcategoria.percentual|default:"0.00" }}%</td>
-                            </tr>
-                            {% endfor %}
-                        {% endfor %}
-                        <tr class="table-info">
-                            <td><strong>Total Custos Variáveis</strong></td>
-                            <td class="text-end"><strong>{{ total_custos_variaveis|default:"0.00" }}</strong></td>
-                            <td class="text-end"><strong>{{ percentual_custos_variaveis|default:"0.00" }}%</strong></td>
-                        </tr>
-
-                        <!-- Investimentos -->
-                        <tr class="table-success">
-                            <td colspan="3"><strong>2.3 INVESTIMENTOS</strong></td>
-                        </tr>
-                        {% for categoria in investimentos %}
-                        <tr>
-                            <td style="padding-left: 20px;"><strong>{{ categoria.nome }}</strong></td>
-                            <td class="text-end">{{ categoria.valor|default:"0.00" }}</td>
-                            <td class="text-end">{{ categoria.percentual|default:"0.00" }}%</td>
-                        </tr>
-                            {% for subcategoria in categoria.subcategorias %}
-                            <tr>
-                                <td style="padding-left: 40px;">{{ subcategoria.nome }}</td>
-                                <td class="text-end">{{ subcategoria.valor|default:"0.00" }}</td>
-                                <td class="text-end">{{ subcategoria.percentual|default:"0.00" }}%</td>
-                            </tr>
-                            {% endfor %}
-                        {% endfor %}
-                        <tr class="table-success">
-                            <td><strong>Total Investimentos</strong></td>
-                            <td class="text-end"><strong>{{ total_investimentos|default:"0.00" }}</strong></td>
-                            <td class="text-end"><strong>{{ percentual_investimentos|default:"0.00" }}%</strong></td>
-                        </tr>
-
-                        <!-- Total Geral de Custos -->
-                        <tr class="table-danger">
-                            <td><strong>TOTAL GERAL DE CUSTOS E DESPESAS</strong></td>
-                            <td class="text-end"><strong>{{ total_geral_custos|default:"0.00" }}</strong></td>
-                            <td class="text-end"><strong>{{ percentual_geral_custos|default:"0.00" }}%</strong></td>
-                        </tr>
-
-                        <!-- Resultado Operacional -->
-                        <tr class="table-success">
-                            <td><strong>3. RESULTADO OPERACIONAL</strong></td>
-                            <td class="text-end"><strong>{{ resultado_operacional|default:"0.00" }}</strong></td>
-                            <td class="text-end"><strong>{{ percentual_resultado|default:"0.00" }}%</strong></td>
-                        </tr>
-
-                        <!-- Receitas/Despesas Não Operacionais -->
-                        <tr class="table-info">
-                            <td colspan="3"><strong>4. NÃO OPERACIONAL</strong></td>
+                            <td class="fw-bold">5. RESULTADO NÃO OPERACIONAL</td>
+                            <td class="text-end fw-bold">{% if dados_dre %}R$ {{ dados_dre.resultado_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.resultado_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">{% if dados_dre %}{{ dados_dre.percentual_resultado_nao_op|floatformat:2 }}{% else %}0{% endif %}%</td>
                         </tr>
                         <tr>
-                            <td>Receitas Não Operacionais</td>
-                            <td class="text-end">{{ receitas_nao_operacionais|default:"0.00" }}</td>
-                            <td class="text-end">{{ percentual_rec_nao_op|default:"0.00" }}%</td>
+                            <td>Receitas Não Operacionais (Entradas)</td>
+                            <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.receitas_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.receitas_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_receitas_nao_op|floatformat:2 }}{% else %}0{% endif %}%</td>
                         </tr>
                         <tr>
-                            <td>Despesas Não Operacionais</td>
-                            <td class="text-end">{{ despesas_nao_operacionais|default:"0.00" }}</td>
-                            <td class="text-end">{{ percentual_desp_nao_op|default:"0.00" }}%</td>
+                            <td>Despesas Não Operacionais (Saídas)</td>
+                            <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.despesas_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.despesas_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_despesas_nao_op|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        <tr class="fw-bold">
+                            <td>Resultado Não Operacional</td>
+                            <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.resultado_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.resultado_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_resultado_nao_op|floatformat:2 }}{% else %}0{% endif %}%</td>
                         </tr>
 
-                        <!-- Resultado Final -->
-                        <tr class="table-warning">
-                            <td><strong>5. RESULTADO FINAL</strong></td>
-                            <td class="text-end"><strong>{{ resultado_final|default:"0.00" }}</strong></td>
-                            <td class="text-end"><strong>{{ percentual_final|default:"0.00" }}%</strong></td>
+                        <!-- RESULTADO FINAL -->
+                        <tr class="{% if dados_dre and dados_dre.resultado_final > 0 %}table-success{% else %}table-danger{% endif %}">
+                            <td class="fw-bold">6. RESULTADO FINAL</td>
+                            <td class="text-end fw-bold">{% if dados_dre %}R$ {{ dados_dre.resultado_final|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.resultado_final|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">{% if dados_dre %}{{ dados_dre.percentual_resultado_final|floatformat:2 }}{% else %}0{% endif %}%</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-
-            <!-- Receitas -->
-            <div class="card mt-4">
-                <div class="card-body">
-                    <h5 class="card-title">Receitas</h5>
-                    <div class="table-responsive">
-                        <table class="table">
-                            <tbody>
-                                <tr>
-                                    <td>Vendas de Animais</td>
-                                    <td class="text-end">R$ <span id="receitas_vendas">0.00</span></td>
-                                </tr>
-                                <tr>
-                                    <td>Abates</td>
-                                    <td class="text-end">R$ <span id="receitas_abates">{{ receitas_abate|default:"0.00" }}</span></td>
-                                </tr>
-                                <tr class="table-active">
-                                    <td><strong>Total de Receitas</strong></td>
-                                    <td class="text-end"><strong>R$ <span id="receitas_totais">0.00</span></strong></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+            {% else %}
+            <!-- Mensagem quando não houver filtros aplicados -->
+            <div class="card mb-2">
+                <div class="card-body p-3 text-center">
+                    <p class="mb-0"><i class="bi bi-info-circle me-1"></i> Selecione o período (Data Inicial e Data Final) para visualizar o relatório DRE.</p>
                 </div>
             </div>
-
-            <!-- Patrimônio -->
-            <div class="row mt-4">
-                <div class="col-md-4">
-                    <div class="card">
-                        <div class="card-header bg-info text-white">
-                            <h5 class="mb-0">Ativo</h5>
-                        </div>
-                        <div class="card-body">
-                            <p>Saldo em Estoque: R$ {{ saldo_estoque|default:"0.00" }}</p>
-                            <p>Total Ativo: R$ {{ total_ativo|default:"0.00" }}</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card">
-                        <div class="card-header bg-warning">
-                            <h5 class="mb-0">Passivo</h5>
-                        </div>
-                        <div class="card-body">
-                            <p>Total Passivo: R$ {{ total_passivo|default:"0.00" }}</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card">
-                        <div class="card-header bg-success text-white">
-                            <h5 class="mb-0">Imobilizado</h5>
-                        </div>
-                        <div class="card-body">
-                            <p>Total Imobilizado: R$ {{ total_imobilizado|default:"0.00" }}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Atualizar relatório quando os filtros mudarem
-    const filtros = ['periodo', 'fazenda', 'data_inicial', 'data_final'];
-    filtros.forEach(filtro => {
-        document.getElementById(filtro).addEventListener('change', atualizarRelatorio);
-    });
-
-    // Carregar relatório inicial
-    atualizarRelatorio();
-});
-
-function atualizarRelatorio() {
-    // Coletar valores dos filtros
-    const filtros = {
-        periodo: document.getElementById('periodo').value,
-        fazenda: document.getElementById('fazenda').value,
-        data_inicial: document.getElementById('data_inicial').value,
-        data_final: document.getElementById('data_final').value
-    };
-
-    console.log('Enviando filtros:', filtros);
-
-    // Fazer requisição AJAX para atualizar os dados
-    fetch('{% url "atualizar_dre" %}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify(filtros)
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log('Dados recebidos:', data);
-        atualizarDRE(data);
-    })
-    .catch(error => {
-        console.error('Erro ao atualizar DRE:', error);
-    });
-}
-
-function atualizarDRE(data) {
-    // Verificar se há erro
-    if (data.error) {
-        console.error('Erro do servidor:', data.error);
-        return;
-    }
-
-    // Atualizar receitas
-    $('#receitas_vendas').text(formatarMoeda(data.receitas_vendas));
-    $('#receitas_abates').text(formatarMoeda(data.receitas_abates));
-    $('#receitas_totais').text(formatarMoeda(data.receitas_totais));
-
-    // Atualizar custos fixos
-    const custoFixosContainer = $('#custos_fixos_container');
-    custoFixosContainer.empty(); // Limpa o conteúdo atual
-
-    if (data.custos_fixos && Array.isArray(data.custos_fixos)) {
-        data.custos_fixos.forEach(categoria => {
-            // Adiciona a linha da categoria
-            custoFixosContainer.append(`
-                <tr>
-                    <td><strong>${categoria.nome}</strong></td>
-                    <td class="text-end"><strong>${formatarMoeda(categoria.valor)}</strong></td>
-                    <td class="text-end"><strong>${categoria.percentual}%</strong></td>
-                </tr>
-            `);
-
-            // Adiciona as linhas das subcategorias
-            if (categoria.subcategorias && Array.isArray(categoria.subcategorias)) {
-                categoria.subcategorias.forEach(sub => {
-                    custoFixosContainer.append(`
-                        <tr>
-                            <td style="padding-left: 40px;">${sub.nome}</td>
-                            <td class="text-end">${formatarMoeda(sub.valor)}</td>
-                            <td class="text-end">${sub.percentual}%</td>
-                        </tr>
-                    `);
-                });
-            }
-        });
-    }
-
-    // Atualizar totais
-    $('#custos_fixos_total').text(formatarMoeda(data.total_custos_fixos || 0));
-    $('#custos_fixos_percentual').text((data.percentual_custos_fixos || 0) + '%');
-}
-
-function exportarPDF() {
-    // Implementar exportação para PDF
-    window.print();
-}
-
-// Função para obter o token CSRF
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
+    function toggleDetails(id) {
+        const element = document.getElementById(id);
+        const icon = document.getElementById(`icon-${id}`);
+        
+        if (element.style.display === "table-row-group" || element.style.display === "") {
+            element.style.display = "none";
+            icon.classList.remove("fa-minus-square");
+            icon.classList.add("fa-plus-square");
+        } else {
+            element.style.display = "table-row-group";
+            icon.classList.remove("fa-plus-square");
+            icon.classList.add("fa-minus-square");
         }
     }
-    return cookieValue;
-}
-
-function formatarMoeda(valor) {
-    if (valor === undefined || valor === null) return 'R$ 0,00';
-    return `R$ ${parseFloat(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+    
+    // Função para exportar para PDF
+    function exportarPDF() {
+        // Esconder os botões durante a exportação
+        const toggleIcons = document.querySelectorAll('.toggle-icon');
+        toggleIcons.forEach(icon => {
+            icon.style.display = 'none';
+        });
+        
+        // Mostrar todos os detalhes para o PDF
+        const detalhes = document.querySelectorAll('.detalhes-categoria');
+        detalhes.forEach(item => {
+            item.style.display = 'table-row-group';
+        });
+        
+        const element = document.getElementById('report-content');
+        const opt = {
+            margin: 10,
+            filename: 'DRE_Report.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        
+        // Gerar PDF
+        html2pdf().set(opt).from(element).save().then(() => {
+            // Restaurar a visualização após gerar o PDF
+            toggleIcons.forEach(icon => {
+                icon.style.display = 'inline-block';
+            });
+            
+            // Ocultar os detalhes novamente
+            detalhes.forEach(item => {
+                item.style.display = 'none';
+            });
+            
+            // Mostrar mensagem de sucesso
+            toastr.success('PDF gerado com sucesso!', '', {
+                timeOut: 3000,
+                positionClass: 'toast-bottom-right'
+            });
+        });
+    }
+    
+    // Configuração do toastr para mensagens temporárias
+    toastr.options = {
+        "closeButton": false,
+        "positionClass": "toast-bottom-right",
+        "showDuration": "300",
+        "hideDuration": "1000",
+        "timeOut": "3000",
+        "showEasing": "swing",
+        "hideEasing": "linear"
+    };
 </script>
 {% endblock %}
 {% endblock %}

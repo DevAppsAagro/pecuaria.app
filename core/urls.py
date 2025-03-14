@@ -12,12 +12,19 @@ from . import views_abates
 from . import views_dashboard
 from . import views_impressao
 from . import views_reproducao
+from . import views_relatorios_reproducao
 from . import views_config
 from . import importacao_views
+from . import views_importacao
+from . import views_importacao_simples
 from . import views_account
 from . import views_eduzz
 from . import views_stripe
+from . import views_financeiro
 from . import auth_supabase
+from . import urls_mortes
+from . import views_debug
+from .api import manejo_api
 
 urlpatterns = [
     # Auth
@@ -43,6 +50,7 @@ urlpatterns = [
     path('financeiro/', views.em_desenvolvimento, name='financeiro'),
     path('reproducao/', views.em_desenvolvimento, name='reproducao'),
     path('relatorios/', views_relatorios.relatorios_view, name='relatorios_list'),
+    path('relatorios/reprodutivo/', views_relatorios_reproducao.relatorio_reprodutivo, name='relatorio_reprodutivo'),
     path('relatorios/pesagens/', views_relatorios.relatorio_pesagens, name='relatorio_pesagens'),
     path('relatorios/pesagens/imprimir/', views_impressao.imprimir_pesagens, name='imprimir_pesagens'),
     path('relatorios/confinamento/', views_relatorios.relatorio_confinamento, name='relatorio_confinamento'),
@@ -55,10 +63,12 @@ urlpatterns = [
     path('animais/', views.animal_list, name='animal_list'),
     path('animais/novo/', views.animal_create, name='animal-create'),
     path('animais/<int:pk>/', views.animal_detail, name='animal_detail'),
+    path('animais/<int:animal_id>/debug/', views_debug.debug_reprodutivo, name='animal_debug'),
     path('animais/<int:pk>/editar/', views.animal_edit, name='animal_edit'),
     path('animais/<int:pk>/excluir/', views.animal_delete, name='animal_delete'),
-    path('animais/importar/', views.animal_import, name='animal_import'),
-    path('animais/download-planilha-modelo/', importacao_views.download_planilha_modelo, name='download_planilha_modelo'),
+    path('animais/importar/', views_importacao_simples.import_animais, name='animal_import'),
+    path('importacao/animais/template/', views_importacao_simples.gerar_template_animais, name='animal_import_template'),
+    path('animais/download-planilha-modelo/', views_importacao.download_planilha_modelo, name='download_planilha_modelo'),
     path('animais/<int:animal_pk>/movimentacoes/', views.movimentacao_list, name='movimentacao_list'),
     path('animais/<int:animal_pk>/movimentacoes/nova/', views.movimentacao_create, name='movimentacao_create'),
     path('animal/<int:animal_pk>/movimentacao/criar/', views.movimentacao_create, name='movimentacao_create'),
@@ -104,6 +114,10 @@ urlpatterns = [
     path('manejos/sanitario/<int:pk>/excluir/', views.excluir_manejo, name='excluir_manejo'),
     path('pesagens/<int:pk>/update/', views.pesagem_update, name='pesagem_update'),
     path('pesagens/<int:pk>/delete/', views.pesagem_delete, name='pesagem_delete'),
+    path('api/buscar_animal/<str:brinco>/', manejo_api.buscar_animal, name='buscar_animal'),
+    path('api/registrar_manejo/', manejo_api.registrar_manejo, name='registrar_manejo'),
+    path('api/lotes_por_fazenda/<int:fazenda_id>/', manejo_api.lotes_por_fazenda, name='api_lotes_por_fazenda'),
+    path('api/pastos_por_fazenda/<int:fazenda_id>/', manejo_api.pastos_por_fazenda, name='api_pastos_por_fazenda'),
     
     # Máquinas e Benfeitorias
     path('maquinas/', views.maquinas_list, name='maquinas_list'),
@@ -142,7 +156,7 @@ urlpatterns = [
     path('estoque/saida/<int:pk>/editar/', views_estoque.saida_edit, name='saida_edit'),
     path('estoque/saida/<int:pk>/excluir/', views_estoque.saida_delete, name='saida_delete'),
     path('estoque/saida-nutricao/', views_estoque.saida_nutricao_list, name='saida_nutricao_list'),
-    path('estoque/saida-nutricao/novo/', views_estoque.saida_nutricao_estoque, name='saida_nutricao_estoque'),
+    path('estoque/saida-nutricao/novo/', views_estoque.saida_nutricao_estoque, name='saida_nutricao'),
     path('estoque/saida-nutricao/<int:pk>/', views_estoque.saida_nutricao_detail, name='saida_nutricao_detail'),
     path('estoque/saida-nutricao/<int:pk>/editar/', views_estoque.saida_nutricao_edit, name='saida_nutricao_edit'),
     path('estoque/saida-nutricao/<int:pk>/excluir/', views_estoque.saida_nutricao_delete, name='saida_nutricao_delete'),
@@ -163,6 +177,7 @@ urlpatterns = [
     path('api/financeiro/despesas/get_destinos/', views.get_destinos, name='get_destinos'),
     path('api/financeiro/despesas/get_subcategorias/', views.get_subcategorias, name='get_subcategorias'),
     path('api/financeiro/despesas/get_unidades_medida/', views.get_unidades_medida, name='get_unidades_medida'),
+    path('financeiro/atualizar-saldos/', views_financeiro.atualizar_saldos_contas_bancarias, name='atualizar_saldos'),
     
     # Vendas
     path('financeiro/vendas/', views_vendas.lista_vendas, name='lista_vendas'),
@@ -358,4 +373,7 @@ urlpatterns = [
     
     # Adicionando URL para a página de verificação de email
     path('verificar-email/', views.verificar_email_view, name='verificar_email'),
+    
+    # Incluir URLs de mortes de animais
+    path('', include(urls_mortes.urlpatterns)),
 ]

@@ -5,14 +5,14 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
     #map, .leaflet-container {
-        height: 70vh !important;
+        height: 65vh !important;
         width: 100%;
         border-radius: 0;
         margin: 0;
         padding: 0;
     }
     .leaflet-container {
-        height: 70vh !important;
+        height: 65vh !important;
         border-radius: 0 !important;
     }
     .map-filter {
@@ -37,9 +37,10 @@
     }
     .card {
         transition: all 0.3s ease;
+        margin-bottom: 1rem;
     }
     .card:hover {
-        transform: translateY(-5px);
+        transform: translateY(-3px);
     }
     .custom-div-icon {
         background: none;
@@ -74,7 +75,7 @@
     }
     .dashboard-section {
         background: white;
-        padding: 1.5rem;
+        padding: 1rem;
         border-radius: 0.5rem;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
@@ -83,19 +84,52 @@
         margin-top: 0 !important;
     }
     .dashboard-section .row + .row {
-        margin-top: 1.5rem;
+        margin-top: 1rem;
+    }
+    
+    /* Estilos para os gráficos */
+    .graph-card {
+        background: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+    .graph-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    .graph-header h5 {
+        margin: 0;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    .graph-body {
+        padding: 1rem;
+    }
+    .quick-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .action-button {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
+<div class="container-fluid mt-2">
     <!-- Mapa no topo -->
-    <div class="row mb-4">
+    <div class="row mb-3">
         <div class="col-12">
             <div id="map"></div>
             <div class="map-filter">
-                <select id="fazendaFilter" class="form-select me-2">
+                <select id="fazendaFilter" class="form-select form-select-sm me-2">
                     {% for fazenda in fazendas %}
                     <option value="{{ fazenda.id }}" {% if fazenda.id == primeira_fazenda.id %}selected{% endif %}>
                         {{ fazenda.nome }}
@@ -107,195 +141,482 @@
     </div>
 
     <!-- Gráficos -->
-    <div class="dashboard-section mb-5">
-        {% include "dashboard_graficos.html" %}
-    </div>
-
-    <!-- Cards do Dashboard -->
-    <div class="dashboard-section mb-5">
-        {% include "dashboard_new.html" %}
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="graph-card">
+                <div class="graph-header">
+                    <h5>Evolução do Rebanho</h5>
+                    <div class="graph-actions">
+                        <select class="form-select form-select-sm">
+                            <option>Último Ano</option>
+                            <option>Últimos 6 Meses</option>
+                            <option>Último Mês</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="graph-body">
+                    <canvas id="grafico-evolucao"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="graph-card">
+                <div class="graph-header">
+                    <h5>Distribuição do Rebanho</h5>
+                </div>
+                <div class="graph-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Categoria</th>
+                                    <th class="text-end">Quantidade</th>
+                                    <th class="text-end">%</th>
+                                </tr>
+                            </thead>
+                            <tbody class="table-distribuicao">
+                                {% for categoria in animais_por_categoria %}
+                                <tr>
+                                    <td>{{ categoria.categoria_display }}</td>
+                                    <td class="text-end">{{ categoria.total }}</td>
+                                    <td class="text-end">{{ categoria.percentual }}%</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     
+    <div class="row">
+        <div class="col-12">
+            <div class="graph-card">
+                <div class="graph-header">
+                    <h5>Financeiro Mensal</h5>
+                </div>
+                <div class="graph-body">
+                    <canvas id="grafico-financeiro"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ações Rápidas -->
+    <div class="row mb-3">
+        <div class="col">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light py-2">
+                    <h6 class="m-0 font-weight-bold text-primary">Ações</h6>
+                </div>
+                <div class="card-body quick-actions py-2">
+                    <a href="{% url 'animal-create' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-plus-circle"></i> Animal
+                    </a>
+                    <a href="{% url 'despesa_create' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-file-invoice-dollar"></i> Despesa
+                    </a>
+                    <a href="{% url 'criar_venda' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-shopping-cart"></i> Venda
+                    </a>
+                    <a href="{% url 'concepcao_form' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-venus-mars"></i> Concepção
+                    </a>
+                    <a href="{% url 'atualizar_saldos' %}" class="btn btn-outline-warning btn-sm">
+                        <i class="fas fa-sync"></i> Saldos
+                    </a>
+                    <a href="{% url 'relatorio_dre' %}" class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-chart-bar"></i> DRE
+                    </a>
+                    <a href="{% url 'relatorio_pesagens' %}" class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-weight"></i> Pesagens
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
+<!-- Scripts para o mapa -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-$(document).ready(function() {
-    // Inicializa o mapa
-    var map = L.map('map').setView([-15.7801, -47.9292], 5);  // Centraliza no Brasil inicialmente
-    
-    // Adiciona camada de satélite com ruas do Google
-    L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
-        maxZoom: 20,
-        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-        attribution: 'Google Maps'
-    }).addTo(map);
-    
-    // Estilos para os pastos
-    var pastosStyle = {
-        color: '#3a6604',
-        fillColor: '#65b307',
-        fillOpacity: 0.3,
-        weight: 4
-    };
-    
-    // Camadas para pastos e benfeitorias
-    var pastosLayer = L.featureGroup().addTo(map);
-    var benfeitoriasLayer = L.featureGroup().addTo(map);
-
-    // Função para formatar valor em R$
-    function formatarValor(valor) {
-        if (typeof valor === 'string') {
-            valor = parseFloat(valor.replace(/[^0-9.-]+/g, ''));
+    $(document).ready(function() {
+        // Inicializa o mapa
+        var map = L.map('map').setView([-15.7801, -47.9292], 5);  // Centraliza no Brasil inicialmente
+        
+        // Adiciona camada de satélite com ruas do Google (híbrido)
+        L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: 'Google Maps'
+        }).addTo(map);
+        
+        // Estilos para os pastos
+        var pastosStyle = {
+            color: '#3a6604',
+            fillColor: '#65b307',
+            fillOpacity: 0.3,
+            weight: 4
+        };
+        
+        // Camadas para pastos e benfeitorias
+        var pastosLayer = L.featureGroup().addTo(map);
+        var benfeitoriasLayer = L.featureGroup().addTo(map);
+        
+        // Função para formatar valor em R$
+        function formatarValor(valor) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(valor);
         }
-        return isNaN(valor) ? '0,00' : valor.toLocaleString('pt-BR', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-    }
-
-    // Função para carregar dados da fazenda
-    function carregarDadosFazenda(fazendaId) {
-        console.log('Carregando dados da fazenda:', fazendaId);  // Debug
         
-        // Limpa as camadas
-        pastosLayer.clearLayers();
-        benfeitoriasLayer.clearLayers();
-        
-        var bounds = L.latLngBounds();  // Cria um bounds vazio
-        var hasValidBounds = false;
-
-        // Carrega os pastos da fazenda selecionada
-        var url = `/api/get_pastos/${fazendaId}/`;
-        console.log('Buscando pastos em:', url);  // Debug
-        
-        // Carrega os pastos
-        $.get(url, function(data) {
-            console.log('Resposta dos pastos:', data);  // Debug
+        // Função para carregar dados da fazenda
+        function carregarDadosFazenda(fazendaId) {
+            // Limpa as camadas
+            pastosLayer.clearLayers();
+            benfeitoriasLayer.clearLayers();
             
-            if (data.success && data.pastos) {
-                data.pastos.forEach(function(pasto) {
-                    console.log('Processando pasto:', pasto);  // Debug
-                    
-                    if (pasto.coordenadas && Array.isArray(pasto.coordenadas)) {
-                        try {
-                            // Cria o polígono do pasto
-                            var polygon = L.polygon(pasto.coordenadas, pastosStyle);
-                            
-                            // Adiciona o popup com informações detalhadas
-                            polygon.bindPopup(`
-                                <div class="p-2">
-                                    <h5 class="font-bold mb-2">${pasto.nome || 'Pasto ' + pasto.id_pasto}</h5>
-                                    <div class="text-sm">
-                                        <p><strong>ID:</strong> ${pasto.id_pasto}</p>
-                                        <p><strong>Área:</strong> ${pasto.area} ha</p>
-                                        <p><strong>Animais:</strong> ${pasto.qtd_animais}</p>
-                                    </div>
-                                    <div class="mt-3">
-                                        <a href="/pastos/${pasto.id}/" class="btn btn-sm btn-primary">Ver Detalhes</a>
-                                    </div>
-                                </div>
-                            `);
-                            
-                            // Adiciona o polígono à camada
-                            pastosLayer.addLayer(polygon);
-                            
-                            // Adiciona as coordenadas ao bounds
-                            var polygonBounds = polygon.getBounds();
-                            bounds.extend(polygonBounds);
-                            hasValidBounds = true;
-                            
-                            console.log('Polígono criado com sucesso para o pasto:', pasto.id);  // Debug
-                        } catch (e) {
-                            console.error('Erro ao criar polígono para o pasto:', pasto.id, e);
+            var bounds = L.latLngBounds();  // Cria um bounds vazio
+            var hasValidBounds = false;
+            
+            // Carrega os dados da fazenda selecionada via AJAX
+            $.ajax({
+                url: "{% url 'atualizar_dashboard' %}",
+                data: {
+                    'fazenda': fazendaId
+                },
+                dataType: 'json',
+                success: function(data) {
+                    // Adiciona pastos ao mapa
+                    if (data.pastos && data.pastos.length > 0) {
+                        // Adiciona cada pasto ao mapa
+                        data.pastos.forEach(function(pasto) {
+                            if (pasto.coordenadas) {
+                                try {
+                                    var coords = JSON.parse(pasto.coordenadas);
+                                    var pastoCoords = [];
+                                    
+                                    // Converte coordenadas para LatLng
+                                    coords.forEach(function(coord) {
+                                        var latlng = L.latLng(coord[0], coord[1]);
+                                        pastoCoords.push(latlng);
+                                        bounds.extend(latlng);
+                                    });
+                                    
+                                    // Cria polígono do pasto
+                                    var polygon = L.polygon(pastoCoords, pastosStyle);
+                                    
+                                    // Adiciona popup com informações
+                                    polygon.bindPopup(
+                                        '<div class="p-2">' +
+                                        '<h5 class="font-bold mb-2">' + pasto.nome + '</h5>' +
+                                        '<div class="text-sm">' +
+                                        '<p><strong>ID:</strong> ' + pasto.id + '</p>' +
+                                        '<p><strong>Área:</strong> ' + pasto.area + ' ha</p>' +
+                                        '<p><strong>Animais:</strong> ' + (pasto.qtd_animais || 0) + '</p>' +
+                                        '</div>' +
+                                        '</div>'
+                                    );
+                                    
+                                    // Adiciona o polígono à camada
+                                    pastosLayer.addLayer(polygon);
+                                    hasValidBounds = true;
+                                    
+                                } catch (e) {
+                                    console.error("Erro ao carregar coordenadas do pasto " + pasto.nome + ": ", e);
+                                }
+                            }
+                        });
+                        
+                        // Carrega as benfeitorias se disponíveis
+                        if (data.benfeitorias) {
+                            data.benfeitorias.forEach(function(benfeitoria) {
+                                try {
+                                    var coords = benfeitoria.coordenadas;
+                                    if (typeof coords === 'string') {
+                                        coords = JSON.parse(coords);
+                                    }
+                                    
+                                    if (coords && coords.lat && coords.lng) {
+                                        // Cria o marcador com ícone personalizado
+                                        var marker = L.marker([coords.lat, coords.lng], {
+                                            icon: L.divIcon({
+                                                className: 'custom-div-icon',
+                                                html: '<div><i class="fas fa-map-marker-alt" style="font-size: 24px; color: #dc2626; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);"></i></div>',
+                                                iconSize: [30, 42],
+                                                iconAnchor: [15, 42]
+                                            })
+                                        });
+                                        
+                                        // Adiciona o popup com informações detalhadas
+                                        marker.bindPopup(
+                                            '<div class="p-2">' +
+                                            '<h5 class="font-bold mb-2">' + benfeitoria.nome + '</h5>' +
+                                            '<div class="text-sm">' +
+                                            '<p><strong>Valor:</strong> ' + formatarValor(benfeitoria.valor_compra) + '</p>' +
+                                            '<p><strong>Data:</strong> ' + (benfeitoria.data_aquisicao || 'Não informada') + '</p>' +
+                                            '</div>' +
+                                            '</div>'
+                                        );
+                                        
+                                        benfeitoriasLayer.addLayer(marker);
+                                        bounds.extend([coords.lat, coords.lng]);
+                                        hasValidBounds = true;
+                                    }
+                                } catch (e) {
+                                    console.error('Erro ao processar benfeitoria:', e);
+                                }
+                            });
+                        }
+                        
+                        // Ajusta o mapa para mostrar todos os elementos
+                        if (hasValidBounds) {
+                            map.fitBounds(bounds, { padding: [50, 50] });
+                        } else {
+                            map.setView([-15.7801, -47.9292], 13);
                         }
                     }
+                    
+                    // Atualiza os gráficos com dados reais
+                    atualizarGraficos(data);
+                }
+            });
+        }
+        
+        // Atualiza os gráficos com dados reais da API
+        function atualizarGraficos(data) {
+            // Dados para o gráfico de evolução do rebanho
+            if (data.evolucao_rebanho) {
+                var labels = data.evolucao_rebanho.map(function(item) {
+                    return item.mes;
+                });
+                
+                var nascimentos = data.evolucao_rebanho.map(function(item) {
+                    return item.nascimentos || 0;
+                });
+                
+                var vendas = data.evolucao_rebanho.map(function(item) {
+                    return item.vendas || 0;
+                });
+                
+                var abates = data.evolucao_rebanho.map(function(item) {
+                    return item.abates || 0;
+                });
+                
+                var compras = data.evolucao_rebanho.map(function(item) {
+                    return item.compras || 0;
+                });
+                
+                // Atualiza o gráfico de evolução
+                evolucaoChart.data.labels = labels;
+                evolucaoChart.data.datasets[0].data = nascimentos;
+                evolucaoChart.data.datasets[1].data = vendas;
+                
+                // Adiciona datasets para abates e compras
+                if (evolucaoChart.data.datasets.length < 3) {
+                    evolucaoChart.data.datasets.push({
+                        label: 'Abates',
+                        data: abates,
+                        borderColor: '#e74a3b',
+                        backgroundColor: 'rgba(231, 74, 59, 0.05)',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#e74a3b',
+                        tension: 0.3,
+                        fill: true
+                    });
+                } else {
+                    evolucaoChart.data.datasets[2].data = abates;
+                }
+                
+                if (evolucaoChart.data.datasets.length < 4) {
+                    evolucaoChart.data.datasets.push({
+                        label: 'Compras',
+                        data: compras,
+                        borderColor: '#f6c23e',
+                        backgroundColor: 'rgba(246, 194, 62, 0.05)',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#f6c23e',
+                        tension: 0.3,
+                        fill: true
+                    });
+                } else {
+                    evolucaoChart.data.datasets[3].data = compras;
+                }
+                
+                evolucaoChart.update();
+            }
+            
+            // Dados para distribuição do rebanho
+            if (data.animais_por_categoria) {
+                // Atualiza a tabela de distribuição do rebanho
+                var tbody = $('.table-distribuicao tbody');
+                tbody.empty();
+                
+                data.animais_por_categoria.forEach(function(categoria) {
+                    var row = '<tr>' +
+                              '<td>' + categoria.categoria_display + '</td>' +
+                              '<td class="text-end">' + categoria.total + '</td>' +
+                              '<td class="text-end">' + categoria.percentual + '%</td>' +
+                              '</tr>';
+                    tbody.append(row);
                 });
             }
             
-            // Carrega as benfeitorias
-            $.get(`/api/get_benfeitorias/${fazendaId}/`, function(data) {
-                if (data.success && data.benfeitorias) {
-                    data.benfeitorias.forEach(function(benfeitoria) {
-                        try {
-                            var coords = benfeitoria.coordenadas;
-                            if (typeof coords === 'string') {
-                                coords = JSON.parse(coords);
-                            }
-                            
-                            if (coords && coords.lat && coords.lng) {
-                                // Cria o marcador com ícone personalizado
-                                var marker = L.marker([coords.lat, coords.lng], {
-                                    icon: L.divIcon({
-                                        className: 'custom-div-icon',
-                                        html: `<div>
-                                                <i class="fas fa-map-marker-alt" style="font-size: 24px; color: #dc2626; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);"></i>
-                                              </div>`,
-                                        iconSize: [30, 42],
-                                        iconAnchor: [15, 42]
-                                    })
-                                });
-                                
-                                // Adiciona o popup com informações detalhadas
-                                marker.bindPopup(`
-                                    <div class="p-2">
-                                        <h5 class="font-bold mb-2">${benfeitoria.nome}</h5>
-                                        <div class="text-sm">
-                                            <p><strong>Valor:</strong> R$ ${benfeitoria.valor_compra}</p>
-                                            <p><strong>Data:</strong> ${benfeitoria.data_aquisicao || 'Não informada'}</p>
-                                        </div>
-                                        <div class="mt-3">
-                                            <a href="/benfeitorias/${benfeitoria.id}/" class="btn btn-sm btn-primary">Ver Detalhes</a>
-                                        </div>
-                                    </div>
-                                `);
-                                
-                                benfeitoriasLayer.addLayer(marker);
-                                bounds.extend([coords.lat, coords.lng]);
-                                hasValidBounds = true;
-                            }
-                        } catch (e) {
-                            console.error('Erro ao processar benfeitoria:', e, benfeitoria);
+            // Dados para o gráfico financeiro
+            if (data.financeiro) {
+                var labels = data.financeiro.map(function(item) {
+                    return item.mes;
+                });
+                
+                var receitas = data.financeiro.map(function(item) {
+                    return item.receitas || 0;
+                });
+                
+                var despesas = data.financeiro.map(function(item) {
+                    return item.despesas || 0;
+                });
+                
+                // Atualiza o gráfico financeiro
+                financeiroChart.data.labels = labels;
+                financeiroChart.data.datasets[0].data = receitas;
+                financeiroChart.data.datasets[1].data = despesas;
+                financeiroChart.update();
+            }
+        }
+        
+        // Evento de mudança do filtro de fazenda
+        $('#fazendaFilter').change(function() {
+            var fazendaId = $(this).val();
+            carregarDadosFazenda(fazendaId);
+        });
+        
+        // Gráficos
+        // Gráfico de Evolução
+        var evolucaoChart = new Chart(document.getElementById('grafico-evolucao').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+                datasets: [{
+                    label: 'Nascimentos',
+                    data: [0, 0, 0, 0, 0, 0],
+                    borderColor: '#4e73df',
+                    backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#4e73df',
+                    tension: 0.3,
+                    fill: true
+                }, {
+                    label: 'Vendas',
+                    data: [0, 0, 0, 0, 0, 0],
+                    borderColor: '#1cc88a',
+                    backgroundColor: 'rgba(28, 200, 138, 0.05)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#1cc88a',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            drawBorder: false,
+                            color: 'rgba(0, 0, 0, 0.05)'
                         }
-                    });
-                    
-                    // Ajusta o zoom do mapa para mostrar todos os elementos
-                    if (hasValidBounds) {
-                        map.fitBounds(bounds, { padding: [50, 50] });
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
                     }
                 }
-            });
-        });
-
-        // Atualiza os indicadores
-        $.get('/dashboard/atualizar/', { fazenda: fazendaId }, function(data) {
-            if (data.success) {
-                // Atualiza os valores nos cards usando formatarValor
-                $('.despesas-valor').text('R$ ' + formatarValor(data.indicadores.despesas));
-                $('.receitas-valor').text('R$ ' + formatarValor(data.indicadores.receitas));
-                $('.resultado-valor').text('R$ ' + formatarValor(data.indicadores.resultado));
             }
         });
-    }
 
-    // Evento de mudança do filtro de fazenda
-    $('#fazendaFilter').change(function() {
-        var fazendaId = $(this).val();
-        carregarDadosFazenda(fazendaId);
+        // Gráfico Financeiro
+        var financeiroChart = new Chart(document.getElementById('grafico-financeiro').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+                datasets: [{
+                    label: 'Receitas',
+                    data: [0, 0, 0, 0, 0, 0],
+                    backgroundColor: 'rgba(28, 200, 138, 0.8)',
+                    borderWidth: 0
+                }, {
+                    label: 'Despesas',
+                    data: [0, 0, 0, 0, 0, 0],
+                    backgroundColor: 'rgba(231, 74, 59, 0.8)',
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                var label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('pt-BR', {
+                                        style: 'currency',
+                                        currency: 'BRL'
+                                    }).format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            drawBorder: false,
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return new Intl.NumberFormat('pt-BR', {
+                                    style: 'currency',
+                                    currency: 'BRL',
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0
+                                }).format(value);
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
         
-        // Atualiza a URL com o novo filtro
-        var url = new URL(window.location);
-        url.searchParams.set('fazenda', fazendaId);
-        window.history.pushState({}, '', url);
+        // Carrega os dados iniciais
+        carregarDadosFazenda($('#fazendaFilter').val());
     });
-
-    // Carrega dados da primeira fazenda
-    var primeiraFazendaId = $('#fazendaFilter').val();
-    if (primeiraFazendaId) {
-        carregarDadosFazenda(primeiraFazendaId);
-    }
-});
 </script>
 {% endblock %}

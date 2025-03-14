@@ -112,7 +112,10 @@ $(document).ready(function() {
         $container.html('<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Carregando lotes...</div>');
         
         $.get(`/api/lotes-por-fazenda/${fazendaId}/`)
-            .done(function(data) {
+            .done(function(response) {
+                // Verifica se a resposta tem a propriedade 'lotes'
+                const data = response.lotes || [];
+                
                 if (data.length === 0) {
                     $container.html('<div class="alert alert-warning">Nenhum lote encontrado nesta fazenda</div>');
                     return;

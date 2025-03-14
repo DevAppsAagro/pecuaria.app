@@ -92,6 +92,8 @@
                                 <span class="badge bg-danger">Abatido</span>
                             {% elif venda %}
                                 <span class="badge bg-success">Vendido</span>
+                            {% elif morte %}
+                                <span class="badge bg-dark">Morto</span>
                             {% else %}
                                 <span class="badge bg-primary">Ativo</span>
                             {% endif %}
@@ -211,6 +213,27 @@
                     </dl>
                     {% else %}
                     <p class="text-muted">Sem informações de abate</p>
+                    {% endif %}
+                    
+                    <h6 class="text-muted mb-3">Informações de Morte</h6>
+                    {% if morte %}
+                    <dl class="row mb-3">
+                        <dt class="col-sm-4">Data da Morte</dt>
+                        <dd class="col-sm-8">{{ morte.data_morte|date:"d/m/Y" }}</dd>
+
+                        <dt class="col-sm-4">Motivo</dt>
+                        <dd class="col-sm-8">{{ morte.motivo.nome }}</dd>
+
+                        <dt class="col-sm-4">Prejuízo</dt>
+                        <dd class="col-sm-8">{{ morte.prejuizo|format_currency_br }}</dd>
+
+                        {% if morte.observacao %}
+                        <dt class="col-sm-4">Observação</dt>
+                        <dd class="col-sm-8">{{ morte.observacao }}</dd>
+                        {% endif %}
+                    </dl>
+                    {% else %}
+                    <p class="text-muted">Sem informações de morte</p>
                     {% endif %}
                 </div>
             </div>
@@ -506,7 +529,7 @@
                         <div class="col-md-6">
                             <p><strong>Data:</strong> {{ venda.venda.data|date:"d/m/Y" }}</p>
                             <p><strong>Peso:</strong> {{ venda.peso_venda|format_decimal_br }} kg</p>
-                            <p><strong>Cliente:</strong> {{ venda.venda.comprador.nome }}</p>
+                            <p><strong>Cliente:</strong> {{ venda.venda.contato.nome }}</p>
                         </div>
                         <div class="col-md-6">
                             <p><strong>Valor por kg:</strong> {{ venda.valor_kg|format_currency_br }}</p>
@@ -519,8 +542,207 @@
                 </div>
             </div>
             {% endif %}
+            
+            <!-- Informações Reprodutivas -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <h6 class="text-muted mb-3">Informações Reprodutivas</h6>
+                    
+                    <!-- Debug Info -->
+                    <div class="alert alert-info small">
+                        <p class="mb-1">Debug: manejos_reprodutivos: {% if manejos_reprodutivos %}Sim ({{ manejos_reprodutivos|length }}){% else %}Não{% endif %}</p>
+                        <p class="mb-1">Debug: filhos: {% if filhos %}Sim ({{ filhos.count }}){% else %}Não{% endif %}</p>
+                        <p class="mb-1">Debug: bezerros_organizados: {% if bezerros_organizados %}Sim ({{ bezerros_organizados|length }}){% else %}Não{% endif %}</p>
+                    </div>
+                    <!-- Informações de matriz -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h6 class="text-muted">Histórico Reprodutivo</h6>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Estação de Monta</th>
+                                            <th>Concepção</th>
+                                            <th>Previsão de Parto</th>
+                                            <th>Diagnóstico</th>
+                                            <th>Data Diagnóstico</th>
+                                            <th>Resultado</th>
+                                            <th>Data Resultado</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% if manejos_reprodutivos %}
+                                        {% for manejo in manejos_reprodutivos %}
+                                        <tr>
+                                            <td>
+                                                {% if manejo.estacao_monta %}
+                                                {{ manejo.estacao_monta }}
+                                                {% else %}
+                                                -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ manejo.data_concepcao|date:"d/m/Y"|default:"-" }}</td>
+                                            <td>{{ manejo.previsao_parto|date:"d/m/Y"|default:"-" }}</td>
+                                            <td>
+                                                {% if manejo.diagnostico %}
+                                                <span class="badge {% if manejo.diagnostico == 'PRENHE' %}bg-success{% else %}bg-warning{% endif %}">
+                                                    {{ manejo.get_diagnostico_display }}
+                                                </span>
+                                                {% else %}
+                                                -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ manejo.data_diagnostico|date:"d/m/Y"|default:"-" }}</td>
+                                            <td>
+                                                {% if manejo.resultado %}
+                                                <span class="badge {% if manejo.resultado == 'NASCIMENTO' %}bg-success{% else %}bg-danger{% endif %}">
+                                                    {{ manejo.get_resultado_display }}
+                                                </span>
+                                                {% else %}
+                                                -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ manejo.data_resultado|date:"d/m/Y"|default:"-" }}</td>
+                                            <td>
+                                                <a href="#" class="btn btn-sm btn-secondary">Editar</a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="8" class="text-center">
+                                                <p class="text-muted my-2">Sem histórico reprodutivo registrado</p>
+                                                <a href="#" class="btn btn-sm btn-primary">Adicionar Manejo Reprodutivo</a>
+                                            </td>
+                                        </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bezerros nascidos por estação -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="text-muted mb-0">Bezerros Nascidos</h6>
+                                <a href="#" class="btn btn-sm btn-primary">Registrar Bezerro</a>
+                            </div>
+                            
+                            {% if bezerros_organizados %}
+                            <div class="accordion" id="accordionBezerros">
+                                {% for item in bezerros_organizados %}
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
+                                            Estação: {{ item.estacao }} - {{ item.bezerros|length }} bezerro(s)
+                                        </button>
+                                    </h2>
+                                    <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#accordionBezerros">
+                                        <div class="accordion-body">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Brinco</th>
+                                                            <th>Data Nascimento</th>
+                                                            <th>Raça</th>
+                                                            <th>Sexo</th>
+                                                            <th>Peso Nascimento</th>
+                                                            <th>Pai</th>
+                                                            <th>Ações</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for bezerro in item.bezerros %}
+                                                        <tr>
+                                                            <td>{{ bezerro.brinco_visual }}</td>
+                                                            <td>{{ bezerro.data_nascimento|date:"d/m/Y" }}</td>
+                                                            <td>{{ bezerro.raca.nome }}</td>
+                                                            <td>{{ bezerro.categoria_animal.get_sexo_display }}</td>
+                                                            <td>{{ bezerro.peso_entrada }} kg</td>
+                                                            <td>
+                                                                {% if bezerro.pai %}
+                                                                <a href="{% url 'animal_detail' bezerro.pai.pk %}" class="text-decoration-none">
+                                                                    {{ bezerro.pai.brinco_visual }}
+                                                                </a>
+                                                                {% else %}
+                                                                -
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                <a href="{% url 'animal_detail' bezerro.pk %}" class="btn btn-primary btn-sm">
+                                                                    <i class="bi bi-eye"></i> Ver
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="alert alert-light text-center py-3">
+                                <p class="text-muted mb-2">Sem bezerros registrados</p>
+                                <small class="d-block text-muted mb-2">Registre os bezerros nascidos desta matriz para acompanhar seu desempenho reprodutivo</small>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Informações gerais de pais -->
+                    {% if animal.mae or animal.pai or estacao_origem %}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Informações de Parentesco</h6>
+                            <dl class="row mb-0">
+                                {% if estacao_origem %}
+                                <dt class="col-sm-4">Estação de Monta</dt>
+                                <dd class="col-sm-8">{{ estacao_origem }}</dd>
+                                {% endif %}
+                                
+                                {% if animal.mae %}
+                                <dt class="col-sm-4">Mãe</dt>
+                                <dd class="col-sm-8">
+                                    <a href="{% url 'animal_detail' animal.mae.pk %}" class="text-decoration-none">
+                                        {{ animal.mae.brinco_visual }}
+                                    </a>
+                                </dd>
+                                {% endif %}
+                                
+                                {% if animal.pai %}
+                                <dt class="col-sm-4">Pai</dt>
+                                <dd class="col-sm-8">
+                                    <a href="{% url 'animal_detail' animal.pai.pk %}" class="text-decoration-none">
+                                        {{ animal.pai.brinco_visual }}
+                                    </a>
+                                </dd>
+                                {% elif animal.tipo_origem_paterna == 'SEMEN' %}
+                                <dt class="col-sm-4">Origem</dt>
+                                <dd class="col-sm-8">Inseminação Artificial</dd>
+                                {% endif %}
+                                
+                                <dt class="col-sm-4">Peso ao Nascer</dt>
+                                <dd class="col-sm-8">{{ animal.peso_entrada }} kg</dd>
+                            </dl>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if not manejos_reprodutivos and not filhos and not bezerros_organizados %}
+                    <p class="text-muted">Sem informações reprodutivas registradas</p>
+                    {% endif %}
+                </div>
+            </div>
         </div>
-        
     </div>
 </div>
 

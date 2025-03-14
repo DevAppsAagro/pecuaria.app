@@ -1,68 +1,246 @@
 {% extends 'base.html' %}
 
+{% block extra_head %}
+<style>
+    /* Estilos para os cards coloridos */
+    .small-box {
+        border-radius: 0.25rem;
+        position: relative;
+        display: block;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+    .small-box > .inner {
+        padding: 15px;
+        position: relative;
+        z-index: 2;
+        color: #fff !important;
+    }
+
+    .small-box h3, .small-box p {
+        color: #fff !important;
+        margin: 0;
+    }
+    
+    .small-box h3 {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+    }
+    
+    .small-box p {
+        font-size: 1rem;
+    }
+
+    .small-box .icon {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        font-size: 2.5rem;
+        color: rgba(255, 255, 255, 0.3);
+    }
+    
+    .bg-primary {
+        background-color: #007bff !important;
+        color: #fff !important;
+    }
+    
+    .bg-success {
+        background-color: #28a745 !important;
+        color: #fff !important;
+    }
+    
+    .bg-info {
+        background-color: #17a2b8 !important;
+        color: #fff !important;
+    }
+    
+    .bg-warning {
+        background-color: #ffc107 !important;
+        color: #212529 !important;
+    }
+    
+    .bg-danger {
+        background-color: #dc3545 !important;
+        color: #fff !important;
+    }
+    
+    /* Ajustes para formato compacto */
+    #searchInput {
+        height: calc(1.5em + 0.5rem + 2px);
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
+    <div class="content-header">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Saídas para Nutrição</h2>
+            <a href="{% url 'saida_nutricao' %}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-circle"></i> Nova Saída
+            </a>
+        </div>
+    </div>
+
+    <!-- Cards informativos coloridos -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-2">
+            <div class="small-box bg-primary">
+                <div class="inner">
+                    <h3>{{ saidas|length }}</h3>
+                    <p>Total de Saídas</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-box-arrow-right"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-2">
+            <div class="small-box bg-success">
+                <div class="inner">
+                    <h3>R$ {{ total_valor_saidas|default:'0.00'|floatformat:2 }}</h3>
+                    <p>Valor Total</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-currency-dollar"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-2">
+            <div class="small-box bg-info">
+                <div class="inner">
+                    <h3>{{ saidas_mes_atual|default:'0' }}</h3>
+                    <p>Saídas no Mês Atual</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-calendar-date"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-2">
+            <div class="small-box bg-warning">
+                <div class="inner">
+                    <h3>{{ total_lotes_atendidos|default:'0' }}</h3>
+                    <p>Lotes Atendidos</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-diagram-3"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
         <div class="col">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h4>Saídas de Estoque - Nutrição</h4>
-                    <a href="{% url 'saida_nutricao_estoque' %}" class="btn btn-primary">
-                        <i class="bi bi-plus-circle"></i> Nova Saída Nutrição
-                    </a>
+                    <h4>Saídas de Estoque para Nutrição</h4>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Insumo</th>
-                                    <th>Quantidade</th>
-                                    <th>Valor Unitário</th>
-                                    <th>Valor Total</th>
-                                    <th>Destino</th>
-                                    <th>Consumo %PV</th>
-                                    <th>Observação</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for saida in saidas %}
-                                <tr>
-                                    <td>{{ saida.data|date:"d/m/Y" }}</td>
-                                    <td>{{ saida.insumo.nome }}</td>
-                                    <td>{{ saida.quantidade|floatformat:2 }} {{ saida.insumo.unidade_medida.sigla }}</td>
-                                    <td>R$ {{ saida.valor_unitario|floatformat:2 }}</td>
-                                    <td>R$ {{ saida.valor_total|floatformat:2 }}</td>
-                                    <td>{{ saida.destino_lote.id_lote }} - {{ saida.destino_lote.fazenda.nome }}</td>
-                                    <td>{{ saida.consumo_pv|floatformat:2 }}%</td>
-                                    <td>{{ saida.observacao|default:"-" }}</td>
-                                    <td>
-                                        <div class="btn-group">
-                                            <a href="{% url 'saida_nutricao_detail' saida.id %}" class="btn btn-sm btn-info" title="Ver Detalhes">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
-                                            <a href="{% url 'saida_nutricao_edit' saida.id %}" class="btn btn-sm btn-warning" title="Editar">
-                                                <i class="bi bi-pencil"></i>
-                                            </a>
-                                            <a href="{% url 'saida_nutricao_delete' saida.id %}" class="btn btn-sm btn-danger" title="Excluir">
-                                                <i class="bi bi-trash"></i>
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="9" class="text-center">Nenhuma saída de nutrição registrada.</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                    <table class="table table-bordered table-striped table-hover" id="saidasNutricaoTable">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Insumo</th>
+                                <th>Quantidade</th>
+                                <th>Valor Unitário</th>
+                                <th>Valor Total</th>
+                                <th>Destino</th>
+                                <th>Consumo %PV</th>
+                                <th>Observação</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for saida in saidas %}
+                            <tr>
+                                <td>{{ saida.data|date:"d/m/Y" }}</td>
+                                <td>{{ saida.insumo.nome }}</td>
+                                <td>{{ saida.quantidade|floatformat:2 }} {{ saida.insumo.unidade_medida.sigla }}</td>
+                                <td>R$ {{ saida.valor_unitario|floatformat:2 }}</td>
+                                <td>R$ {{ saida.valor_total|floatformat:2 }}</td>
+                                <td>{{ saida.destino_lote.id_lote }} - {{ saida.destino_lote.fazenda.nome }}</td>
+                                <td>{{ saida.consumo_pv|floatformat:3 }}%</td>
+                                <td>{{ saida.observacao|default:"-" }}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{% url 'saida_nutricao_detail' saida.id %}" class="btn btn-sm btn-info" title="Ver Detalhes">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{% url 'saida_nutricao_edit' saida.id %}" class="btn btn-sm btn-warning" title="Editar">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="{% url 'saida_nutricao_delete' saida.id %}" class="btn btn-sm btn-danger" title="Excluir">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center">Nenhuma saída registrada.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Desativando DataTables completamente devido aos erros persistentes
+        console.log("Usando tabela básica para interface mais compacta e eficiente");
+        
+        // Adiciona campo de pesquisa compacto
+        var searchField = $('<div class="mb-2"><input type="text" class="form-control form-control-sm" id="searchInput" placeholder="Busca rápida..."></div>');
+        $('#saidasNutricaoTable').before(searchField);
+        
+        // Implementa pesquisa rápida (sem necessidade de pressionar botões)
+        $('#searchInput').on('keyup', function() {
+            var value = $(this).val().toLowerCase();
+            $('#saidasNutricaoTable tbody tr').filter(function() {
+                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+            });
+        });
+        
+        // Ordenação ao clicar nos cabeçalhos (interface intuitiva em campo)
+        $('#saidasNutricaoTable th').css('cursor', 'pointer').click(function() {
+            var table = $(this).parents('table').eq(0);
+            var rows = table.find('tr:gt(0)').toArray().sort(comparer($(this).index()));
+            this.asc = !this.asc;
+            if (!this.asc) {
+                rows = rows.reverse();
+            }
+            for (var i = 0; i < rows.length; i++) {
+                table.append(rows[i]);
+            }
+        });
+        
+        // Função auxiliar para ordenação
+        function comparer(index) {
+            return function(a, b) {
+                var valA = getCellValue(a, index), valB = getCellValue(b, index);
+                return $.isNumeric(valA) && $.isNumeric(valB) ? valA - valB : valA.localeCompare(valB);
+            };
+        }
+        
+        // Função auxiliar para obter valor da célula
+        function getCellValue(row, index) {
+            return $(row).children('td').eq(index).text();
+        }
+    });
+</script>
 {% endblock %}

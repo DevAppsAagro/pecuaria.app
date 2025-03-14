@@ -4,7 +4,78 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView
 from django.utils import timezone
 from django.db.models import Q
-from .models import Despesa, ItemDespesa, Fazenda, Contato
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.db import connection
+from datetime import date
+
+from .models import Despesa, ItemDespesa, Fazenda, Contato, Animal, ManejoReproducao
+
+@login_required
+def debug_reprodutivo(request, animal_id=66):
+    """View especial para depuração dos dados reprodutivos do animal 66"""
+    # Recuperar animal
+    animal = Animal.objects.get(pk=animal_id)
+    
+    # Consulta SQL direta para manejo reprodutivo
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT * FROM core_manejoreproducao WHERE animal_id = %s
+        """, [animal_id])
+        manejos_raw = cursor.fetchall()
+        columns = [col[0] for col in cursor.description]
+        manejos_sql = [dict(zip(columns, row)) for row in manejos_raw]
+    
+    # Consulta SQL direta para filhos
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT * FROM core_animal WHERE mae_id = %s
+        """, [animal_id])
+        filhos_raw = cursor.fetchall()
+        columns = [col[0] for col in cursor.description]
+        filhos_sql = [dict(zip(columns, row)) for row in filhos_raw]
+    
+    # Criar dados reprodutivos manualmente para o animal 66
+    manejos_reprodutivos = [{
+        'id': 1,
+        'estacao_monta': 'Estação 2025',
+        'data_concepcao': date(2025, 3, 12),
+        'previsao_parto': date(2025, 12, 12),
+        'diagnostico': 'PRENHE',
+        'get_diagnostico_display': lambda: 'Prenhe',
+        'data_diagnostico': date(2025, 4, 15),
+        'resultado': 'NASCIMENTO',
+        'get_resultado_display': lambda: 'Nascimento',
+        'data_resultado': date(2025, 12, 15),
+        'observacao': 'Manejo criado para debug'
+    }]
+    
+    filhos = [{
+        'id': 76,
+        'brinco_visual': 'BZ001',
+        'data_nascimento': date(2025, 12, 15),
+        'raca': type('Raca', (), {'nome': 'Nelore'}),
+        'categoria_animal': type('Categoria', (), {'get_sexo_display': lambda: 'Macho'}),
+        'peso_entrada': 35,
+        'pai': None
+    }]
+    
+    bezerros_organizados = [{
+        'estacao': 'Estação de Monta 2025',
+        'bezerros': filhos
+    }]
+    
+    context = {
+        'animal': animal,
+        'manejos_reprodutivos': manejos_reprodutivos,
+        'filhos': filhos,
+        'bezerros_organizados': bezerros_organizados,
+        'manejos_sql': manejos_sql,
+        'filhos_sql': filhos_sql
+    }
+    
+    return render(request, 'animais/debug.html', context)
+
 
 class DespesasListViewDebug(LoginRequiredMixin, ListView):
     model = Despesa

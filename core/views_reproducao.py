@@ -2,6 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.db.models import Q
+from django.shortcuts import render, redirect
+from django.contrib import messages
 from datetime import datetime, timedelta
 import logging
 import traceback
@@ -135,16 +137,14 @@ def get_lotes_por_fazenda(request, fazenda_id):
             data.append({
                 'id': lote.id,
                 'id_lote': lote.id_lote,
+                'nome': lote.id_lote,  
                 'quantidade_animais': qtd_animais,
                 'text': f'{lote.id_lote} ({qtd_animais} animais)'
             })
         
-        return JsonResponse(data, safe=False)
+        return JsonResponse({'lotes': data})
     except Exception as e:
-        import traceback
-        print(f"Erro ao buscar lotes: {str(e)}")
-        print(traceback.format_exc())
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'error': str(e)}, status=400)
 
 @login_required
 def buscar_animal(request):

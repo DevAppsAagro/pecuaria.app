@@ -112,6 +112,87 @@
                     </div>
                 </div>
 
+                <!-- Seção de Origem Animal (Genealogia) -->
+                <div class="row mt-3 mb-2">
+                    <div class="col-12 d-flex justify-content-between align-items-center">
+                        <h5><i class="bi bi-diagram-3"></i> Genealogia</h5>
+                        <div class="form-check form-switch ms-2">
+                            <input class="form-check-input" type="checkbox" id="is_nascimento" name="is_nascimento" onchange="toggleNascimento()">
+                            <label class="form-check-label" for="is_nascimento">
+                                <i class="bi bi-stars me-1"></i>Nascimento
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Seleção de Estação de Monta (mostrada apenas se for nascimento) -->
+                <div class="row" id="estacao_monta_row" style="display: none;">
+                    <div class="col-md-12 mb-3">
+                        <label for="estacao_monta" class="form-label">Estação de Monta</label>
+                        <select class="form-select" id="estacao_monta" name="estacao_monta">
+                            <option value="">Selecione a estação de monta</option>
+                            {% for estacao in estacoes_monta %}
+                            <option value="{{ estacao.id }}">
+                                {{ estacao }} 
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Selecione a estação de monta associada ao nascimento</small>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <!-- Origem Materna -->
+                    <div class="col-md-4 mb-3">
+                        <label for="mae" class="form-label">Mãe</label>
+                        <select class="form-select" id="mae" name="mae">
+                            <option value="">Selecione a mãe</option>
+                            {% for animal_mae in animais %}
+                            <option value="{{ animal_mae.id }}" {% if animal.mae_id == animal_mae.id %}selected{% endif %}>
+                                {{ animal_mae.brinco_visual }} - {{ animal_mae.categoria_animal }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Tipo de Origem Paterna -->
+                    <div class="col-md-4 mb-3">
+                        <label for="tipo_origem_paterna" class="form-label">Tipo de Origem Paterna</label>
+                        <select class="form-select" id="tipo_origem_paterna" name="tipo_origem_paterna" onchange="toggleOrigemPaterna()">
+                            <option value="">Selecione o tipo</option>
+                            <option value="ANIMAL" {% if animal.tipo_origem_paterna == 'ANIMAL' %}selected{% endif %}>Animal</option>
+                            <option value="SEMEN" {% if animal.tipo_origem_paterna == 'SEMEN' %}selected{% endif %}>Sêmen</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Pai (Animal) -->
+                    <div class="col-md-4 mb-3" id="pai_animal_div" {% if animal.tipo_origem_paterna != 'ANIMAL' and animal.tipo_origem_paterna %}style="display:none"{% endif %}>
+                        <label for="pai" class="form-label">Pai</label>
+                        <select class="form-select" id="pai" name="pai">
+                            <option value="">Selecione o pai</option>
+                            {% for animal_pai in animais %}
+                            <option value="{{ animal_pai.id }}" {% if animal.pai_id == animal_pai.id %}selected{% endif %}>
+                                {{ animal_pai.brinco_visual }} - {{ animal_pai.categoria_animal }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Informação de Sêmen (placeholder para implementação futura) -->
+                    <div class="col-md-4 mb-3" id="pai_semen_div" {% if animal.tipo_origem_paterna != 'SEMEN' %}style="display:none"{% endif %}>
+                        <label for="codigo_semen" class="form-label">Código do Sêmen</label>
+                        <input type="text" class="form-control" id="codigo_semen" name="codigo_semen" value="{{ animal.codigo_semen|default:'' }}" disabled>
+                        <small class="text-muted">Funcionalidade de cadastro de sêmen em desenvolvimento</small>
+                    </div>
+                </div>
+                
+                <!-- Seção de Localização -->
+                <div class="row mt-3 mb-2">
+                    <div class="col-12">
+                        <h5><i class="bi bi-geo-alt"></i> Localização</h5>
+                    </div>
+                </div>
+                
                 <div class="row">
                     <!-- Lote -->
                     <div class="col-md-4 mb-3">
@@ -195,11 +276,81 @@ function atualizarPastos() {
     }
 }
 
+// Função para gerenciar a exibição dos campos de origem paterna
+function toggleOrigemPaterna() {
+    const tipoOrigemPaterna = document.getElementById('tipo_origem_paterna').value;
+    const paiAnimalDiv = document.getElementById('pai_animal_div');
+    const paiSemenDiv = document.getElementById('pai_semen_div');
+    
+    if (tipoOrigemPaterna === 'ANIMAL') {
+        paiAnimalDiv.style.display = 'block';
+        paiSemenDiv.style.display = 'none';
+        document.getElementById('pai').disabled = false;
+        document.getElementById('codigo_semen').disabled = true;
+    } else if (tipoOrigemPaterna === 'SEMEN') {
+        paiAnimalDiv.style.display = 'none';
+        paiSemenDiv.style.display = 'block';
+        document.getElementById('pai').disabled = true;
+        document.getElementById('codigo_semen').disabled = true; // Manter desabilitado até implementação futura
+    } else {
+        paiAnimalDiv.style.display = 'none';
+        paiSemenDiv.style.display = 'none';
+        document.getElementById('pai').disabled = true;
+        document.getElementById('codigo_semen').disabled = true;
+    }
+}
+
+// Função para gerenciar a exibição do campo de estação de monta
+function toggleNascimento() {
+    const isNascimento = document.getElementById('is_nascimento').checked;
+    const estacaoMontaRow = document.getElementById('estacao_monta_row');
+    const estacaoMontaSelect = document.getElementById('estacao_monta');
+    
+    if (isNascimento) {
+        estacaoMontaRow.style.display = 'flex';
+        estacaoMontaSelect.required = true;
+        
+        // Automaticamente mostra os campos de mãe já que é nascimento
+        document.getElementById('mae').required = true;
+        
+        // Define a data de entrada como igual à data de nascimento
+        const dataNascimento = document.getElementById('data_nascimento');
+        const dataEntrada = document.getElementById('data_entrada');
+        if (dataNascimento.value) {
+            dataEntrada.value = dataNascimento.value;
+        }
+        
+        // Oculta campo de valor de compra já que é nascimento
+        document.getElementById('valor_compra').value = '';
+        document.getElementById('valor_compra').parentElement.style.display = 'none';
+    } else {
+        estacaoMontaRow.style.display = 'none';
+        estacaoMontaSelect.required = false;
+        estacaoMontaSelect.value = '';
+        document.getElementById('mae').required = false;
+        
+        // Mostra novamente o campo de valor de compra
+        document.getElementById('valor_compra').parentElement.style.display = 'block';
+    }
+}
+
 // Executa ao carregar a página se já houver um lote selecionado
 document.addEventListener('DOMContentLoaded', function() {
     const loteSelect = document.getElementById('lote');
     if (loteSelect.value) {
         atualizarPastos();
+    }
+    
+    // Garante que os campos de origem paterna estejam corretamente exibidos ao carregar a página
+    toggleOrigemPaterna();
+    
+    // Também verifica o estado do checkbox de nascimento
+    toggleNascimento();
+    
+    // Se estiver editando um animal com nascimento selecionado, marca o checkbox
+    if (document.getElementById('estacao_monta').value) {
+        document.getElementById('is_nascimento').checked = true;
+        toggleNascimento();
     }
 });
 

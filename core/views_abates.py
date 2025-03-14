@@ -276,8 +276,17 @@ def excluir_abate(request, pk):
     if request.method == 'POST':
         try:
             with transaction.atomic():
-                # O método delete do AbateAnimal já cuida de restaurar o status dos animais
+                # Primeiro, restaurar o status dos animais para ATIVO
+                animais_ids = AbateAnimal.objects.filter(abate=abate).values_list('animal_id', flat=True)
+                Animal.objects.filter(id__in=animais_ids).update(
+                    situacao='ATIVO',
+                    data_saida=None,
+                    valor_venda=None
+                )
+                
+                # Depois, excluir o abate (isso vai excluir os AbateAnimal em cascata)
                 abate.delete()
+                
                 messages.success(request, 'Abate excluído com sucesso!')
                 return redirect('abates_list')
         except Exception as e:
@@ -321,7 +330,7 @@ def registrar_pagamento_abate(request, parcela_id):
                 parcela.abate.atualizar_status()
             
             messages.success(request, 'Pagamento registrado com sucesso!')
-            return redirect('abates_detalhe', pk=parcela.abate.id)
+            return redirect('detalhe_abate', pk=parcela.abate.id)
             
         except ValueError as e:
             messages.error(request, str(e))

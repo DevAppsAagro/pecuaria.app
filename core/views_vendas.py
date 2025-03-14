@@ -535,6 +535,20 @@ def registrar_pagamento_venda(request, parcela_id):
                 # Atualiza o status da parcela
                 parcela.atualizar_status()
                 parcela.save()
+                
+                # Verifica se todas as parcelas estão pagas
+                venda = parcela.venda
+                parcelas_pendentes = ParcelaVenda.objects.filter(
+                    venda=venda
+                ).annotate(
+                    valor_pago=Coalesce(Sum('pagamentos_venda__valor'), 0, output_field=DecimalField())
+                ).filter(valor_pago__lt=F('valor')).count()
+                
+                # Se não há parcelas pendentes, atualiza o status da venda para PAGO
+                if parcelas_pendentes == 0:
+                    venda.data_pagamento = timezone.now().date()
+                    venda.status = 'PAGO'
+                    venda.save()
             
             messages.success(request, 'Pagamento registrado com sucesso!')
             return redirect('detalhe_venda', pk=parcela.venda.id)

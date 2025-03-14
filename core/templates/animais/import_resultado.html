@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Resultado da Importação de Animais{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h4><i class="fas fa-file-import"></i> Resultado da Importação de Animais</h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-12">
+                    <h5 class="card-title">Resumo da Importação</h5>
+                    
+                    <!-- Estatísticas gerais -->
+                    <div class="row mb-4">
+                        <div class="col-md-4 text-center">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h3 class="text-primary">{{ total_processados }}</h3>
+                                    <p class="text-muted">Total Processados</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <div class="card {% if animais_importados > 0 %}bg-success text-white{% else %}bg-light{% endif %}">
+                                <div class="card-body">
+                                    <h3>{{ animais_importados }}</h3>
+                                    <p>Importados com Sucesso</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <div class="card {% if erros %}bg-danger text-white{% else %}bg-light{% endif %}">
+                                <div class="card-body">
+                                    <h3>{{ erros|length }}</h3>
+                                    <p>Erros Encontrados</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Status geral -->
+                    {% if status == 'success' %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i> {{ message }}
+                        </div>
+                    {% elif status == 'partial' %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i> {{ message }}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-times-circle"></i> {{ message }}
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Lista de erros -->
+                    {% if erros %}
+                        <div class="mt-4">
+                            <h5><i class="fas fa-bug"></i> Detalhes dos Erros</h5>
+                            <div class="list-group">
+                                {% for erro in erros %}
+                                <div class="list-group-item list-group-item-danger">
+                                    {{ erro }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Botões de ação -->
+                    <div class="mt-4">
+                        <a href="{% url 'animal_import' %}" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Nova Importação
+                        </a>
+                        <a href="{% url 'animal_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-list"></i> Ver Lista de Animais
+                        </a>
+                        <a href="{% url 'gerar_template_animais' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-file-excel"></i> Baixar Modelo de Planilha
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+    // Limpa a URL de consulta para evitar problemas de redirecionamento
+    history.replaceState({}, document.title, window.location.pathname);
+</script>
+{% endblock %}

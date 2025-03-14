@@ -1,0 +1,251 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/select/1.7.0/css/select.bootstrap5.min.css">
+<style>
+    .btn-group .btn {
+        margin: 0 2px;
+    }
+    .btn-group .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(50,50,93,.11), 0 1px 3px rgba(0,0,0,.08);
+    }
+    
+    /* Correção para dropdown não ser cortado pelo DataTable */
+    .dropdown-menu {
+        z-index: 1100 !important;
+        position: absolute !important;
+    }
+    
+    /* Garantir que o DataTable não corte elementos */
+    .dataTables_wrapper {
+        overflow: visible !important;
+    }
+    
+    .table-responsive {
+        overflow: visible !important;
+    }
+    
+    .dropdown-menu.show {
+        display: block !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Content Header -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">Registros de Mortes</h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'animal_list' %}">Animais</a></li>
+                        <li class="breadcrumb-item active">Registros de Mortes</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <section class="content">
+        <div class="container-fluid">
+            <!-- Filtros -->
+            <div class="card card-primary card-outline mb-4">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-filter mr-1"></i>
+                        Filtros
+                    </h3>
+                    <div class="card-tools">
+                        <button type="button" class="btn btn-tool" data-bs-toggle="collapse" data-bs-target="#filtros" aria-expanded="false">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body collapse" id="filtros">
+                    <form method="get">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="motivo" class="form-label">Motivo</label>
+                                <select name="motivo" id="motivo" class="form-select">
+                                    <option value="">Todos</option>
+                                    {% for motivo in motivos %}
+                                    <option value="{{ motivo.id }}" {% if request.GET.motivo == motivo.id|stringformat:"i" %}selected{% endif %}>{{ motivo.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="data_inicio" class="form-label">Data Início</label>
+                                <input type="date" name="data_inicio" id="data_inicio" class="form-control" value="{{ request.GET.data_inicio }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="data_fim" class="form-label">Data Fim</label>
+                                <input type="date" name="data_fim" id="data_fim" class="form-control" value="{{ request.GET.data_fim }}">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Filtrar
+                                </button>
+                                <a href="{% url 'morte_list' %}" class="btn btn-secondary">
+                                    <i class="fas fa-eraser"></i> Limpar Filtros
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Lista de Registros -->
+            <div class="card card-primary card-outline">
+                <div class="card-header">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h3 class="card-title">Registros de Mortes</h3>
+                        </div>
+                        <div class="col-auto">
+                            <div class="btn-group">
+                                <a href="{% url 'morte_create' %}" class="btn btn-danger">
+                                    <i class="fas fa-plus"></i> Novo Registro
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="mortes-table" class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Brinco Visual</th>
+                                    <th>Motivo</th>
+                                    <th>Data da Morte</th>
+                                    <th>Prejuízo (R$)</th>
+                                    <th>Data do Registro</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registro in registros %}
+                                <tr>
+                                    <td>{{ registro.animal.brinco_visual }}</td>
+                                    <td>{{ registro.motivo.nome }}</td>
+                                    <td>{{ registro.data_morte|date:"d/m/Y" }}</td>
+                                    <td>R$ {{ registro.prejuizo|floatformat:2 }}</td>
+                                    <td>{{ registro.data_registro|date:"d/m/Y H:i" }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="fas fa-cog"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="{% url 'morte_update' registro.id %}"><i class="fas fa-pencil-alt"></i> Editar</a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item text-danger" href="{% url 'morte_delete' registro.id %}"><i class="fas fa-trash-alt"></i> Excluir</a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginação -->
+                    <div class="mt-3">
+                        <nav aria-label="Navegação de página">
+                            {% if registros.has_other_pages %}
+                            <ul class="pagination justify-content-center">
+                                {% if registros.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ registros.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Anterior">
+                                        <span aria-hidden="true">&laquo;</span>
+                                    </a>
+                                </li>
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" aria-label="Anterior">
+                                        <span aria-hidden="true">&laquo;</span>
+                                    </a>
+                                </li>
+                                {% endif %}
+                                
+                                {% for i in registros.paginator.page_range %}
+                                    {% if registros.number == i %}
+                                    <li class="page-item active"><a class="page-link" href="#">{{ i }}</a></li>
+                                    {% elif i > registros.number|add:'-3' and i < registros.number|add:'3' %}
+                                    <li class="page-item"><a class="page-link" href="?page={{ i }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ i }}</a></li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if registros.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ registros.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Próximo">
+                                        <span aria-hidden="true">&raquo;</span>
+                                    </a>
+                                </li>
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" aria-label="Próximo">
+                                        <span aria-hidden="true">&raquo;</span>
+                                    </a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                            {% endif %}
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- DataTables & Plugins -->
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        // Inicializa a tabela
+        $('#mortes-table').DataTable({
+            responsive: true,
+            lengthChange: true,
+            autoWidth: false,
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
+            },
+            order: [[2, 'desc']], // Ordena por data da morte decrescente
+            columnDefs: [
+                {
+                    targets: -1,
+                    orderable: false,
+                    searchable: false
+                }
+            ],
+            // Configuração para reposicionar os elementos do dropdown
+            drawCallback: function() {
+                $('.dropdown-menu').css('position', 'absolute');
+                $('.btn-group').on('show.bs.dropdown', function() {
+                    setTimeout(function() {
+                        $('.dropdown-menu.show').css('z-index', '1100');
+                    }, 10);
+                });
+            }
+        });
+    });
+</script>
+{% endblock %}

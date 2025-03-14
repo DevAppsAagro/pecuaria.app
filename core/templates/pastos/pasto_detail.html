@@ -6,235 +6,402 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
     #map {
-        height: 400px;
+        height: 350px;
         width: 100%;
-        border-radius: 0.5rem;
-        margin-bottom: 1rem;
+        border-radius: 0.25rem;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     .info-box {
         background: white;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 0.75rem;
+        border-radius: 0.25rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         margin-bottom: 1rem;
     }
-    .table-responsive {
-        margin-top: 1rem;
+    .small-box {
+        border-radius: 0.25rem;
+        position: relative;
+        display: block;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        overflow: hidden;
     }
-    .table th {
-        background-color: #f8f9fa;
+    .small-box > .inner {
+        padding: 0.75rem;
+        position: relative;
+        z-index: 2;
+        color: #fff !important;
+    }
+    .small-box h3, .small-box p {
+        color: #fff !important;
+        margin: 0;
+    }
+    .small-box h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+    }
+    .small-box p {
+        font-size: 0.875rem;
+    }
+    .small-box .icon {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        font-size: 1.75rem;
+        color: rgba(255, 255, 255, 0.3);
+    }
+    .badge {
+        font-weight: 500;
+    }
+    .info-list {
+        list-style: none;
+        padding-left: 0;
+        margin-bottom: 0;
+    }
+    .info-list li {
+        padding: 0.375rem 0;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+    }
+    .info-list li:last-child {
+        border-bottom: none;
+    }
+    .info-label {
+        font-weight: 500;
+        color: #6c757d;
+    }
+    .info-value {
+        text-align: right;
+    }
+    .table-compact th, .table-compact td {
+        padding: 0.5rem 0.75rem;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Detalhes do Pasto</h2>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="bi bi-grid me-2"></i>Detalhes do Pasto</h4>
         <div>
-            <a href="{% url 'pasto_edit' pk=pasto.id %}" class="btn btn-primary">
+            <a href="{% url 'pasto_edit' pk=pasto.id %}" class="btn btn-sm btn-warning me-1">
                 <i class="bi bi-pencil"></i> Editar
             </a>
-            <a href="{% url 'pasto_list' %}" class="btn btn-secondary">
+            <a href="{% url 'pasto_list' %}" class="btn btn-sm btn-secondary">
                 <i class="bi bi-arrow-left"></i> Voltar
             </a>
+        </div>
+    </div>
+
+    <!-- Cards de Estatísticas -->
+    <div class="row mb-3">
+        <div class="col-lg-3 col-md-6 mb-2">
+            <div class="small-box bg-primary">
+                <div class="inner">
+                    <h3>{{ pasto.area|floatformat:2 }} ha</h3>
+                    <p>Área Total</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-rulers"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 mb-2">
+            <div class="small-box bg-success">
+                <div class="inner">
+                    <h3>{{ qtd_animais }}</h3>
+                    <p>Animais</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-piggy-bank"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 mb-2">
+            <div class="small-box bg-info">
+                <div class="inner">
+                    <h3>{{ ua_atual|floatformat:1 }}/{{ ua_total|floatformat:1 }} UA</h3>
+                    <p>Unidades Animal</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-clipboard-data"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 mb-2">
+            <div class="small-box {% if porcentagem_ocupacao > 100 %}bg-danger{% elif porcentagem_ocupacao > 90 %}bg-warning{% else %}bg-success{% endif %}">
+                <div class="inner">
+                    <h3>{{ porcentagem_ocupacao }}%</h3>
+                    <p>Ocupação</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-percent"></i>
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="row">
         <!-- Informações Básicas -->
         <div class="col-md-6">
-            <div class="info-box">
-                <h5 class="mb-3">Informações Básicas</h5>
-                <p><strong>ID do Pasto:</strong> {{ pasto.id_pasto }}</p>
-                <p><strong>Fazenda:</strong> {{ pasto.fazenda.nome }}</p>
-                <p><strong>Área:</strong> {{ pasto.area|floatformat:2 }} ha</p>
-                <p><strong>Capacidade:</strong> {{ capacidade_ua_ha|floatformat:2 }} UA/ha</p>
-                <p><strong>Lotação Atual:</strong> {{ ua_ha_atual|floatformat:2 }} UA/ha 
-                    <small class="{% if porcentagem_ocupacao > 100 %}text-danger{% elif porcentagem_ocupacao > 90 %}text-warning{% else %}text-success{% endif %}">
-                        ({{ porcentagem_ocupacao }}% ocupado)
-                    </small>
-                </p>
-                <p><strong>Peso Total:</strong> {{ soma_pesos|floatformat:0 }} kg ({{ ua_total|floatformat:1 }} UA)</p>
-                <p><strong>Variedade de Capim:</strong> {{ pasto.variedade_capim.nome|default:"-" }}</p>
-                <p><strong>Quantidade de Animais:</strong> {{ qtd_animais }} animais</p>
-                {% if lote_atual %}
-                <p><strong>Lote Atual:</strong> {{ lote_atual.id_lote }}</p>
-                {% endif %}
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-1"></i>Informações Básicas</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="info-list">
+                        <li>
+                            <span class="info-label">ID do Pasto:</span>
+                            <span class="info-value">{{ pasto.id_pasto }}</span>
+                        </li>
+                        <li>
+                            <span class="info-label">Fazenda:</span>
+                            <span class="info-value">{{ pasto.fazenda.nome }}</span>
+                        </li>
+                        <li>
+                            <span class="info-label">Capacidade:</span>
+                            <span class="info-value">{{ capacidade_ua_ha|floatformat:2 }} UA/ha</span>
+                        </li>
+                        <li>
+                            <span class="info-label">Lotação Atual:</span>
+                            <span class="info-value">
+                                {{ ua_ha_atual|floatformat:2 }} UA/ha
+                                <span class="badge {% if porcentagem_ocupacao > 100 %}bg-danger{% elif porcentagem_ocupacao > 90 %}bg-warning{% else %}bg-success{% endif %}">
+                                    {{ porcentagem_ocupacao }}%
+                                </span>
+                            </span>
+                        </li>
+                        <li>
+                            <span class="info-label">Variedade de Capim:</span>
+                            <span class="info-value">{{ pasto.variedade_capim.nome|default:"-" }}</span>
+                        </li>
+                        <li>
+                            <span class="info-label">Peso Total:</span>
+                            <span class="info-value">{{ soma_pesos|floatformat:0 }} kg</span>
+                        </li>
+                        {% if lote_atual %}
+                        <li>
+                            <span class="info-label">Lote Atual:</span>
+                            <span class="info-value">
+                                <a href="{% url 'lote_detail' lote_atual.id %}">{{ lote_atual.id_lote }}</a>
+                            </span>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
             </div>
         </div>
 
         <!-- Mapa -->
         <div class="col-md-6">
-            <div class="info-box">
-                <h5 class="mb-3">Localização</h5>
-                <div id="map"></div>
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-geo-alt me-1"></i>Localização</h5>
+                </div>
+                <div class="card-body">
+                    <div id="map"></div>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Histórico de Custos -->
-    <div class="row mt-4">
+    <div class="row mt-3">
         <div class="col-12">
-            <div class="info-box">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">Histórico de Custos</h5>
-                    <div>
-                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosDespesas">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-currency-dollar me-1"></i>Histórico de Custos</h5>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosDespesas">
                             <i class="bi bi-funnel"></i> Filtros
                         </button>
                     </div>
                 </div>
 
-                <!-- Filtros Collapse -->
-                <div class="collapse mb-3" id="filtrosDespesas">
-                    <div class="card card-body">
-                        <form method="get" class="row g-3">
-                            <div class="col-md-3">
-                                <label class="form-label">Data Inicial</label>
-                                <input type="date" name="data_inicial" class="form-control form-control-sm">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Data Final</label>
-                                <input type="date" name="data_final" class="form-control form-control-sm">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Categoria</label>
-                                <select name="categoria" class="form-select form-select-sm">
-                                    <option value="">Todas</option>
-                                    {% for item in despesas %}
-                                        <option value="{{ item.categoria.id }}">{{ item.categoria.nome }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Status</label>
-                                <select name="status" class="form-select form-select-sm">
-                                    <option value="">Todos</option>
-                                    <option value="PENDENTE">Pendente</option>
-                                    <option value="PAGO">Pago</option>
-                                    <option value="VENCIDO">Vencido</option>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
-                                <button type="reset" class="btn btn-secondary btn-sm">Limpar</button>
-                            </div>
-                        </form>
+                <div class="card-body p-0">
+                    <!-- Filtros Collapse -->
+                    <div class="collapse" id="filtrosDespesas">
+                        <div class="p-3 border-bottom">
+                            <form method="get" class="row g-2">
+                                <div class="col-md-3">
+                                    <label class="form-label small">Data Inicial</label>
+                                    <input type="date" name="data_inicial" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small">Data Final</label>
+                                    <input type="date" name="data_final" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small">Categoria</label>
+                                    <select name="categoria" class="form-select form-select-sm">
+                                        <option value="">Todas</option>
+                                        {% for item in despesas %}
+                                            <option value="{{ item.categoria.id }}">{{ item.categoria.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small">Status</label>
+                                    <select name="status" class="form-select form-select-sm">
+                                        <option value="">Todos</option>
+                                        <option value="PENDENTE">Pendente</option>
+                                        <option value="PAGO">Pago</option>
+                                        <option value="VENCIDO">Vencido</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 mt-2">
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-search"></i> Filtrar
+                                    </button>
+                                    <button type="reset" class="btn btn-sm btn-secondary">
+                                        <i class="bi bi-x-circle"></i> Limpar
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Resumo dos Custos -->
-                <div class="row mb-3">
-                    <div class="col">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <h6 class="card-title text-muted">Total de Despesas</h6>
-                                <h4 class="mb-0">R$ {{ total_despesas|floatformat:2 }}</h4>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col">
-                        <div class="card bg-success text-white">
-                            <div class="card-body">
-                                <h6 class="card-title">Despesas Pagas</h6>
-                                <h4 class="mb-0">R$ {{ total_pagas|floatformat:2 }}</h4>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col">
-                        <div class="card bg-warning">
-                            <div class="card-body">
-                                <h6 class="card-title">Despesas Pendentes</h6>
-                                <h4 class="mb-0">R$ {{ total_pendentes|floatformat:2 }}</h4>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col">
-                        <div class="card bg-danger text-white">
-                            <div class="card-body">
-                                <h6 class="card-title">Despesas Vencidas</h6>
-                                <h4 class="mb-0">R$ {{ total_vencidas|floatformat:2 }}</h4>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col">
-                        <div class="card bg-info text-white">
-                            <div class="card-body">
-                                <h6 class="card-title">Vence Hoje</h6>
-                                <h4 class="mb-0">R$ {{ total_vence_hoje|floatformat:2 }}</h4>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Data</th>
-                                <th>Descrição</th>
-                                <th>Categoria</th>
-                                <th>Subcategoria</th>
-                                <th>Quantidade</th>
-                                <th>Valor Unit.</th>
-                                <th>Valor Total</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in despesas %}
-                            <tr>
-                                <td>{{ item.despesa.data_emissao|date:"d/m/Y" }}</td>
-                                <td>
-                                    <div>{{ item.despesa.observacao|default:"-" }}</div>
-                                    {% if item.despesa.numero_nf %}
-                                        <small class="text-muted">NF: {{ item.despesa.numero_nf }}</small>
-                                    {% endif %}
-                                </td>
-                                <td>{{ item.categoria.nome }}</td>
-                                <td>{{ item.subcategoria.nome|default:"-" }}</td>
-                                <td>{{ item.quantidade|floatformat:2 }}</td>
-                                <td>R$ {{ item.valor_unitario|floatformat:2 }}</td>
-                                <td>R$ {{ item.valor_total|floatformat:2 }}</td>
-                                <td>
-                                    {% if item.despesa.status == 'PENDENTE' %}
-                                        <span class="badge bg-warning">Pendente</span>
-                                    {% elif item.despesa.status == 'PAGO' %}
-                                        <span class="badge bg-success">Pago</span>
-                                    {% elif item.despesa.status == 'VENCIDO' %}
-                                        <span class="badge bg-danger">Vencido</span>
-                                    {% elif item.despesa.status == 'VENCE_HOJE' %}
-                                        <span class="badge bg-info">Vence Hoje</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="{% url 'despesa_detail' item.despesa.id %}" class="btn btn-outline-info" title="Ver Detalhes">
-                                            <i class="bi bi-eye"></i>
-                                        </a>
-                                        <a href="{% url 'despesa_update' item.despesa.id %}" class="btn btn-outline-warning" title="Editar">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
+                    <!-- Cards de resumo dos custos -->
+                    <div class="px-3 py-2 bg-light border-bottom">
+                        <div class="row g-2">
+                            <div class="col">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-2">
+                                        <span class="badge bg-secondary p-2">
+                                            <i class="bi bi-cash-coin"></i>
+                                        </span>
                                     </div>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="9" class="text-center">Nenhuma despesa registrada para este pasto.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                        {% if despesas %}
-                        <tfoot class="table-light">
-                            <tr>
-                                <td colspan="6" class="text-end"><strong>Total:</strong></td>
-                                <td colspan="3"><strong>R$ {{ total_despesas|floatformat:2 }}</strong></td>
-                            </tr>
-                        </tfoot>
-                        {% endif %}
-                    </table>
+                                    <div>
+                                        <div class="small text-muted">Total</div>
+                                        <div class="fw-bold">R$ {{ total_despesas|floatformat:2 }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-2">
+                                        <span class="badge bg-success p-2">
+                                            <i class="bi bi-check-circle"></i>
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <div class="small text-muted">Pagas</div>
+                                        <div class="fw-bold">R$ {{ total_pagas|floatformat:2 }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-2">
+                                        <span class="badge bg-warning p-2">
+                                            <i class="bi bi-hourglass-split"></i>
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <div class="small text-muted">Pendentes</div>
+                                        <div class="fw-bold">R$ {{ total_pendentes|floatformat:2 }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-2">
+                                        <span class="badge bg-danger p-2">
+                                            <i class="bi bi-exclamation-circle"></i>
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <div class="small text-muted">Vencidas</div>
+                                        <div class="fw-bold">R$ {{ total_vencidas|floatformat:2 }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-2">
+                                        <span class="badge bg-info p-2">
+                                            <i class="bi bi-calendar-day"></i>
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <div class="small text-muted">Vence Hoje</div>
+                                        <div class="fw-bold">R$ {{ total_vence_hoje|floatformat:2 }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tabela de despesas -->
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped table-compact m-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Descrição</th>
+                                    <th>Categoria</th>
+                                    <th>Subcategoria</th>
+                                    <th>Qtde</th>
+                                    <th>Valor Unit.</th>
+                                    <th>Valor Total</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in despesas %}
+                                <tr>
+                                    <td>{{ item.despesa.data_emissao|date:"d/m/Y" }}</td>
+                                    <td>
+                                        <div>{{ item.despesa.observacao|default:"-" }}</div>
+                                        {% if item.despesa.numero_nf %}
+                                            <small class="text-muted">NF: {{ item.despesa.numero_nf }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.categoria.nome }}</td>
+                                    <td>{{ item.subcategoria.nome|default:"-" }}</td>
+                                    <td>{{ item.quantidade|floatformat:2 }}</td>
+                                    <td>R$ {{ item.valor_unitario|floatformat:2 }}</td>
+                                    <td>R$ {{ item.valor_total|floatformat:2 }}</td>
+                                    <td>
+                                        {% if item.despesa.status == 'PENDENTE' %}
+                                            <span class="badge bg-warning">Pendente</span>
+                                        {% elif item.despesa.status == 'PAGO' %}
+                                            <span class="badge bg-success">Pago</span>
+                                        {% elif item.despesa.status == 'VENCIDO' %}
+                                            <span class="badge bg-danger">Vencido</span>
+                                        {% elif item.despesa.status == 'VENCE_HOJE' %}
+                                            <span class="badge bg-info">Vence Hoje</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'despesa_detail' item.despesa.id %}" class="btn btn-info btn-sm" title="Ver Detalhes">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="{% url 'despesa_update' item.despesa.id %}" class="btn btn-warning btn-sm" title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="9" class="text-center py-3">
+                                        <i class="bi bi-receipt text-muted" style="font-size: 1.5rem;"></i>
+                                        <p class="mt-2 mb-0">Nenhuma despesa registrada para este pasto.</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

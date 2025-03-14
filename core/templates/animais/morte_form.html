@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<!-- Estilos específicos para o formulário de morte -->
+<style>
+    .animal-info {
+        background-color: #f8f9fa;
+        border-radius: 0.25rem;
+        padding: 1rem;
+        margin-top: 1rem;
+        border: 1px solid #dee2e6;
+    }
+    
+    .info-label {
+        font-weight: bold;
+        margin-bottom: 0.25rem;
+    }
+    
+    .info-value {
+        margin-bottom: 0.5rem;
+    }
+    
+    .btn-danger {
+        margin-top: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="card-title mb-0">
+                        {% if registro %}
+                        <i class="fas fa-edit me-2"></i>Editar Registro de Morte
+                        {% else %}
+                        <i class="fas fa-plus-circle me-2"></i>Novo Registro de Morte
+                        {% endif %}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% if registro %}{% url 'morte_update' registro.id %}{% else %}{% url 'morte_create' %}{% endif %}">
+                        {% csrf_token %}
+                        
+                        {% if messages %}
+                        <div class="alert alert-info">
+                            {% for message in messages %}
+                            <p {% if message.tags %}class="{{ message.tags }}"{% endif %}>{{ message }}</p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
+                        {% if is_edit_mode %}
+                        <input type="hidden" id="is-edit-mode" value="1">
+                        {% endif %}
+                        
+                        <div class="row">
+                            {% if not registro %}
+                            <!-- Campo para seleção do animal (apenas na criação) -->
+                            <div class="col-md-6 mb-3">
+                                <label for="brinco" class="form-label">
+                                    <i class="fas fa-search"></i> Buscar animal por brinco
+                                </label>
+                                <input type="text" class="form-control form-control-lg" id="brinco" 
+                                       placeholder="Digite o número do brinco visual ou eletrônico" 
+                                       required style="height: 50px; font-size: 1.1rem;">
+                                <input type="hidden" id="animal" name="animal" required>
+                                <small class="form-text text-muted mt-2">
+                                    <i class="fas fa-info-circle"></i> Digite o número do brinco visual ou eletrônico
+                                </small>
+                            </div>
+                            
+                            <!-- Informações do animal selecionado -->
+                            <div class="col-12 mb-3" id="animal-info" style="display:none;">
+                                <div class="animal-info">
+                                    <h5 class="mb-3"><i class="fas fa-cow me-2"></i>Informações do Animal</h5>
+                                    <div class="row">
+                                        <div class="col-md-3 mb-2">
+                                            <div class="info-label">Brinco Visual:</div>
+                                            <div class="info-value" id="info-brinco-visual">-</div>
+                                        </div>
+                                        <div class="col-md-3 mb-2">
+                                            <div class="info-label">Brinco Eletrônico:</div>
+                                            <div class="info-value" id="info-brinco-eletronico">-</div>
+                                        </div>
+                                        <div class="col-md-3 mb-2">
+                                            <div class="info-label">Raça:</div>
+                                            <div class="info-value" id="info-raca">-</div>
+                                        </div>
+                                        <div class="col-md-3 mb-2">
+                                            <div class="info-label">Fazenda:</div>
+                                            <div class="info-value" id="info-fazenda">-</div>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-md-12">
+                                            <div class="alert alert-warning">
+                                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                                <strong>Prejuízo Estimado:</strong> <span id="info-custo-total">-</span>
+                                                <div class="small text-muted">
+                                                    (Valor de compra + custos acumulados)
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <!-- Informações do animal (modo edição) -->
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label"><i class="fas fa-cow me-2"></i>Animal</label>
+                                <div class="form-control-plaintext">
+                                    <strong>{{ registro.animal.brinco_visual }}</strong>
+                                    ({{ registro.animal.raca.nome }})
+                                </div>
+                                <input type="hidden" name="animal" value="{{ registro.animal.id }}">
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Data da Morte -->
+                            <div class="col-md-6 mb-3">
+                                <label for="data_morte" class="form-label">
+                                    <i class="fas fa-calendar-alt me-2"></i>Data da Morte
+                                </label>
+                                <input type="date" class="form-control" id="data_morte" name="data_morte" required
+                                       value="{% if registro %}{{ registro.data_morte|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}">
+                            </div>
+                            
+                            <!-- Motivo da Morte -->
+                            <div class="col-md-6 mb-3">
+                                <label for="motivo" class="form-label">
+                                    <i class="fas fa-clipboard-list me-2"></i>Motivo
+                                </label>
+                                <select class="form-select" id="motivo" name="motivo" required>
+                                    <option value="">Selecione um motivo</option>
+                                    {% for motivo in motivos %}
+                                    <option value="{{ motivo.id }}" {% if registro and registro.motivo.id == motivo.id %}selected{% endif %}>
+                                        {{ motivo.nome }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <!-- Prejuízo Monetário -->
+                            <div class="col-md-6 mb-3">
+                                <label for="prejuizo" class="form-label">
+                                    <i class="fas fa-dollar-sign me-2"></i>Prejuízo (R$)
+                                </label>
+                                <input type="text" class="form-control" id="prejuizo" name="prejuizo" 
+                                       placeholder="0,00" 
+                                       value="{% if registro %}{{ registro.prejuizo|stringformat:'0.2f'|cut:'.' }}{% endif %}">
+                                <small class="form-text text-muted">
+                                    Digite o valor do prejuízo (será preenchido automaticamente com o prejuízo estimado)
+                                </small>
+                            </div>
+                            
+                            <!-- Observações -->
+                            <div class="col-12 mb-3">
+                                <label for="observacoes" class="form-label">
+                                    <i class="fas fa-comment me-2"></i>Observações
+                                </label>
+                                <textarea class="form-control" id="observacoes" name="observacoes" rows="3">{% if registro %}{{ registro.observacoes }}{% endif %}</textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-12 d-flex justify-content-between">
+                                <a href="{% url 'morte_list' %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Voltar
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>Salvar
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- jQuery Mask Plugin -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        // Formatação de campos de valor monetário usando jQuery Mask Plugin
+        $('#prejuizo').mask('000.000.000,00', {reverse: true});
+        
+        // Buscar animal quando o brinco for informado
+        $('#brinco').on('change', function() {
+            const brinco = $(this).val().trim();
+            if (!brinco) {
+                $('#animal-info').hide();
+                $('#animal').val('');
+                return;
+            }
+
+            // Usar jQuery para AJAX em vez de fetch para manter consistência
+            $.ajax({
+                url: "{% url 'buscar_animal_ajax' %}",
+                data: {
+                    'termo': brinco
+                },
+                dataType: 'json',
+                success: function(data) {
+                    if (data.results && data.results.length > 0) {
+                        const animal = data.results[0];
+                        
+                        // Preencher o campo oculto com o ID do animal
+                        $('#animal').val(animal.id);
+                        
+                        // Exibir informações do animal
+                        $('#animal-info').show();
+                        $('#info-brinco-visual').text(animal.brinco_visual);
+                        $('#info-brinco-eletronico').text(animal.brinco_eletronico);
+                        $('#info-raca').text(animal.raca);
+                        $('#info-fazenda').text(animal.fazenda);
+                        
+                        // Calcular o prejuízo estimado (valor de compra + custo acumulado)
+                        const prejuizo = animal.valor_compra + animal.custo_total;
+                        $('#prejuizo').val(prejuizo.toFixed(2));
+                        $('#prejuizo').trigger('input'); // Acionar a formatação
+                    } else {
+                        alert("Animal não encontrado com o brinco " + brinco);
+                        $('#animal-info').hide();
+                        $('#animal').val('');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("Erro ao buscar animal:", error);
+                    alert("Erro ao buscar animal. Verifique o console para mais detalhes.");
+                }
+            });
+        });
+        
+        // Se estiver no modo de edição
+        if ($('#is-edit-mode').length) {
+            $('#animal-info').hide();
+        }
+        
+        // Validar formulário antes de enviar
+        $('form').on('submit', function(e) {
+            if (!$('#animal').val() && !$('#is-edit-mode').length) {
+                e.preventDefault();
+                alert('Por favor, selecione um animal válido antes de prosseguir.');
+                return false;
+            }
+            return true;
+        });
+    });
+</script>
+{% endblock %}

@@ -94,6 +94,7 @@
                     <div class="inner">
                         <h3>R$ {{ conta_selecionada.saldo|default:0|floatformat:2|intcomma }}</h3>
                         <p>Saldo Atual</p>
+                        <small class="text-muted">Inicial: R$ {{ conta_selecionada.saldo_inicial|default:0|floatformat:2|intcomma }}</small>
                     </div>
                     <div class="icon">
                         <i class="fas fa-wallet"></i>

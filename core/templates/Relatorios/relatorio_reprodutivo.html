@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5>Relatório Reprodutivo</h5>
+        <div>
+            <button id="btnPrint" class="btn btn-sm btn-outline-primary py-1">
+                <i class="bi bi-printer"></i> Imprimir
+            </button>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-2 shadow-sm">
+        <div class="card-body p-2">
+            <form method="get" class="row g-2">
+                <div class="col-md-5">
+                    <label for="estacao_id" class="form-label small mb-1">Estação</label>
+                    <select class="form-select form-select-sm py-1" id="estacao_id" name="estacao_id" required onchange="this.form.submit()">
+                        <option value="">Selecione uma estação</option>
+                        {% for estacao in estacoes %}
+                            <option value="{{ estacao.id }}" {% if filtros.estacao_id == estacao.id|stringformat:"s" %}selected{% endif %}>
+                                {{ estacao }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label for="lote_id" class="form-label small mb-1">Lote</label>
+                    <select class="form-select form-select-sm py-1" id="lote_id" name="lote_id">
+                        <option value="">Todos os Lotes</option>
+                        {% for lote in lotes %}
+                            <option value="{{ lote.id }}" {% if filtros.lote_id == lote.id|stringformat:"s" %}selected{% endif %}>
+                                {{ lote.id_lote }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-sm btn-outline-primary py-1 w-100"><i class="bi bi-search"></i></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if dados_relatorio %}
+    <!-- Indicadores Principais -->
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card mb-3">
+                <div class="card-header bg-light py-2">
+                    <h6 class="mb-0">Dados Gerais</h6>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm table-bordered mb-0">
+                        <tbody>
+                            <tr>
+                                <td width="60%">Lote da Estação de Monta</td>
+                                <td>{{ dados_relatorio.lote_estacao }}</td>
+                            </tr>
+                            <tr>
+                                <td>Lote dos nascimentos</td>
+                                <td>{{ dados_relatorio.lote_nascimentos }}</td>
+                            </tr>
+                            <tr>
+                                <td>Total em cobertura</td>
+                                <td>{{ dados_relatorio.total_cobertura }}</td>
+                            </tr>
+                            <tr>
+                                <td>Total de Prenhes</td>
+                                <td>{{ dados_relatorio.total_prenhe }}</td>
+                            </tr>
+                            <tr>
+                                <td>Total de Nascimentos</td>
+                                <td>{{ dados_relatorio.total_nascimentos }}</td>
+                            </tr>
+                            <tr>
+                                <td>Total de Desmames</td>
+                                <td>{{ dados_relatorio.total_desmames }}</td>
+                            </tr>
+                            <tr>
+                                <td>Doses de Sêmen gastas</td>
+                                <td>{{ dados_relatorio.doses_semen }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card mb-3">
+                <div class="card-header bg-light py-2">
+                    <h6 class="mb-0">Índices de Produtividade</h6>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm table-bordered mb-0">
+                        <tbody>
+                            <tr>
+                                <td width="60%">Índice de Fertilidade</td>
+                                <td>{{ dados_relatorio.indice_fertilidade }}%</td>
+                            </tr>
+                            <tr>
+                                <td>Índice de Serviço</td>
+                                <td>{{ dados_relatorio.indice_servico }} Dose</td>
+                            </tr>
+                            <tr>
+                                <td>Perda Pré-parto</td>
+                                <td>{{ dados_relatorio.perda_preparto }}%</td>
+                            </tr>
+                            <tr>
+                                <td>Mortalidade de Bezerros</td>
+                                <td>{{ dados_relatorio.mortalidade_bezerros }}%</td>
+                            </tr>
+                            <tr>
+                                <td>Perda pré-desmame</td>
+                                <td>{{ dados_relatorio.perda_predesmame }}%</td>
+                            </tr>
+                            <tr>
+                                <td>Taxa de Desmame</td>
+                                <td>{{ dados_relatorio.taxa_desmame }}%</td>
+                            </tr>
+                            <tr>
+                                <td>Relação de Desmame</td>
+                                <td>{{ dados_relatorio.relacao_desmame }}%</td>
+                            </tr>
+                            <tr>
+                                <td>Peso médio ao desmame "machos"</td>
+                                <td>{{ dados_relatorio.peso_medio_desmame_machos }} kg</td>
+                            </tr>
+                            <tr>
+                                <td>Peso médio ao desmame "fêmeas"</td>
+                                <td>{{ dados_relatorio.peso_medio_desmame_femeas }} kg</td>
+                            </tr>
+                            <tr>
+                                <td>Quilos Desmamados por vaca exposta</td>
+                                <td>{{ dados_relatorio.quilos_desmamados_vaca }} kg</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="row">
+        <!-- Gráfico de Resultados -->
+        <div class="col-lg-6 col-md-12 mb-3">
+            <div class="card mb-2 shadow-sm">
+                <div class="card-header bg-light py-1">
+                    <h6 class="mb-0 small">Resultados</h6>
+                </div>
+                <div class="card-body py-2" style="height: 280px;">
+                    <canvas id="graficoResultados"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Gráfico de Indicadores Zootécnicos -->
+        <div class="col-lg-6 col-md-12 mb-3">
+            <div class="card mb-2 shadow-sm">
+                <div class="card-header bg-light py-1">
+                    <h6 class="mb-0 small">Indicadores Zootécnicos</h6>
+                </div>
+                <div class="card-body py-2" style="height: 280px;">
+                    <canvas id="graficoIndicadores"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+        {% if filtros.estacao_id %}
+        <div class="alert alert-warning py-2 small mb-0">
+            <i class="bi bi-exclamation-triangle"></i> Nenhum dado encontrado.
+        </div>
+        {% else %}
+        <div class="alert alert-info py-2 small mb-0">
+            <i class="bi bi-info-circle"></i> Selecione uma estação para continuar.
+        </div>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Passando os dados como variáveis JavaScript -->  
+<script>
+    // Definindo variáveis globais com os dados dos gráficos
+    {% if dados_grafico_resultados.labels %}
+    // Dados para gráfico de Resultados
+    var dadosResultados = {
+        labels: {{ dados_grafico_resultados.labels|safe }},
+        values: {{ dados_grafico_resultados.values|safe }},
+        colors: {{ dados_grafico_resultados.colors|safe }},
+        borders: {{ dados_grafico_resultados.borders|safe }}
+    };
+    
+    // Dados para gráfico de Indicadores
+    var dadosIndicadores = {
+        labels: {{ dados_grafico_indicadores.labels|safe }},
+        values: {{ dados_grafico_indicadores.values|safe }},
+        colors: {{ dados_grafico_indicadores.colors|safe }},
+        borders: {{ dados_grafico_indicadores.borders|safe }}
+    };
+    
+    // Variável para indicar que os dados estão disponíveis
+    var temDados = true;
+    {% else %}
+    var temDados = false;
+    {% endif %}
+</script>
+
+<!-- Script para renderizar os gráficos -->
+<script>
+    // Função principal quando documento está pronto
+    $(document).ready(function() {
+        // Botão de impressão
+        $('#btnPrint').click(function() {
+            window.print();
+        });
+        
+        // Verificar se existem dados para renderizar os gráficos
+        if (temDados) {
+            renderizarGraficos();
+        }
+    });
+    
+    // Função para renderizar os gráficos
+    function renderizarGraficos() {
+        // Gráfico de Resultados
+        var ctxResultados = document.getElementById('graficoResultados').getContext('2d');
+        new Chart(ctxResultados, {
+            type: 'bar',
+            data: {
+                labels: dadosResultados.labels,
+                datasets: [{
+                    label: 'Quantidade',
+                    data: dadosResultados.values,
+                    backgroundColor: dadosResultados.colors,
+                    borderColor: dadosResultados.borders,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Resultados'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Quantidade'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Gráfico de Indicadores Zootécnicos
+        var ctxIndicadores = document.getElementById('graficoIndicadores').getContext('2d');
+        new Chart(ctxIndicadores, {
+            type: 'bar',
+            data: {
+                labels: dadosIndicadores.labels,
+                datasets: [{
+                    label: 'Porcentagem',
+                    data: dadosIndicadores.values,
+                    backgroundColor: dadosIndicadores.colors,
+                    borderColor: dadosIndicadores.borders,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Indicadores Zootécnicos'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Percentual (%)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        },
+                        max: 100
+                    }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

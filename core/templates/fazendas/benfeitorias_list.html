@@ -4,10 +4,15 @@
 <div class="container mt-4">
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Benfeitorias</h5>
-            <a href="{% url 'benfeitoria_create' %}" class="btn btn-primary btn-sm">
-                <i class="bi bi-plus-lg"></i> Nova Benfeitoria
-            </a>
+            <div class="d-flex align-items-center">
+                <h5 class="mb-0 me-3">Benfeitorias</h5>
+                <a href="{% url 'benfeitoria_create' %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg"></i> Nova Benfeitoria
+                </a>
+            </div>
+            <div>
+                <!-- Espaço para outros botões ou informações caso sejam adicionados no futuro -->
+            </div>
         </div>
         <div class="card-body">
             {% if benfeitorias %}
@@ -51,7 +56,56 @@
                         </tr>
                         {% endfor %}
                     </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="8" class="text-end">
+                                <strong>Total de Benfeitorias: {{ benfeitorias|length }}</strong>
+                            </td>
+                        </tr>
+                    </tfoot>
                 </table>
+            </div>
+            
+            <!-- Card de Resumo -->
+            <div class="mt-4">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-calculator me-2"></i>Resumo</h5>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
+                                        Total de Benfeitorias
+                                        <span class="badge bg-primary rounded-pill">{{ benfeitorias|length }}</span>
+                                    </li>
+                                    {% with valor_compra_total=0 %}
+                                        {% with valor_residual_total=0 %}
+                                            {% with depreciacao_total=0 %}
+                                                {% for benfeitoria in benfeitorias %}
+                                                    {% with valor_compra_total=valor_compra_total|add:benfeitoria.valor_compra %}{% endwith %}
+                                                    {% with valor_residual_total=valor_residual_total|add:benfeitoria.valor_residual %}{% endwith %}
+                                                    {% with depreciacao_total=depreciacao_total|add:benfeitoria.depreciacao_anual %}{% endwith %}
+                                                {% endfor %}
+                                                <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
+                                                    Valor de Compra Total
+                                                    <span class="badge bg-primary rounded-pill valor-compra-total">{{ valor_compra_total }}</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
+                                                    Valor Residual Total
+                                                    <span class="badge bg-primary rounded-pill valor-residual-total">{{ valor_residual_total }}</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
+                                                    Depreciação Anual Total
+                                                    <span class="badge bg-primary rounded-pill depreciacao-total">{{ depreciacao_total }}</span>
+                                                </li>
+                                            {% endwith %}
+                                        {% endwith %}
+                                    {% endwith %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             {% else %}
             <div class="alert alert-info" role="alert">
@@ -79,6 +133,14 @@
 
         // Formata todos os valores monetários
         document.querySelectorAll('.valor-monetario').forEach(element => {
+            const valor = element.textContent;
+            if (valor) {
+                element.textContent = formatarMoeda(valor);
+            }
+        });
+
+        // Formata os totais
+        document.querySelectorAll('.valor-compra-total, .valor-residual-total, .depreciacao-total').forEach(element => {
             const valor = element.textContent;
             if (valor) {
                 element.textContent = formatarMoeda(valor);

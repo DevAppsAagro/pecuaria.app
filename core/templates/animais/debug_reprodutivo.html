@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Debug Reprodutivo{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <div class="row">
+        <div class="col-12">
+            <h3>Dados Reprodutivos do Animal #{{ animal.id }} ({{ animal.brinco_visual }})</h3>
+            
+            <!-- Informações básicas do animal -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5>Informações do Animal</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>ID:</strong> {{ animal.id }}</p>
+                    <p><strong>Brinco:</strong> {{ animal.brinco_visual }}</p>
+                    <p><strong>Categoria:</strong> {{ animal.categoria_animal }}</p>
+                    <p><strong>Sexo:</strong> {{ animal.categoria_animal.sexo }}</p>
+                </div>
+            </div>
+            
+            <!-- Dados brutos para debugging -->
+            <div class="card mb-3">
+                <div class="card-header bg-warning">
+                    <h5>Dados Brutos (Debug)</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Manejos Reprodutivos ({{ manejos_reprodutivos|length }})</h6>
+                    <pre>{% for manejo in manejos_reprodutivos %}
+ID: {{ manejo.id }}
+Estação: {{ manejo.estacao_monta }}
+Data Concepção: {{ manejo.data_concepcao }}
+Diagnóstico: {{ manejo.diagnostico }}
+Data Diagnóstico: {{ manejo.data_diagnostico }}
+Resultado: {{ manejo.resultado }}
+Data Resultado: {{ manejo.data_resultado }}
+-----
+{% empty %}
+Nenhum manejo reprodutivo encontrado!
+{% endfor %}</pre>
+                    
+                    <h6 class="mt-4">Filhos ({{ filhos.count }})</h6>
+                    <pre>{% for filho in filhos %}
+ID: {{ filho.id }}
+Brinco: {{ filho.brinco_visual }}
+Data Nascimento: {{ filho.data_nascimento }}
+-----
+{% empty %}
+Nenhum filho encontrado!
+{% endfor %}</pre>
+                    
+                    <h6 class="mt-4">Bezerros Organizados ({{ bezerros_organizados|length }})</h6>
+                    <pre>{% for grupo in bezerros_organizados %}
+Estação: {{ grupo.estacao }}
+Bezerros: {{ grupo.bezerros|length }}
+{% for bezerro in grupo.bezerros %}
+  - ID: {{ bezerro.id }}, Brinco: {{ bezerro.brinco_visual }}
+{% empty %}
+  - Nenhum bezerro neste grupo
+{% endfor %}
+-----
+{% empty %}
+Nenhum grupo de bezerros encontrado!
+{% endfor %}</pre>
+                </div>
+            </div>
+            
+            <!-- SQL direto no template para depuração -->
+            <div class="card mb-3">
+                <div class="card-header bg-danger text-white">
+                    <h5>SQL Direto (Debug extremo)</h5>
+                </div>
+                <div class="card-body">
+                    {% with manejos_sql=animal.get_manejos_reprodutivos_sql filhos_sql=animal.get_filhos_sql %}
+                    <h6>Manejos SQL ({{ manejos_sql|length }})</h6>
+                    <pre>{{ manejos_sql }}</pre>
+                    
+                    <h6 class="mt-4">Filhos SQL ({{ filhos_sql|length }})</h6>
+                    <pre>{{ filhos_sql }}</pre>
+                    {% endwith %}
+                </div>
+            </div>
+            
+            <a href="{% url 'animal_detail' animal.id %}" class="btn btn-primary">Voltar</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

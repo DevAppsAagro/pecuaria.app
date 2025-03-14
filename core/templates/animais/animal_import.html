@@ -10,13 +10,88 @@
             <h5 class="card-title">Instruções</h5>
             <p>Para importar animais, siga os passos abaixo:</p>
             <ol>
-                <li>Baixe a planilha modelo clicando no botão abaixo</li>
-                <li>Preencha os dados dos animais seguindo as instruções na aba "Instruções"</li>
-                <li>Salve a planilha e faça o upload usando o formulário abaixo</li>
+                <li>Baixe o modelo de planilha simples usando o botão abaixo</li>
+                <li>Preencha com os dados dos animais, usando apenas lotes, raças, categorias e pastos que já existem no sistema</li>
+                <li>Salve a planilha e faça o upload usando o formulário na parte inferior</li>
             </ol>
-            <a href="{% url 'download_planilha_modelo' %}" class="btn btn-primary">
-                <i class="fas fa-download"></i> Baixar Planilha Modelo
+            <a href="{% url 'animal_import_template' %}" class="btn btn-outline-primary mt-3">
+                <i class="fas fa-download"></i> Baixar Modelo de Planilha Simples
             </a>
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle"></i> <strong>Importante:</strong> Para que a importação funcione corretamente, os lotes, raças, categorias e pastos mencionados na planilha já devem existir no sistema. Novos lotes e pastos NÃO serão criados automaticamente.
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Personalizar Planilha</h5>
+            <form id="planilha-form" method="get" action="{% url 'download_planilha_modelo' %}">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="fazenda" class="form-label">Fazenda:</label>
+                            <select class="form-select" id="fazenda" name="fazenda" required>
+                                <option value="">Selecione uma fazenda</option>
+                                {% for fazenda in fazendas %}
+                                <option value="{{ fazenda.id }}">{{ fazenda.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="raca" class="form-label">Raça:</label>
+                            <select class="form-select" id="raca" name="raca" required>
+                                <option value="">Selecione uma raça</option>
+                                {% for raca in racas %}
+                                <option value="{{ raca.id }}">{{ raca.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="categoria" class="form-label">Categoria:</label>
+                            <select class="form-select" id="categoria" name="categoria" required>
+                                <option value="">Selecione uma categoria</option>
+                                {% for categoria in categorias %}
+                                <option value="{{ categoria.id }}">{{ categoria.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="quantidade" class="form-label">Quantidade de Animais:</label>
+                            <input type="number" class="form-control" id="quantidade" name="quantidade" min="1" value="10" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="lote" class="form-label">Lote:</label>
+                            <select class="form-select" id="lote" name="lote" disabled>
+                                <option value="">Selecione um lote</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="pasto" class="form-label">Pasto:</label>
+                            <select class="form-select" id="pasto" name="pasto" disabled>
+                                <option value="">Selecione um pasto</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-download"></i> Baixar Planilha Personalizada
+                </button>
+            </form>
         </div>
     </div>
 
@@ -55,6 +130,49 @@
 {% block extra_js %}
 <script>
 $(document).ready(function() {
+    // Carregar lotes quando a fazenda for selecionada
+    $('#fazenda').on('change', function() {
+        var fazendaId = $(this).val();
+        if (fazendaId) {
+            // Limpar e habilitar o dropdown de lotes
+            $('#lote').html('<option value="">Carregando lotes...</option>').prop('disabled', true);
+            
+            // Fazer uma requisição para obter os lotes da fazenda
+            $.get(`/api/lotes-por-fazenda/${fazendaId}/`, function(data) {
+                var options = '<option value="">Selecione um lote</option>';
+                if (data.lotes && data.lotes.length > 0) {
+                    data.lotes.forEach(function(lote) {
+                        options += `<option value="${lote.id}">${lote.id_lote}</option>`;
+                    });
+                    $('#lote').html(options).prop('disabled', false);
+                } else {
+                    $('#lote').html('<option value="">Nenhum lote encontrado</option>').prop('disabled', true);
+                }
+            });
+            
+            // Limpar e habilitar o dropdown de pastos
+            $('#pasto').html('<option value="">Carregando pastos...</option>').prop('disabled', true);
+            
+            // Fazer uma requisição para obter os pastos da fazenda
+            $.get(`/api/pastos-por-fazenda/${fazendaId}/`, function(data) {
+                var options = '<option value="">Selecione um pasto</option>';
+                if (data.pastos && data.pastos.length > 0) {
+                    data.pastos.forEach(function(pasto) {
+                        options += `<option value="${pasto.id}">${pasto.id_pasto}</option>`;
+                    });
+                    $('#pasto').html(options).prop('disabled', false);
+                } else {
+                    $('#pasto').html('<option value="">Nenhum pasto encontrado</option>').prop('disabled', true);
+                }
+            });
+        } else {
+            // Se nenhuma fazenda for selecionada, desabilitar os dropdowns
+            $('#lote').html('<option value="">Selecione um lote</option>').prop('disabled', true);
+            $('#pasto').html('<option value="">Selecione um pasto</option>').prop('disabled', true);
+        }
+    });
+
+    // Formulário de importação
     $('#import-form').on('submit', function(e) {
         e.preventDefault();
         
