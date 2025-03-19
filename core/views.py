@@ -52,6 +52,19 @@ def login_view(request):
                 
                 if email and session:
                     if login_with_email(request, email, None, session=session):
+                        # Verificar se o usuário já tem uma assinatura ativa
+                        try:
+                            from .models_stripe import StripeSubscription
+                            has_active_subscription = StripeSubscription.objects.filter(
+                                user=request.user, 
+                                status__in=['active', 'trialing']
+                            ).exists()
+                            
+                            if has_active_subscription:
+                                return JsonResponse({'success': True, 'redirect': reverse('dashboard')})
+                        except Exception as e:
+                            print(f"[DEBUG] Erro ao verificar assinatura: {str(e)}")
+                            
                         return JsonResponse({'success': True, 'redirect': reverse('planos_stripe')})
                     else:
                         return JsonResponse({'success': False, 'message': 'Falha na autenticação'}, status=401)
@@ -64,7 +77,21 @@ def login_view(request):
         
         if email and password:
             if login_with_email(request, email, password):
-                # Redirecionar para a página de planos após o login bem-sucedido
+                # Verificar se o usuário já tem uma assinatura ativa
+                try:
+                    from .models_stripe import StripeSubscription
+                    has_active_subscription = StripeSubscription.objects.filter(
+                        user=request.user, 
+                        status__in=['active', 'trialing']
+                    ).exists()
+                    
+                    if has_active_subscription:
+                        messages.success(request, "Bem-vindo de volta! Você já possui uma assinatura ativa.")
+                        return redirect('dashboard')
+                except Exception as e:
+                    print(f"[DEBUG] Erro ao verificar assinatura: {str(e)}")
+                
+                # Se não tem assinatura ativa, redireciona para a página de planos
                 return redirect('planos_stripe')
             else:
                 messages.error(request, 'Email ou senha inválidos.')
