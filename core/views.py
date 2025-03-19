@@ -52,7 +52,7 @@ def login_view(request):
                 
                 if email and session:
                     if login_with_email(request, email, None, session=session):
-                        return JsonResponse({'success': True, 'redirect': reverse('dashboard')})
+                        return JsonResponse({'success': True, 'redirect': reverse('planos_stripe')})
                     else:
                         return JsonResponse({'success': False, 'message': 'Falha na autenticação'}, status=401)
                 return JsonResponse({'success': False, 'message': 'Dados inválidos'}, status=400)
@@ -64,7 +64,8 @@ def login_view(request):
         
         if email and password:
             if login_with_email(request, email, password):
-                return redirect('dashboard')
+                # Redirecionar para a página de planos após o login bem-sucedido
+                return redirect('planos_stripe')
             else:
                 messages.error(request, 'Email ou senha inválidos.')
         else:
@@ -82,7 +83,8 @@ def register_view(request):
         
         if email and password and first_name and last_name:
             if register_with_email(request, email, password, first_name, last_name, phone):
-                return redirect('verificar_email')
+                messages.success(request, f'Conta criada com sucesso para {email}! Escolha um plano para continuar.')
+                return redirect('planos_stripe')
         else:
             messages.error(request, 'Por favor, preencha todos os campos obrigatórios.')
             

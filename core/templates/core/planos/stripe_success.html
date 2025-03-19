@@ -1,20 +1,40 @@
-{% extends 'base.html' %}
+{% extends 'base_clean.html' %}
 {% load static %}
 
 {% block content %}
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <div class="card shadow-sm border-success">
+            <div class="card shadow-sm {% if is_simulation %}border-warning{% else %}border-success{% endif %}">
                 <div class="card-body text-center p-5">
                     <div class="mb-4">
-                        <i class="bi bi-check-circle-fill text-success" style="font-size: 5rem;"></i>
+                        <i class="bi bi-check-circle-fill {% if is_simulation %}text-warning{% else %}text-success{% endif %}" style="font-size: 5rem;"></i>
                     </div>
+                    
+                    {% if is_simulation %}
+                    <div class="alert alert-warning mb-4">
+                        <strong>MODO DE SIMULAÇÃO</strong> - Esta é apenas uma demonstração.
+                    </div>
+                    {% endif %}
+                    
                     <h1 class="display-5 mb-4">Pagamento Confirmado!</h1>
+                    
                     <p class="lead mb-4">
-                        Sua assinatura foi criada com sucesso. Você já tem acesso a todas as 
-                        funcionalidades do Pecuarista Pro.
+                        Sua assinatura do plano <strong>{{ plan_type|title }}</strong> foi criada com sucesso. 
+                        Você já tem acesso a todas as funcionalidades do PecuaristaPRO™.
                     </p>
+                    
+                    <div class="card bg-light mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">Detalhes da Assinatura</h5>
+                            <p><strong>Plano:</strong> {{ plan_type|title }}</p>
+                            <p><strong>Data:</strong> {{ date_now|date:"d/m/Y H:i" }}</p>
+                            {% if is_simulation %}
+                            <p><small class="text-muted">Observação: Esta é uma simulação e os dados acima são apenas ilustrativos.</small></p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
                     <div class="mt-5">
                         <a href="{% url 'dashboard' %}" class="btn btn-primary btn-lg px-5">
                             Ir para o Dashboard
@@ -22,14 +42,24 @@
                     </div>
                 </div>
             </div>
+            
+            {% if not is_simulation %}
+            <div class="text-center mt-4">
+                <p class="text-muted">
+                    Enviamos um comprovante para seu e-mail. Em caso de dúvidas, entre em contato com nosso suporte.
+                </p>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
+{% if not is_simulation %}
 <script>
-    // Redireciona automaticamente após 3 segundos
+    // Redireciona automaticamente após 5 segundos
     setTimeout(function() {
         window.location.href = "{% url 'dashboard' %}";
-    }, 3000);
+    }, 5000);
 </script>
+{% endif %}
 {% endblock %}

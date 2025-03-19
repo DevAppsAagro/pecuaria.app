@@ -39,11 +39,38 @@ stripe_api = StripeAPI()
 
 def planos(request):
     """Página principal de planos"""
+    
+    # Verificar se o usuário está autenticado
+    if not request.user.is_authenticated:
+        messages.warning(request, 'Para escolher um plano, você precisa estar logado.')
+        return redirect('login')
+    
+    # Verificar se o usuário já tem uma assinatura ativa
+    try:
+        from .models_stripe import StripeSubscription
+        has_active_subscription = StripeSubscription.objects.filter(
+            user=request.user, 
+            status__in=['active', 'trialing']
+        ).exists()
+        
+        if has_active_subscription:
+            messages.info(request, 'Você já possui uma assinatura ativa.')
+            return redirect('dashboard')
+    except Exception as e:
+        logger.error(f"Erro ao verificar assinatura: {str(e)}")
+        # Se ocorrer erro na verificação, continua o fluxo
+        pass
+    
+    # Verificar e registrar os IDs dos preços para debug
+    logger.info(f"ID do plano Mensal: {settings.STRIPE_MENSAL_PRICE_ID}")
+    logger.info(f"ID do plano Anual: {settings.STRIPE_ANUAL_PRICE_ID}")
+    
     context = {
         'stripe_public_key': settings.STRIPE_PUBLIC_KEY,
         'stripe_mensal_price_id': settings.STRIPE_MENSAL_PRICE_ID,
         'stripe_anual_price_id': settings.STRIPE_ANUAL_PRICE_ID,
         'email': request.user.email if request.user.is_authenticated else '',
+        'debug': settings.DEBUG,  
     }
     return render(request, 'core/planos/planos_stripe.html', context)
 
@@ -55,6 +82,7 @@ def checkout_session(request, price_id):
         return JsonResponse({'error': 'Preço não informado'}, status=400)
     
     user = request.user
+    logger.info(f"Iniciando checkout para usuário {user.email} com price_id: {price_id}")
     
     # URLs de sucesso e cancelamento
     success_url = request.build_absolute_uri(reverse('stripe_success'))
@@ -63,43 +91,97 @@ def checkout_session(request, price_id):
     # Definir o tipo de plano
     if price_id == settings.STRIPE_MENSAL_PRICE_ID:
         plan_type = 'mensal'
+        logger.info(f"Checkout do plano mensal selecionado: {price_id}")
     elif price_id == settings.STRIPE_ANUAL_PRICE_ID:
         plan_type = 'anual'
+        logger.info(f"Checkout do plano anual selecionado: {price_id}")
     else:
+        logger.error(f"ID de preço inválido: {price_id}")
         return JsonResponse({'error': 'Preço não encontrado'}, status=404)
     
-    # Criar a sessão de checkout
-    checkout_result = stripe_api.create_checkout_session(
-        price_id=price_id,
-        customer_email=user.email,
-        success_url=success_url,
-        cancel_url=cancel_url,
-        mode='subscription',
-        metadata={
-            'user_id': user.id,
-            'plan_type': plan_type,
-        }
-    )
+    # MODO DE DESENVOLVIMENTO - Simulação de checkout sem conexão com Stripe
+    # Remova ou comente este bloco quando estiver em produção
+    if settings.DEBUG and not request.GET.get('no_simulation'):
+        # Simular sucesso do checkout para desenvolvimento local
+        logger.info(f"MODO DE DESENVOLVIMENTO: Simulando sucesso do checkout para {plan_type}")
+        messages.success(request, f"SIMULAÇÃO: Assinatura do plano {plan_type} criada com sucesso!")
+        request.session['plan_type'] = plan_type
+        request.session['is_simulation'] = True
+        return redirect(success_url)
+    elif settings.DEBUG and request.GET.get('no_simulation'):
+        logger.info(f"MODO DE DESENVOLVIMENTO com no_simulation=1: Testando fluxo real do Stripe para {plan_type}")
     
-    if checkout_result['success']:
-        return redirect(checkout_result['url'])
-    else:
-        logger.error(f"Erro ao criar sessão de checkout: {checkout_result.get('error')}")
-        return JsonResponse({'error': 'Erro ao criar sessão de checkout'}, status=500)
+    try:
+        # Criar a sessão de checkout
+        checkout_result = stripe_api.create_checkout_session(
+            price_id=price_id,
+            customer_email=user.email,
+            success_url=success_url,
+            cancel_url=cancel_url,
+            mode='subscription',
+            metadata={
+                'user_id': user.id,
+                'plan_type': plan_type,
+            }
+        )
+        
+        if checkout_result['success']:
+            logger.info(f"Sessão de checkout criada com sucesso: {checkout_result['session_id']}")
+            return redirect(checkout_result['url'])
+        else:
+            error_message = checkout_result.get('error', 'Erro desconhecido')
+            logger.error(f"Erro ao criar sessão de checkout: {error_message}")
+            messages.error(request, f"Erro ao processar pagamento: {error_message}")
+            return redirect('planos_stripe')
+    except Exception as e:
+        logger.exception(f"Exceção ao criar sessão de checkout: {str(e)}")
+        messages.error(request, f"Ocorreu um erro ao processar seu pagamento: {str(e)}")
+        return redirect('planos_stripe')
 
 
 def stripe_success(request):
     """Página de sucesso após o checkout"""
+    # Recuperar informações da sessão, se disponíveis
+    plan_type = request.session.get('plan_type', 'premium')
+    is_simulation = request.session.get('is_simulation', False)
+    
+    # Verificar se o usuário já tem assinatura ativa
+    try:
+        from .models_stripe import StripeSubscription
+        subscription = StripeSubscription.objects.filter(
+            user=request.user, 
+            status__in=['active', 'trialing']
+        ).first()
+        
+        # Se não tem assinatura ainda, pode ser que o webhook não tenha processado
+        # Espera-se que o webhook já tenha processado a assinatura, mas em caso de falha,
+        # exibe uma mensagem mais informativa
+        if not subscription:
+            logger.warning(f"Usuário {request.user.email} chegou à página de sucesso sem assinatura ativa")
+    except Exception as e:
+        logger.error(f"Erro ao verificar assinatura na página de sucesso: {str(e)}")
+    
+    context = {
+        'plan_type': plan_type,
+        'is_simulation': is_simulation,
+        'date_now': timezone.now(),
+        'redirect_url': reverse('dashboard')  # Garantir que o redirecionamento seja para o dashboard
+    }
+    
     # Adiciona uma mensagem de sucesso na sessão
-    messages.success(
-        request, 
-        "Sua assinatura foi criada com sucesso! Você já pode acessar o sistema."
-    )
+    if is_simulation:
+        messages.success(
+            request, 
+            "SIMULAÇÃO: Sua assinatura foi criada com sucesso! Este é apenas um modo de teste."
+        )
+    else:
+        messages.success(
+            request, 
+            "Sua assinatura foi criada com sucesso! Você já pode acessar o sistema."
+        )
     
     # Redireciona para a página inicial
-    return render(request, 'core/planos/stripe_success.html', {
-        'redirect_url': '/'
-    })
+    return render(request, 'core/planos/stripe_success.html', context)
 
 
 def stripe_cancel(request):
@@ -173,42 +255,64 @@ def handle_checkout_completed(session):
             return False
         
         # Criar ou atualizar cliente
-        customer, created = StripeCustomer.objects.update_or_create(
-            user=user,
-            defaults={'stripe_customer_id': customer_id}
-        )
-        logger.info(f"Cliente {'criado' if created else 'atualizado'}: {customer}")
-        
-        # Buscar detalhes da assinatura (para ter os períodos de início/fim)
-        subscription_id = session.get('subscription')
-        if subscription_id:
-            try:
-                import stripe
-                stripe.api_key = settings.STRIPE_SECRET_KEY
-                subscription_data = stripe.Subscription.retrieve(subscription_id)
+        try:
+            from .models_stripe import StripeCustomer, StripeSubscription
+            
+            # Criar cliente se não existir
+            customer, created = StripeCustomer.objects.get_or_create(
+                user=user,
+                defaults={'stripe_customer_id': customer_id}
+            )
+            
+            if not created:
+                customer.stripe_customer_id = customer_id
+                customer.save()
                 
-                # Criar ou atualizar assinatura
-                subscription, created = StripeSubscription.objects.update_or_create(
-                    user=user,
-                    defaults={
-                        'stripe_subscription_id': subscription_id,
-                        'status': subscription_data.status,
-                        'plan_type': plan_type or 'mensal',
-                        'current_period_start': datetime.fromtimestamp(subscription_data.current_period_start),
-                        'current_period_end': datetime.fromtimestamp(subscription_data.current_period_end),
-                    }
-                )
+            # Verificar assinatura
+            subscription_id = session.get('subscription')
+            if subscription_id:
+                # Obter detalhes da assinatura via API do Stripe
+                stripe_subscription = stripe.Subscription.retrieve(subscription_id)
                 
-                logger.info(f"Assinatura {'criada' if created else 'atualizada'}: {subscription}")
-                return True
-            except Exception as e:
-                logger.error(f"Erro ao criar assinatura: {str(e)}")
-                return False
-        else:
-            logger.warning("Checkout sem subscription_id")
+                # Obter primeiro item da assinatura
+                if stripe_subscription.get('items') and stripe_subscription['items'].get('data'):
+                    price_id = stripe_subscription['items']['data'][0]['price']['id']
+                    
+                    # Criar ou atualizar assinatura no banco de dados
+                    subscription, created = StripeSubscription.objects.get_or_create(
+                        user=user,
+                        defaults={
+                            'stripe_subscription_id': subscription_id,
+                            'status': stripe_subscription.get('status', 'active'),
+                            'current_period_end': timezone.datetime.fromtimestamp(
+                                stripe_subscription.get('current_period_end', 0),
+                                tz=timezone.get_current_timezone()
+                            ),
+                            'cancel_at_period_end': stripe_subscription.get('cancel_at_period_end', False),
+                            'plan_type': plan_type or 'premium'
+                        }
+                    )
+                    
+                    if not created:
+                        subscription.stripe_subscription_id = subscription_id
+                        subscription.status = stripe_subscription.get('status', 'active')
+                        subscription.current_period_end = timezone.datetime.fromtimestamp(
+                            stripe_subscription.get('current_period_end', 0),
+                            tz=timezone.get_current_timezone()
+                        )
+                        subscription.cancel_at_period_end = stripe_subscription.get('cancel_at_period_end', False)
+                        subscription.plan_type = plan_type or 'premium'
+                        subscription.save()
+                        
+            logger.info(f"Processamento de checkout para o usuário {user.email} concluído com sucesso")
+            return True
+                
+        except Exception as e:
+            logger.exception(f"Erro ao processar cliente ou assinatura: {str(e)}")
             return False
+            
     except Exception as e:
-        logger.error(f"Erro ao processar checkout: {str(e)}")
+        logger.exception(f"Erro no processamento do checkout: {str(e)}")
         return False
 
 

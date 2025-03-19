@@ -65,25 +65,35 @@ def register_with_email(request, email, password, first_name='', last_name='', p
         return False
 
 def login_with_email(request, email, password, session=None):
-    response = supabase.auth.sign_in_with_password({
-        "email": email,
-        "password": password
-    }) if password else supabase.auth.get_user(session)
-    
     try:
-        if not session:  # Login com email e senha
+        if password:
+            response = supabase.auth.sign_in_with_password({
+                "email": email,
+                "password": password
+            })
+        else:
+            # Extrair o token de acesso do objeto de sessão
+            access_token = session.get('access_token') if isinstance(session, dict) else None
+            if not access_token:
+                print("[DEBUG] Token de acesso não encontrado na sessão")
+                return False
+            
+            # Usar o token de acesso para obter os dados do usuário
+            response = supabase.auth.get_user(access_token)
+        
+        if not password:  # Login com sessão (token)
+            user_data = response.user
+            if not user_data:
+                print("[DEBUG] Sessão inválida ou expirada")
+                return False
+            print("[DEBUG] Autenticação com token bem-sucedida")
+        else:
             if response.user:
                 user_data = response.user
                 print("[DEBUG] Autenticação com Supabase bem-sucedida")
             else:
                 print("[DEBUG] Erro de autenticação com Supabase")
                 return False
-        else:  # Login com sessão (token)
-            user_data = response.user
-            if not user_data:
-                print("[DEBUG] Sessão inválida ou expirada")
-                return False
-            print("[DEBUG] Autenticação com token bem-sucedida")
         
         # Verificar se o email foi confirmado
         email_confirmed = user_data.email_confirmed_at is not None
@@ -129,26 +139,29 @@ def login_with_email(request, email, password, session=None):
             
             print("[DEBUG] Usuário e perfil criados com sucesso")
         
-        # Fazer login no Django
-        login(request, user)
-        print("[DEBUG] Login no Django realizado com sucesso")
-        
-        # Verificar se o usuário tem assinatura ativa
-        try:
-            from .models_stripe import StripeSubscription
-            has_active_subscription = StripeSubscription.objects.filter(
-                user=user, 
-                status__in=['active', 'trialing']
-            ).exists()
+        # Fazer login do usuário no Django
+        auth_user = authenticate(username=email, password=password) if password else user
+        if auth_user:
+            login(request, auth_user)
+            print("[DEBUG] Login com Django realizado com sucesso")
             
-            if not has_active_subscription:
-                messages.info(request, 'Bem-vindo! Por favor, escolha um plano para continuar utilizando o sistema.')
-        except Exception as e:
-            print(f"[DEBUG] Erro ao verificar assinatura: {str(e)}")
-            # Se ocorrer erro, não bloqueia o login
-            pass
-        
-        return True
+            # Verificar se o usuário já tem StripeCustomer (simulação)
+            try:
+                # Tente acessar o cliente Stripe, mas não falhe se o modelo não existir
+                try:
+                    from .models_stripe import StripeCustomer
+                    StripeCustomer.objects.filter(user=user).first()
+                except (ImportError, Exception) as e:
+                    print(f"[DEBUG] Modelo StripeCustomer não disponível: {str(e)}")
+                    pass
+                
+                return True
+            except Exception as e:
+                print(f"[DEBUG] Erro no processo de login: {str(e)}")
+                return False
+        else:
+            print("[DEBUG] Falha ao fazer login com Django")
+            return False
     
     except Exception as e:
         print(f"[DEBUG] Erro no processo de login: {str(e)}")

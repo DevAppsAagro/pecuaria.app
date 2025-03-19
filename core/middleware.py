@@ -55,8 +55,11 @@ class SubscriptionMiddleware:
             'api',
             'stripe',  
             'checkout',
+            'success',  
+            'cancel',   
             'password_reset',
             'planos-stripe',
+            'webhook',  
         ]
         
         # Verifica se a URL atual está na lista de exceções
@@ -75,6 +78,28 @@ class SubscriptionMiddleware:
         try:
             # Verifica se existe assinatura ativa no Stripe
             from .models_stripe import StripeSubscription
+            
+            # Verifica se o usuário está saindo da página de sucesso do Stripe
+            is_from_success = 'stripe/success' in request.META.get('HTTP_REFERER', '')
+            
+            # Se veio da página de sucesso, permite acesso temporário
+            # isso dá tempo para o webhook processar a assinatura
+            if is_from_success:
+                logger.info(f"Usuário {request.user.email} veio da página de sucesso do Stripe, permitindo acesso temporário")
+                request.session['from_stripe_success'] = True
+                request.session['stripe_success_time'] = timezone.now().timestamp()
+                return self.get_response(request)
+            
+            # Se tem flag temporária de sucesso do Stripe e ainda está no período de graça (5 minutos)
+            from_success = request.session.get('from_stripe_success', False)
+            success_time = request.session.get('stripe_success_time', 0)
+            current_time = timezone.now().timestamp()
+            
+            if from_success and (current_time - success_time < 300):  # 5 minutos
+                logger.info(f"Usuário {request.user.email} está no período de graça após sucesso do Stripe")
+                return self.get_response(request)
+            
+            # Verificação normal de assinatura
             stripe_subscription = StripeSubscription.objects.filter(
                 user=request.user, 
                 status__in=['active', 'trialing']
