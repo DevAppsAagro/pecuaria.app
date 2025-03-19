@@ -52,18 +52,40 @@ def login_view(request):
                 
                 if email and session:
                     if login_with_email(request, email, None, session=session):
-                        # Verificar se o usuário já tem uma assinatura ativa
+                        # Verificar assinatura diretamente no Stripe
                         try:
-                            from .models_stripe import StripeSubscription
-                            has_active_subscription = StripeSubscription.objects.filter(
-                                user=request.user, 
-                                status__in=['active', 'trialing']
-                            ).exists()
+                            import stripe
+                            from django.conf import settings
                             
-                            if has_active_subscription:
-                                return JsonResponse({'success': True, 'redirect': reverse('dashboard')})
+                            # Configurar chave API
+                            stripe.api_key = settings.STRIPE_SECRET_KEY
+                            
+                            print(f"[DEBUG] Verificando assinatura no Stripe para: {request.user.email}")
+                            
+                            # Buscar cliente pelo email
+                            customers = stripe.Customer.list(email=request.user.email)
+                            has_active_subscription = False
+                            
+                            if customers and customers.data:
+                                customer = customers.data[0]
+                                print(f"[DEBUG] Cliente Stripe encontrado: {customer.id}")
+                                
+                                # Verificar assinaturas do cliente
+                                subscriptions = stripe.Subscription.list(
+                                    customer=customer.id,
+                                    status='active'
+                                )
+                                
+                                has_active_subscription = subscriptions and len(subscriptions.data) > 0
+                                print(f"[DEBUG] Assinaturas ativas encontradas: {len(subscriptions.data) if subscriptions else 0}")
+                                
+                                if has_active_subscription:
+                                    print(f"[DEBUG] Redirecionando para dashboard - assinatura ativa encontrada")
+                                    return JsonResponse({'success': True, 'redirect': reverse('dashboard')})
+                            else:
+                                print(f"[DEBUG] Cliente não encontrado no Stripe")
                         except Exception as e:
-                            print(f"[DEBUG] Erro ao verificar assinatura: {str(e)}")
+                            print(f"[DEBUG] Erro ao verificar assinatura no Stripe: {str(e)}")
                             
                         return JsonResponse({'success': True, 'redirect': reverse('planos_stripe')})
                     else:
@@ -77,19 +99,41 @@ def login_view(request):
         
         if email and password:
             if login_with_email(request, email, password):
-                # Verificar se o usuário já tem uma assinatura ativa
+                # Verificar assinatura diretamente no Stripe
                 try:
-                    from .models_stripe import StripeSubscription
-                    has_active_subscription = StripeSubscription.objects.filter(
-                        user=request.user, 
-                        status__in=['active', 'trialing']
-                    ).exists()
+                    import stripe
+                    from django.conf import settings
                     
-                    if has_active_subscription:
-                        messages.success(request, "Bem-vindo de volta! Você já possui uma assinatura ativa.")
-                        return redirect('dashboard')
+                    # Configurar chave API
+                    stripe.api_key = settings.STRIPE_SECRET_KEY
+                    
+                    print(f"[DEBUG] Verificando assinatura no Stripe para: {request.user.email}")
+                    
+                    # Buscar cliente pelo email
+                    customers = stripe.Customer.list(email=request.user.email)
+                    has_active_subscription = False
+                    
+                    if customers and customers.data:
+                        customer = customers.data[0]
+                        print(f"[DEBUG] Cliente Stripe encontrado: {customer.id}")
+                        
+                        # Verificar assinaturas do cliente
+                        subscriptions = stripe.Subscription.list(
+                            customer=customer.id,
+                            status='active'
+                        )
+                        
+                        has_active_subscription = subscriptions and len(subscriptions.data) > 0
+                        print(f"[DEBUG] Assinaturas ativas encontradas: {len(subscriptions.data) if subscriptions else 0}")
+                        
+                        if has_active_subscription:
+                            print(f"[DEBUG] Redirecionando para dashboard - assinatura ativa encontrada")
+                            messages.success(request, "Bem-vindo de volta! Você já possui uma assinatura ativa.")
+                            return redirect('dashboard')
+                    else:
+                        print(f"[DEBUG] Cliente não encontrado no Stripe")
                 except Exception as e:
-                    print(f"[DEBUG] Erro ao verificar assinatura: {str(e)}")
+                    print(f"[DEBUG] Erro ao verificar assinatura no Stripe: {str(e)}")
                 
                 # Se não tem assinatura ativa, redireciona para a página de planos
                 return redirect('planos_stripe')

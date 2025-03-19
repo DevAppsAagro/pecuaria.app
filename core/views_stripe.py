@@ -45,19 +45,35 @@ def planos(request):
         messages.warning(request, 'Para escolher um plano, você precisa estar logado.')
         return redirect('login')
     
-    # Verificar se o usuário já tem uma assinatura ativa
+    # Verificar se o usuário já tem uma assinatura ativa (diretamente no Stripe)
     try:
-        from .models_stripe import StripeSubscription
-        has_active_subscription = StripeSubscription.objects.filter(
-            user=request.user, 
-            status__in=['active', 'trialing']
-        ).exists()
+        print(f"[DEBUG] Verificando assinatura no Stripe para: {request.user.email}")
         
-        if has_active_subscription:
-            messages.info(request, 'Você já possui uma assinatura ativa.')
-            return redirect('dashboard')
+        # Buscar cliente pelo email
+        customers = stripe.Customer.list(email=request.user.email)
+        has_active_subscription = False
+        
+        if customers and customers.data:
+            customer = customers.data[0]
+            print(f"[DEBUG] Cliente Stripe encontrado: {customer.id}")
+            
+            # Verificar assinaturas do cliente
+            subscriptions = stripe.Subscription.list(
+                customer=customer.id,
+                status='active'
+            )
+            
+            has_active_subscription = subscriptions and len(subscriptions.data) > 0
+            print(f"[DEBUG] Assinaturas ativas encontradas: {len(subscriptions.data) if subscriptions else 0}")
+            
+            if has_active_subscription:
+                print(f"[DEBUG] Redirecionando para dashboard - assinatura ativa encontrada")
+                messages.info(request, 'Você já possui uma assinatura ativa.')
+                return redirect('dashboard')
+        else:
+            print(f"[DEBUG] Cliente não encontrado no Stripe")
     except Exception as e:
-        logger.error(f"Erro ao verificar assinatura: {str(e)}")
+        logger.error(f"Erro ao verificar assinatura no Stripe: {str(e)}")
         # Se ocorrer erro na verificação, continua o fluxo
         pass
     

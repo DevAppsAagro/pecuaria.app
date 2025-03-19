@@ -77,7 +77,11 @@ class SubscriptionMiddleware:
             
         try:
             # Verifica se existe assinatura ativa no Stripe
-            from .models_stripe import StripeSubscription
+            import stripe
+            from django.conf import settings
+            
+            # Configurar chave API
+            stripe.api_key = settings.STRIPE_SECRET_KEY
             
             # Verifica se o usuário está saindo da página de sucesso do Stripe
             is_from_success = 'stripe/success' in request.META.get('HTTP_REFERER', '')
@@ -99,14 +103,29 @@ class SubscriptionMiddleware:
                 logger.info(f"Usuário {request.user.email} está no período de graça após sucesso do Stripe")
                 return self.get_response(request)
             
-            # Verificação normal de assinatura
-            stripe_subscription = StripeSubscription.objects.filter(
-                user=request.user, 
-                status__in=['active', 'trialing']
-            ).first()
+            # Verificar diretamente no Stripe
+            has_active_subscription = False
+            try:
+                # Buscar cliente pelo email
+                customers = stripe.Customer.list(email=request.user.email)
+                
+                if customers and customers.data:
+                    customer = customers.data[0]
+                    logger.info(f"Cliente Stripe encontrado: {customer.id}")
+                    
+                    # Verificar assinaturas do cliente
+                    subscriptions = stripe.Subscription.list(
+                        customer=customer.id,
+                        status='active'
+                    )
+                    
+                    has_active_subscription = subscriptions and len(subscriptions.data) > 0
+                    logger.info(f"Assinaturas ativas encontradas: {len(subscriptions.data) if subscriptions else 0}")
+            except Exception as e:
+                logger.error(f"Erro ao verificar assinatura diretamente no Stripe: {str(e)}")
             
             # Se tem assinatura ativa no Stripe, permite acesso
-            if stripe_subscription:
+            if has_active_subscription:
                 return self.get_response(request)
                 
             # Caso contrário, redireciona para página de planos
