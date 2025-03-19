@@ -1,6 +1,5 @@
 from django.contrib import admin
 from .models import Fazenda, Animal, UnidadeMedida
-from .models_eduzz import ClienteLegado, EduzzTransaction
 
 @admin.register(Fazenda)
 class FazendaAdmin(admin.ModelAdmin):
@@ -31,53 +30,6 @@ class AnimalAdmin(admin.ModelAdmin):
             'fields': ('primeiro_peso', 'data_primeiro_peso')
         }),
     )
-
-@admin.register(ClienteLegado)
-class ClienteLegadoAdmin(admin.ModelAdmin):
-    list_display = ('email', 'nome', 'percentual_desconto', 'ativo', 'data_cadastro')
-    list_filter = ('ativo',)
-    search_fields = ('email', 'nome')
-    ordering = ('nome',)
-    fieldsets = (
-        (None, {
-            'fields': ('email', 'nome', 'ativo')
-        }),
-        ('Desconto', {
-            'fields': ('percentual_desconto',),
-            'description': 'Use 100 para dar 100% de desconto na adesão'
-        }),
-        ('Informações Adicionais', {
-            'fields': ('id_eduzz_antigo', 'observacoes'),
-            'classes': ('collapse',)
-        })
-    )
-    list_per_page = 50
-    save_on_top = True
-
-@admin.register(EduzzTransaction)
-class EduzzTransactionAdmin(admin.ModelAdmin):
-    list_display = ('email', 'nome', 'plano', 'status', 'valor_original', 'valor_pago', 'data_pagamento')
-    list_filter = ('status', 'plano')
-    search_fields = ('email', 'nome', 'transaction_id')
-    ordering = ('-data_pagamento',)
-    readonly_fields = ('transaction_id', 'status', 'data_pagamento', 'created_at', 'updated_at')
-    fieldsets = (
-        (None, {
-            'fields': ('email', 'nome', 'plano', 'status')
-        }),
-        ('Valores', {
-            'fields': ('valor_original', 'valor_pago')
-        }),
-        ('Datas', {
-            'fields': ('data_pagamento', 'data_expiracao')
-        }),
-        ('Informações do Sistema', {
-            'fields': ('transaction_id', 'created_at', 'updated_at'),
-            'classes': ('collapse',)
-        })
-    )
-    list_per_page = 50
-    save_on_top = True
 
 @admin.register(UnidadeMedida)
 class UnidadeMedidaAdmin(admin.ModelAdmin):

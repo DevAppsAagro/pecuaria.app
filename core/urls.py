@@ -18,7 +18,6 @@ from . import importacao_views
 from . import views_importacao
 from . import views_importacao_simples
 from . import views_account
-# from . import views_eduzz  # Removido - Sistema migrado para Stripe
 from . import views_stripe
 from . import views_financeiro
 from . import auth_supabase
