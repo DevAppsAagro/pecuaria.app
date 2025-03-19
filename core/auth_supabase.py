@@ -87,7 +87,9 @@ def login_with_email(request, email, password, session=None):
         
         # Verificar se o email foi confirmado
         email_confirmed = user_data.email_confirmed_at is not None
-        if not email_confirmed and not settings.DEBUG:
+        if not email_confirmed and settings.DEBUG:
+            print("[DEBUG] Email não confirmado, mas permitindo login em ambiente de desenvolvimento")
+        elif not email_confirmed:
             print("[DEBUG] Email não confirmado")
             messages.error(request, 'Por favor, confirme seu email antes de fazer login.')
             return False
@@ -122,7 +124,7 @@ def login_with_email(request, email, password, session=None):
                 except Profile.DoesNotExist:
                     profile = Profile.objects.create(user=user)
                 
-                profile.telefone = phone
+                profile.phone = phone
                 profile.save()
             
             print("[DEBUG] Usuário e perfil criados com sucesso")
