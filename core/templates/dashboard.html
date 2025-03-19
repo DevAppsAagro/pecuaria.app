@@ -129,13 +129,18 @@
         <div class="col-12">
             <div id="map"></div>
             <div class="map-filter">
-                <select id="fazendaFilter" class="form-select form-select-sm me-2">
-                    {% for fazenda in fazendas %}
-                    <option value="{{ fazenda.id }}" {% if fazenda.id == primeira_fazenda.id %}selected{% endif %}>
-                        {{ fazenda.nome }}
-                    </option>
-                    {% endfor %}
-                </select>
+                <div class="mb-4">
+                    <label for="fazendaFilter" class="block text-sm font-medium text-gray-700">Fazenda</label>
+                    <select id="fazendaFilter" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        {% for fazenda in fazendas %}
+                            <option value="{{ fazenda.id }}">{{ fazenda.nome }}</option>
+                        {% endfor %}
+                    </select>
+                    
+                    <!-- Botão para testar polígonos (apenas para desenvolvimento) -->
+                    <button id="testarPoligonos" class="mt-2 px-3 py-1 bg-gray-200 text-gray-700 rounded text-xs">Testar Polígonos</button>
+                    <button id="testarGraficos" class="mt-2 px-3 py-1 bg-gray-200 text-gray-700 rounded text-xs">Testar Gráficos</button>
+                </div>
             </div>
         </div>
     </div>
@@ -243,253 +248,85 @@
 <script>
     $(document).ready(function() {
         // Inicializa o mapa
-        var map = L.map('map').setView([-15.7801, -47.9292], 5);  // Centraliza no Brasil inicialmente
-        
-        // Adiciona camada de satélite com ruas do Google (híbrido)
-        L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
-            maxZoom: 20,
-            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-            attribution: 'Google Maps'
+        var map = L.map('map', {
+            zoomControl: true,
+            attributionControl: true,
+            scrollWheelZoom: true
+        }).setView([-15.7801, -47.9292], 13);
+
+        // Adiciona camada de mapa base
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
         
         // Estilos para os pastos
         var pastosStyle = {
-            color: '#3a6604',
-            fillColor: '#65b307',
-            fillOpacity: 0.3,
-            weight: 4
+            color: '#3388ff',
+            weight: 2,
+            opacity: 0.7,
+            fillColor: '#3388ff',
+            fillOpacity: 0.2
         };
         
         // Camadas para pastos e benfeitorias
-        var pastosLayer = L.featureGroup().addTo(map);
-        var benfeitoriasLayer = L.featureGroup().addTo(map);
+        var pastosLayer = L.layerGroup().addTo(map);
+        var benfeitoriasLayer = L.layerGroup().addTo(map);
         
-        // Função para formatar valor em R$
-        function formatarValor(valor) {
-            return new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL'
-            }).format(valor);
-        }
-        
-        // Função para carregar dados da fazenda
-        function carregarDadosFazenda(fazendaId) {
+        // Função para criar polígonos de exemplo para teste
+        function criarPoligonosExemplo() {
+            console.log("Criando polígonos de exemplo para teste");
+            
             // Limpa as camadas
             pastosLayer.clearLayers();
-            benfeitoriasLayer.clearLayers();
             
-            var bounds = L.latLngBounds();  // Cria um bounds vazio
-            var hasValidBounds = false;
-            
-            // Carrega os dados da fazenda selecionada via AJAX
-            $.ajax({
-                url: "{% url 'atualizar_dashboard' %}",
-                data: {
-                    'fazenda': fazendaId
+            // Coordenadas de exemplo para 3 pastos
+            var exemplos = [
+                {
+                    nome: "Pasto Exemplo 1",
+                    coords: [
+                        [-15.7801, -47.9292],
+                        [-15.7901, -47.9392],
+                        [-15.7701, -47.9492],
+                        [-15.7601, -47.9392],
+                        [-15.7801, -47.9292]
+                    ]
                 },
-                dataType: 'json',
-                success: function(data) {
-                    // Adiciona pastos ao mapa
-                    if (data.pastos && data.pastos.length > 0) {
-                        // Adiciona cada pasto ao mapa
-                        data.pastos.forEach(function(pasto) {
-                            if (pasto.coordenadas) {
-                                try {
-                                    var coords = JSON.parse(pasto.coordenadas);
-                                    var pastoCoords = [];
-                                    
-                                    // Converte coordenadas para LatLng
-                                    coords.forEach(function(coord) {
-                                        var latlng = L.latLng(coord[0], coord[1]);
-                                        pastoCoords.push(latlng);
-                                        bounds.extend(latlng);
-                                    });
-                                    
-                                    // Cria polígono do pasto
-                                    var polygon = L.polygon(pastoCoords, pastosStyle);
-                                    
-                                    // Adiciona popup com informações
-                                    polygon.bindPopup(
-                                        '<div class="p-2">' +
-                                        '<h5 class="font-bold mb-2">' + pasto.nome + '</h5>' +
-                                        '<div class="text-sm">' +
-                                        '<p><strong>ID:</strong> ' + pasto.id + '</p>' +
-                                        '<p><strong>Área:</strong> ' + pasto.area + ' ha</p>' +
-                                        '<p><strong>Animais:</strong> ' + (pasto.qtd_animais || 0) + '</p>' +
-                                        '</div>' +
-                                        '</div>'
-                                    );
-                                    
-                                    // Adiciona o polígono à camada
-                                    pastosLayer.addLayer(polygon);
-                                    hasValidBounds = true;
-                                    
-                                } catch (e) {
-                                    console.error("Erro ao carregar coordenadas do pasto " + pasto.nome + ": ", e);
-                                }
-                            }
-                        });
-                        
-                        // Carrega as benfeitorias se disponíveis
-                        if (data.benfeitorias) {
-                            data.benfeitorias.forEach(function(benfeitoria) {
-                                try {
-                                    var coords = benfeitoria.coordenadas;
-                                    if (typeof coords === 'string') {
-                                        coords = JSON.parse(coords);
-                                    }
-                                    
-                                    if (coords && coords.lat && coords.lng) {
-                                        // Cria o marcador com ícone personalizado
-                                        var marker = L.marker([coords.lat, coords.lng], {
-                                            icon: L.divIcon({
-                                                className: 'custom-div-icon',
-                                                html: '<div><i class="fas fa-map-marker-alt" style="font-size: 24px; color: #dc2626; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);"></i></div>',
-                                                iconSize: [30, 42],
-                                                iconAnchor: [15, 42]
-                                            })
-                                        });
-                                        
-                                        // Adiciona o popup com informações detalhadas
-                                        marker.bindPopup(
-                                            '<div class="p-2">' +
-                                            '<h5 class="font-bold mb-2">' + benfeitoria.nome + '</h5>' +
-                                            '<div class="text-sm">' +
-                                            '<p><strong>Valor:</strong> ' + formatarValor(benfeitoria.valor_compra) + '</p>' +
-                                            '<p><strong>Data:</strong> ' + (benfeitoria.data_aquisicao || 'Não informada') + '</p>' +
-                                            '</div>' +
-                                            '</div>'
-                                        );
-                                        
-                                        benfeitoriasLayer.addLayer(marker);
-                                        bounds.extend([coords.lat, coords.lng]);
-                                        hasValidBounds = true;
-                                    }
-                                } catch (e) {
-                                    console.error('Erro ao processar benfeitoria:', e);
-                                }
-                            });
-                        }
-                        
-                        // Ajusta o mapa para mostrar todos os elementos
-                        if (hasValidBounds) {
-                            map.fitBounds(bounds, { padding: [50, 50] });
-                        } else {
-                            map.setView([-15.7801, -47.9292], 13);
-                        }
-                    }
-                    
-                    // Atualiza os gráficos com dados reais
-                    atualizarGraficos(data);
+                {
+                    nome: "Pasto Exemplo 2",
+                    coords: [
+                        [-15.8001, -47.9492],
+                        [-15.8101, -47.9592],
+                        [-15.7901, -47.9692],
+                        [-15.7801, -47.9592],
+                        [-15.8001, -47.9492]
+                    ]
                 }
+            ];
+            
+            exemplos.forEach(function(exemplo) {
+                var polygon = L.polygon(exemplo.coords, pastosStyle);
+                polygon.addTo(pastosLayer);
+                polygon.bindPopup('<div class="p-2">' +
+                                  '<h5 class="font-bold mb-2">' + exemplo.nome + '</h5>' +
+                                  '</div>');
             });
-        }
-        
-        // Atualiza os gráficos com dados reais da API
-        function atualizarGraficos(data) {
-            // Dados para o gráfico de evolução do rebanho
-            if (data.evolucao_rebanho) {
-                var labels = data.evolucao_rebanho.map(function(item) {
-                    return item.mes;
-                });
-                
-                var nascimentos = data.evolucao_rebanho.map(function(item) {
-                    return item.nascimentos || 0;
-                });
-                
-                var vendas = data.evolucao_rebanho.map(function(item) {
-                    return item.vendas || 0;
-                });
-                
-                var abates = data.evolucao_rebanho.map(function(item) {
-                    return item.abates || 0;
-                });
-                
-                var compras = data.evolucao_rebanho.map(function(item) {
-                    return item.compras || 0;
-                });
-                
-                // Atualiza o gráfico de evolução
-                evolucaoChart.data.labels = labels;
-                evolucaoChart.data.datasets[0].data = nascimentos;
-                evolucaoChart.data.datasets[1].data = vendas;
-                
-                // Adiciona datasets para abates e compras
-                if (evolucaoChart.data.datasets.length < 3) {
-                    evolucaoChart.data.datasets.push({
-                        label: 'Abates',
-                        data: abates,
-                        borderColor: '#e74a3b',
-                        backgroundColor: 'rgba(231, 74, 59, 0.05)',
-                        borderWidth: 2,
-                        pointBackgroundColor: '#e74a3b',
-                        tension: 0.3,
-                        fill: true
-                    });
-                } else {
-                    evolucaoChart.data.datasets[2].data = abates;
-                }
-                
-                if (evolucaoChart.data.datasets.length < 4) {
-                    evolucaoChart.data.datasets.push({
-                        label: 'Compras',
-                        data: compras,
-                        borderColor: '#f6c23e',
-                        backgroundColor: 'rgba(246, 194, 62, 0.05)',
-                        borderWidth: 2,
-                        pointBackgroundColor: '#f6c23e',
-                        tension: 0.3,
-                        fill: true
-                    });
-                } else {
-                    evolucaoChart.data.datasets[3].data = compras;
-                }
-                
-                evolucaoChart.update();
-            }
-            
-            // Dados para distribuição do rebanho
-            if (data.animais_por_categoria) {
-                // Atualiza a tabela de distribuição do rebanho
-                var tbody = $('.table-distribuicao tbody');
-                tbody.empty();
-                
-                data.animais_por_categoria.forEach(function(categoria) {
-                    var row = '<tr>' +
-                              '<td>' + categoria.categoria_display + '</td>' +
-                              '<td class="text-end">' + categoria.total + '</td>' +
-                              '<td class="text-end">' + categoria.percentual + '%</td>' +
-                              '</tr>';
-                    tbody.append(row);
-                });
-            }
-            
-            // Dados para o gráfico financeiro
-            if (data.financeiro) {
-                var labels = data.financeiro.map(function(item) {
-                    return item.mes;
-                });
-                
-                var receitas = data.financeiro.map(function(item) {
-                    return item.receitas || 0;
-                });
-                
-                var despesas = data.financeiro.map(function(item) {
-                    return item.despesas || 0;
-                });
-                
-                // Atualiza o gráfico financeiro
-                financeiroChart.data.labels = labels;
-                financeiroChart.data.datasets[0].data = receitas;
-                financeiroChart.data.datasets[1].data = despesas;
-                financeiroChart.update();
-            }
         }
         
         // Evento de mudança do filtro de fazenda
         $('#fazendaFilter').change(function() {
             var fazendaId = $(this).val();
-            carregarDadosFazenda(fazendaId);
+            // carregarDadosFazenda(fazendaId);
+        });
+        
+        // Carrega os dados da primeira fazenda ao iniciar
+        var primeiraFazendaId = $('#fazendaFilter').val();
+        if (primeiraFazendaId) {
+            // carregarDadosFazenda(primeiraFazendaId);
+        }
+        
+        // Força o redimensionamento do mapa quando a página terminar de carregar
+        $(window).on('load', function() {
+            map.invalidateSize();
         });
         
         // Gráficos
@@ -615,8 +452,113 @@
             }
         });
         
-        // Carrega os dados iniciais
-        carregarDadosFazenda($('#fazendaFilter').val());
+        // Função para criar dados de exemplo para os gráficos
+        function criarDadosExemploGraficos() {
+            console.log("Criando dados de exemplo para os gráficos");
+            
+            // Dados de exemplo para evolução do rebanho
+            var meses = ['Jan/2025', 'Fev/2025', 'Mar/2025', 'Abr/2025', 'Mai/2025', 'Jun/2025'];
+            
+            // Dados para o gráfico de evolução do rebanho
+            var nascimentos = [12, 8, 15, 10, 14, 9];
+            var vendas = [5, 8, 3, 7, 4, 6];
+            var abates = [2, 3, 1, 4, 2, 3];
+            var mortes = [1, 2, 1, 2, 3, 1];
+            var compras = [5, 0, 8, 3, 0, 4];
+            
+            // Atualiza o gráfico de evolução
+            evolucaoChart.data.labels = meses;
+            evolucaoChart.data.datasets[0].data = nascimentos;
+            evolucaoChart.data.datasets[1].data = vendas;
+            
+            // Adiciona datasets para abates, mortes e compras
+            if (evolucaoChart.data.datasets.length < 3) {
+                evolucaoChart.data.datasets.push({
+                    label: 'Abates',
+                    data: abates,
+                    borderColor: '#e74a3b',
+                    backgroundColor: 'rgba(231, 74, 59, 0.05)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#e74a3b',
+                    tension: 0.3,
+                    fill: true
+                });
+            } else {
+                evolucaoChart.data.datasets[2].data = abates;
+            }
+            
+            if (evolucaoChart.data.datasets.length < 4) {
+                evolucaoChart.data.datasets.push({
+                    label: 'Mortes',
+                    data: mortes,
+                    borderColor: '#6e707e',
+                    backgroundColor: 'rgba(110, 112, 126, 0.05)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#6e707e',
+                    tension: 0.3,
+                    fill: true
+                });
+            } else {
+                evolucaoChart.data.datasets[3].data = mortes;
+            }
+            
+            if (evolucaoChart.data.datasets.length < 5) {
+                evolucaoChart.data.datasets.push({
+                    label: 'Compras',
+                    data: compras,
+                    borderColor: '#f6c23e',
+                    backgroundColor: 'rgba(246, 194, 62, 0.05)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#f6c23e',
+                    tension: 0.3,
+                    fill: true
+                });
+            } else {
+                evolucaoChart.data.datasets[4].data = compras;
+            }
+            
+            evolucaoChart.update();
+            
+            // Dados para o gráfico financeiro
+            var receitas = [25000, 18000, 22000, 28000, 20000, 24000];
+            var despesas = [15000, 12000, 18000, 16000, 14000, 17000];
+            var investimentos = [5000, 0, 8000, 0, 12000, 0];
+            
+            // Atualiza o gráfico financeiro
+            financeiroChart.data.labels = meses;
+            financeiroChart.data.datasets[0].data = receitas;
+            financeiroChart.data.datasets[1].data = despesas;
+            
+            // Adiciona dataset para investimentos
+            if (financeiroChart.data.datasets.length < 3) {
+                financeiroChart.data.datasets.push({
+                    label: 'Investimentos',
+                    data: investimentos,
+                    borderColor: '#4e73df',
+                    backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#4e73df',
+                    tension: 0.3,
+                    fill: true
+                });
+            } else {
+                financeiroChart.data.datasets[2].data = investimentos;
+            }
+            
+            financeiroChart.update();
+            
+            console.log("Dados de exemplo criados para os gráficos");
+        }
+        
+        // Botão para testar polígonos (apenas para desenvolvimento)
+        $('#testarPoligonos').click(function() {
+            criarPoligonosExemplo();
+        });
+        
+        // Botão para testar dados dos gráficos
+        $('#testarGraficos').click(function() {
+            criarDadosExemploGraficos();
+        });
     });
 </script>
 {% endblock %}

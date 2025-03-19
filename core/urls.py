@@ -18,7 +18,7 @@ from . import importacao_views
 from . import views_importacao
 from . import views_importacao_simples
 from . import views_account
-from . import views_eduzz
+# from . import views_eduzz  # Removido - Sistema migrado para Stripe
 from . import views_stripe
 from . import views_financeiro
 from . import auth_supabase
@@ -34,11 +34,6 @@ urlpatterns = [
     
     # Dashboard
     path('', views_dashboard.dashboard, name='dashboard'),
-    
-    # Eduzz Webhooks
-    path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
-    path('api/eduzz/test/', views_eduzz.test_eduzz_connection, name='test_eduzz'),
-    path('api/eduzz/sync-sales/', views_eduzz.sync_eduzz_sales, name='sync_eduzz_sales'),
     
     # Dashboard
     path('dashboard/atualizar/', views_dashboard.atualizar_dashboard, name='atualizar_dashboard'),
@@ -252,22 +247,10 @@ urlpatterns = [
     # Configurações
     path('config/selecionar-fazenda/', views_config.selecionar_fazenda, name='selecionar_fazenda'),
     
-    # Eduzz Integration
-    path('api/eduzz/webhook/', views_eduzz.webhook_eduzz, name='webhook_eduzz'),
-    path('api/eduzz/test/', views_eduzz.test_eduzz_connection, name='test_eduzz'),
-    path('api/eduzz/sync-sales/', views_eduzz.sync_eduzz_sales, name='sync_eduzz_sales'),
-    path('api/eduzz/checkout/', views_eduzz.create_checkout, name='eduzz_checkout'),
-    path('api/eduzz/return/', views_eduzz.eduzz_return, name='eduzz_return'),
-    path('eduzz/checkout/', views_eduzz.checkout_page, name='eduzz_checkout_page'),
-    
-    # Eduzz Planos
-    path('planos/', views_eduzz.planos_view, name='planos'),
-    path('planos/verificar-email/', views_eduzz.verificar_email, name='verificar_email_plano'),
-    path('planos/mensal/', views_eduzz.plano_mensal, name='plano_mensal'),
-    path('planos/anual/', views_eduzz.plano_anual, name='plano_anual'),
-    path('checkout/<str:plan_id>/', views_eduzz.checkout_plano, name='checkout_plano'),
-    path('assinatura/', views_eduzz.assinatura, name='assinatura'),
-    path('assinatura/alterar-plano/', views_eduzz.alterar_plano, name='alterar_plano'),
+    # Planos e Assinaturas (Stripe)
+    path('planos/', views_stripe.planos, name='planos'),  # Redirecionado para o Stripe
+    path('checkout/<str:price_id>/', views_stripe.checkout_session, name='checkout_plano'),  # Redirecionado para o Stripe
+    path('assinatura/', views_stripe.portal_stripe, name='assinatura'),  # Redirecionado para o portal do Stripe
     
     # Stripe Endpoints
     path('stripe/plans/', views_stripe.planos, name='stripe_plans'),

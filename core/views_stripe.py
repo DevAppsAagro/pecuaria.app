@@ -3,6 +3,8 @@ Views para integração com o Stripe
 """
 import json
 import logging
+import stripe
+import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -10,27 +12,23 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
-from django.utils import timezone
+from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from django.urls import reverse
+from django.utils import timezone
 
-import stripe
 from .stripe_api import StripeAPI
-
-# Comentando a importação dos modelos que ainda não existem no banco
-# from .models_stripe import (
-#     StripeCustomer,
-#     StripeEvent,
-#     StripeInvoice,
-#     StripePrice,
-#     StripeProduct,
-#     StripeSubscription,
-# )
+from .models_stripe import (
+    StripeCustomer,
+    StripeEvent,
+    StripeInvoice,
+    StripePrice,
+    StripeProduct,
+    StripeSubscription,
+)
 
 # Configure o logger
 logger = logging.getLogger(__name__)
@@ -132,17 +130,11 @@ def webhook_stripe(request):
         # Logando mais detalhes para debug
         logger.info(f"Dados do evento: {event}")
         
-        # Processar o evento (comentando o processamento atual para evitar erros de banco)
-        # handle_stripe_event(event)
-        
-        # Para checkout.session.completed, atualiza a sessão do usuário
+        # Processar o evento
         if event.type == 'checkout.session.completed':
             session = event.data.object
-            # Atualiza cliente com metadados ou outras informações necessárias
-            customer_id = session.customer
-            if customer_id:
-                logger.info(f"Atualizando cliente {customer_id} após checkout completo")
-                # Como não podemos usar o banco, apenas logar por enquanto
+            # Processa a conclusão do checkout e cria assinatura
+            handle_checkout_completed(session)
                 
         return HttpResponse(status=200)
     
@@ -151,9 +143,78 @@ def webhook_stripe(request):
         return HttpResponse(status=400)
 
 
+def handle_checkout_completed(session):
+    """
+    Processa um evento de checkout.session.completed
+    """
+    try:
+        # Extrair metadados da sessão
+        metadata = session.get('metadata', {})
+        user_id = metadata.get('user_id')
+        plan_type = metadata.get('plan_type')
+        
+        if not user_id:
+            logger.error("Checkout sem user_id nos metadados")
+            return False
+        
+        # Buscar usuário
+        try:
+            from django.contrib.auth.models import User
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            logger.error(f"Usuário com ID {user_id} não encontrado")
+            return False
+        
+        # Verificar se já existe cliente do Stripe para este usuário
+        customer_id = session.get('customer')
+        
+        if not customer_id:
+            logger.error("Checkout sem customer_id")
+            return False
+        
+        # Criar ou atualizar cliente
+        customer, created = StripeCustomer.objects.update_or_create(
+            user=user,
+            defaults={'stripe_customer_id': customer_id}
+        )
+        logger.info(f"Cliente {'criado' if created else 'atualizado'}: {customer}")
+        
+        # Buscar detalhes da assinatura (para ter os períodos de início/fim)
+        subscription_id = session.get('subscription')
+        if subscription_id:
+            try:
+                import stripe
+                stripe.api_key = settings.STRIPE_SECRET_KEY
+                subscription_data = stripe.Subscription.retrieve(subscription_id)
+                
+                # Criar ou atualizar assinatura
+                subscription, created = StripeSubscription.objects.update_or_create(
+                    user=user,
+                    defaults={
+                        'stripe_subscription_id': subscription_id,
+                        'status': subscription_data.status,
+                        'plan_type': plan_type or 'mensal',
+                        'current_period_start': datetime.fromtimestamp(subscription_data.current_period_start),
+                        'current_period_end': datetime.fromtimestamp(subscription_data.current_period_end),
+                    }
+                )
+                
+                logger.info(f"Assinatura {'criada' if created else 'atualizada'}: {subscription}")
+                return True
+            except Exception as e:
+                logger.error(f"Erro ao criar assinatura: {str(e)}")
+                return False
+        else:
+            logger.warning("Checkout sem subscription_id")
+            return False
+    except Exception as e:
+        logger.error(f"Erro ao processar checkout: {str(e)}")
+        return False
+
+
 def handle_stripe_event(event):
     """
-    Processa eventos do Stripe - Desativado temporariamente
+    Processa eventos do Stripe
     """
     try:
         event_type = event.type

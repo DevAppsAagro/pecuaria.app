@@ -158,19 +158,8 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
-# Configurações da Eduzz (DEPRECIADO - Em migração para Stripe)
-EDUZZ_API_URL = config('EDUZZ_API_URL', default='https://api.eduzz.com')
-EDUZZ_ACCESS_TOKEN = config('EDUZZ_ACCESS_TOKEN', default='edzpap_uwevgLCGelKcojXp2MLMK1Sf_kB_xndYrfEIMpjg-BBbpdhew8hlEmyPKpWigQvwhbixBfItbVwSGFhQQkX')
-EDUZZ_SOFTWARE_CORTESIA_ID_3F = '2655876'  # ID do produto de cortesia
-EDUZZ_WEBHOOK_URL = config('EDUZZ_WEBHOOK_URL', default='https://app.pecuaristapro.com/api/eduzz/webhook/')
-EDUZZ_RETURN_URL = config('EDUZZ_RETURN_URL', default='https://app.pecuaristapro.com/api/eduzz/return/')
-EDUZZ_PLANILHA_ID = config('EDUZZ_PLANILHA_ID', default='')  # ID do produto da planilha na Eduzz
-EDUZZ_SOFTWARE_MENSAL_ID_3F = '2655883'
-EDUZZ_SOFTWARE_MENSAL_SEM_ADESAO_ID_3F = '2658194'
-EDUZZ_SOFTWARE_ANUAL_ID_3F = '2655875'
-EDUZZ_SOFTWARE_ANUAL_SEM_ADESAO_ID_3F = '2658208'
-
 # Configurações do Stripe
+# Nota: A integração com Eduzz foi removida e o sistema utiliza exclusivamente o Stripe para pagamentos
 STRIPE_API_BASE = config('STRIPE_API_BASE', default='https://api.stripe.com')
 STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='sk_test_...')  # Substituir pela sua chave secreta
 STRIPE_PUBLIC_KEY = config('STRIPE_PUBLIC_KEY', default='pk_test_...')  # Substituir pela sua chave pública

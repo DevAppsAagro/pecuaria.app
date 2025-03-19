@@ -1,10 +1,10 @@
 from django.conf import settings
 from supabase import create_client, Client
 from django.contrib.auth.models import User
-from django.contrib.auth import login
+from django.contrib.auth import login, authenticate
 from django.shortcuts import redirect, render
 from django.contrib import messages
-from .models_eduzz import UserSubscription, ClientePlanilha
+# Removido: from .models_eduzz import UserSubscription, ClientePlanilha
 from django.http import JsonResponse
 import json
 
@@ -65,162 +65,91 @@ def register_with_email(request, email, password, first_name='', last_name='', p
         return False
 
 def login_with_email(request, email, password, session=None):
+    response = supabase.auth.sign_in_with_password({
+        "email": email,
+        "password": password
+    }) if password else supabase.auth.get_user(session)
+    
     try:
-        print("\n[DEBUG] Iniciando processo de login...")
-        print(f"[DEBUG] Tentando login para o email: {email}")
-        
-        if session:
-            # Usar a sessão fornecida
-            print("[DEBUG] Usando sessão fornecida")
-            print("[DEBUG] Sessão:", session)
-            
-            # Configurar tokens
-            request.session['supabase_access_token'] = session.get('access_token')
-            request.session['supabase_refresh_token'] = session.get('refresh_token')
-            request.session.set_expiry(60 * 60 * 24 * 7)  # 7 days
-            print("[DEBUG] Tokens configurados com sucesso")
-            
-            # Obter dados do usuário
-            try:
-                user_response = supabase.auth.get_user(session.get('access_token'))
-                print("[DEBUG] Resposta get_user:", user_response)
-                
-                if not user_response or not user_response.user:
-                    print("[DEBUG] Erro: Não foi possível obter dados do usuário")
-                    messages.error(request, 'Erro ao obter dados do usuário.')
-                    return False
-                    
-                user_data = user_response.user
-                
-                # Verificar se o email foi confirmado
-                if not user_data.email_confirmed_at:
-                    messages.error(request, 'Por favor, confirme seu email antes de fazer login.')
-                    return False
-                    
-                # Login ou criação no Django
-                try:
-                    user = User.objects.get(email=email)
-                    print("[DEBUG] Usuário encontrado no Django")
-                except User.DoesNotExist:
-                    print("[DEBUG] Criando novo usuário no Django")
-                    # Pegar dados do user_metadata
-                    metadata = user_data.user_metadata
-                    first_name = metadata.get('first_name', '')
-                    last_name = metadata.get('last_name', '')
-                    phone = metadata.get('phone', '')  # Pega o telefone do metadata
-                    
-                    # Criar usuário Django
-                    user = User.objects.create_user(
-                        username=email,
-                        email=email,
-                        first_name=first_name,
-                        last_name=last_name
-                    )
-                    
-                    # Criar perfil do usuário se não existir
-                    from django.db import transaction
-                    from core.models import Profile
-                    
-                    with transaction.atomic():
-                        try:
-                            profile = user.profile
-                        except Profile.DoesNotExist:
-                            profile = Profile.objects.create(user=user)
-                        
-                        profile.telefone = phone
-                        profile.save()
-                    
-                    print("[DEBUG] Usuário e perfil criados com sucesso")
-                    
-                login(request, user)
-                print("[DEBUG] Login no Django realizado com sucesso")
-                return True
-                    
-            except Exception as e:
-                print(f"[DEBUG] Erro ao obter dados do usuário: {str(e)}")
-                messages.error(request, 'Erro ao obter dados do usuário.')
-                return False
-                
-        else:
-            # Login no Supabase
-            response = supabase.auth.sign_in_with_password({
-                "email": email,
-                "password": password
-            })
-            print("[DEBUG] Resposta do Supabase:", response)
-            
-            if not response or not hasattr(response, 'user') or not response.user:
-                print("[DEBUG] Erro: Resposta inválida do Supabase")
-                print("[DEBUG] Response:", response)
-                print("[DEBUG] Tem atributo user?", hasattr(response, 'user'))
-                if hasattr(response, 'user'):
-                    print("[DEBUG] User:", response.user)
-                messages.error(request, 'Credenciais inválidas. Por favor, verifique seu email e senha.')
-                return False
-                
-            # Armazena o token de acesso na sessão
-            print("[DEBUG] Verificando sessão...")
-            if hasattr(response, 'session') and response.session:
-                print("[DEBUG] Sessão encontrada, configurando tokens...")
-                request.session['supabase_access_token'] = response.session.access_token
-                request.session['supabase_refresh_token'] = response.session.refresh_token
-                request.session.set_expiry(60 * 60 * 24 * 7)  # 7 days
-                print("[DEBUG] Tokens configurados com sucesso")
+        if not session:  # Login com email e senha
+            if response.user:
+                user_data = response.user
+                print("[DEBUG] Autenticação com Supabase bem-sucedida")
             else:
-                print("[DEBUG] Erro: Sessão não encontrada")
-                print("[DEBUG] Response session:", getattr(response, 'session', None))
-                messages.error(request, 'Erro ao processar autenticação. Por favor, tente novamente.')
+                print("[DEBUG] Erro de autenticação com Supabase")
                 return False
-            
+        else:  # Login com sessão (token)
             user_data = response.user
-            
-            # Verificar se o email foi confirmado
-            if not user_data.email_confirmed_at:
-                messages.error(request, 'Por favor, confirme seu email antes de fazer login.')
+            if not user_data:
+                print("[DEBUG] Sessão inválida ou expirada")
                 return False
+            print("[DEBUG] Autenticação com token bem-sucedida")
+        
+        # Verificar se o email foi confirmado
+        email_confirmed = user_data.email_confirmed_at is not None
+        if not email_confirmed and not settings.DEBUG:
+            print("[DEBUG] Email não confirmado")
+            messages.error(request, 'Por favor, confirme seu email antes de fazer login.')
+            return False
+        
+        # Verificar se usuário existe no Django e criar se não existir
+        try:
+            user = User.objects.get(email=email)
+            print("[DEBUG] Usuário encontrado no Django")
+        except User.DoesNotExist:
+            print("[DEBUG] Criando novo usuário no Django")
+            # Pegar dados do user_metadata
+            metadata = user_data.user_metadata
+            first_name = metadata.get('first_name', '')
+            last_name = metadata.get('last_name', '')
+            phone = metadata.get('phone', '')  # Pega o telefone do metadata
+            
+            # Criar usuário Django
+            user = User.objects.create_user(
+                username=email,
+                email=email,
+                first_name=first_name,
+                last_name=last_name
+            )
+            
+            # Criar perfil do usuário se não existir
+            from django.db import transaction
+            from core.models import Profile
+            
+            with transaction.atomic():
+                try:
+                    profile = user.profile
+                except Profile.DoesNotExist:
+                    profile = Profile.objects.create(user=user)
                 
-            # Login ou criação no Django
-            try:
-                user = User.objects.get(email=email)
-                print("[DEBUG] Usuário encontrado no Django")
-            except User.DoesNotExist:
-                print("[DEBUG] Criando novo usuário no Django")
-                # Pegar dados do user_metadata
-                metadata = user_data.user_metadata
-                first_name = metadata.get('first_name', '')
-                last_name = metadata.get('last_name', '')
-                phone = metadata.get('phone', '')  # Pega o telefone do metadata
-                
-                # Criar usuário Django
-                user = User.objects.create_user(
-                    username=email,
-                    email=email,
-                    first_name=first_name,
-                    last_name=last_name
-                )
-                
-                # Criar perfil do usuário se não existir
-                from django.db import transaction
-                from core.models import Profile
-                
-                with transaction.atomic():
-                    try:
-                        profile = user.profile
-                    except Profile.DoesNotExist:
-                        profile = Profile.objects.create(user=user)
-                    
-                    profile.telefone = phone
-                    profile.save()
-                
-                print("[DEBUG] Usuário e perfil criados com sucesso")
-                
-            login(request, user)
-            print("[DEBUG] Login no Django realizado com sucesso")
-            return True
-                
+                profile.telefone = phone
+                profile.save()
+            
+            print("[DEBUG] Usuário e perfil criados com sucesso")
+        
+        # Fazer login no Django
+        login(request, user)
+        print("[DEBUG] Login no Django realizado com sucesso")
+        
+        # Verificar se o usuário tem assinatura ativa
+        try:
+            from .models_stripe import StripeSubscription
+            has_active_subscription = StripeSubscription.objects.filter(
+                user=user, 
+                status__in=['active', 'trialing']
+            ).exists()
+            
+            if not has_active_subscription:
+                messages.info(request, 'Bem-vindo! Por favor, escolha um plano para continuar utilizando o sistema.')
+        except Exception as e:
+            print(f"[DEBUG] Erro ao verificar assinatura: {str(e)}")
+            # Se ocorrer erro, não bloqueia o login
+            pass
+        
+        return True
+    
     except Exception as e:
         print(f"[DEBUG] Erro no processo de login: {str(e)}")
-        messages.error(request, f'Erro ao fazer login: {str(e)}')
         return False
 
 def reset_password(email):
