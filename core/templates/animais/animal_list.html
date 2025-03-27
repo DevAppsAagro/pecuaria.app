@@ -79,6 +79,33 @@
         margin-bottom: 0.5rem;
         font-weight: 500;
     }
+    
+    /* Otimizações de desempenho */
+    .fast-render {
+        contain: content;
+        will-change: transform;
+    }
+    
+    .nowrap {
+        white-space: nowrap;
+    }
+    
+    /* Otimizações para DataTables */
+    table.dataTable {
+        contain: layout style;
+    }
+    
+    table.dataTable tbody tr td {
+        contain: content;
+    }
+    
+    /* Melhorar a percepção de velocidade */
+    .dataTables_processing {
+        background-color: rgba(255, 255, 255, 0.9) !important;
+        color: #333 !important;
+        border: none !important;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1) !important;
+    }
 </style>
 {% endblock %}
 
@@ -532,7 +559,7 @@
 
 <script>
     $(document).ready(function() {
-        // Inicializar DataTable
+        // Inicializar DataTable com processamento do lado do servidor
         const table = $('#animais-table').DataTable({
             language: {
                 url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json',
@@ -544,11 +571,18 @@
                     last: "Último",
                     next: "Próximo",
                     previous: "Anterior"
-                }
+                },
+                processing: "Processando...",
+                emptyTable: "Nenhum registro encontrado",
+                zeroRecords: "Nenhum registro encontrado"
             },
-            pageLength: 25,
-            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+            serverSide: false, // Mantemos como false para não precisar criar um endpoint AJAX
+            pageLength: 50,
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
             order: [[0, 'asc']], // Ordenar pela coluna do brinco visual
+            deferRender: true,
+            processing: true,
+            dom: '<"top"Bfl>rt<"bottom"ip>',
             buttons: [
                 {
                     extend: 'excel',
@@ -585,7 +619,24 @@
                     targets: -2, // Penúltima coluna (ações)
                     orderable: false
                 }
-            ]
+            ],
+            // Mostrar informações corretas sobre o total de registros
+            drawCallback: function(settings) {
+                // Atualizar o contador com o número total de registros
+                const totalRegistros = parseInt('{{ total_ativos|default:0 }}');
+                const info = settings._iDisplayStart + 1;
+                const end = settings._iDisplayStart + settings._iDisplayLength > totalRegistros ? totalRegistros : settings._iDisplayStart + settings._iDisplayLength;
+                $('.dataTables_info').text('Mostrando ' + info + ' a ' + end + ' de ' + totalRegistros + ' registros');
+                
+                // Adicionar classe para melhorar o desempenho de renderização
+                $('table.dataTable tbody tr').addClass('fast-render');
+            },
+            initComplete: function() {
+                // Adicionar otimizações após a inicialização completa
+                this.api().columns().every(function() {
+                    $(this.header()).addClass('nowrap');
+                });
+            }
         });
 
         // Função para exportação

@@ -20,10 +20,12 @@ from . import views_importacao_simples
 from . import views_account
 from . import views_stripe
 from . import views_financeiro
+from . import views_fluxo_caixa
 from . import auth_supabase
 from . import urls_mortes
 from . import views_debug
 from .api import manejo_api
+from . import views_animal  # Importando o novo arquivo com a função animal_list otimizada
 
 urlpatterns = [
     # Auth
@@ -35,7 +37,8 @@ urlpatterns = [
     path('', views_dashboard.dashboard, name='dashboard'),
     
     # Dashboard
-    path('dashboard/atualizar/', views_dashboard.atualizar_dashboard, name='atualizar_dashboard'),
+    path('dashboard/dados/', views_dashboard.dashboard_dados, name='dashboard_dados'),
+    path('api/dre/dados/', views_relatorios.atualizar_dre_dados_ajax, name='atualizar_dre_dados_ajax'),
     
     # Página em desenvolvimento
     path('em-desenvolvimento/', views.em_desenvolvimento, name='em_desenvolvimento'),
@@ -50,11 +53,17 @@ urlpatterns = [
     path('relatorios/confinamento/', views_relatorios.relatorio_confinamento, name='relatorio_confinamento'),
     path('relatorios/confinamento/imprimir/', views_impressao.imprimir_confinamento, name='imprimir_confinamento'),
     path('relatorios/dre/', views_relatorios.relatorio_dre, name='relatorio_dre'),
+    path('relatorios/dre/imprimir/', views_impressao.imprimir_dre, name='imprimir_dre'),
     path('relatorios/dre/atualizar/', views_relatorios.atualizar_dre, name='atualizar_dre'),
+    path('relatorios/fluxo-caixa/', views_fluxo_caixa.relatorio_fluxo_caixa, name='relatorio_fluxo_caixa'),
+    path('relatorios/fluxo-caixa/imprimir/', views_impressao.imprimir_fluxo_caixa, name='fluxo_caixa_print'),
+    path('fluxo-caixa/', views_fluxo_caixa.relatorio_fluxo_caixa, name='fluxo_caixa'),
+    path('fluxo-caixa/mensal/', views_fluxo_caixa.fluxo_caixa_mensal, name='fluxo_caixa_mensal'),
+    path('fluxo-caixa/mensal/imprimir/', views_fluxo_caixa.fluxo_caixa_mensal_print, name='fluxo_caixa_mensal_print'),
     path('api/animais-por-lote/<int:lote_id>/', views_relatorios.animais_por_lote, name='animais_por_lote'),
     
     # Animais
-    path('animais/', views.animal_list, name='animal_list'),
+    path('animais/', views_animal.animal_list, name='animal_list'),  # Atualizando o caminho para usar a função animal_list do arquivo views_animal.py
     path('animais/novo/', views.animal_create, name='animal-create'),
     path('animais/<int:pk>/', views.animal_detail, name='animal_detail'),
     path('animais/<int:animal_id>/debug/', views_debug.debug_reprodutivo, name='animal_debug'),
@@ -77,9 +86,9 @@ urlpatterns = [
     
     # Fazendas URLs
     path('fazendas/', views.fazenda_list, name='fazenda_list'),
-    path('fazendas/nova/', views.fazenda_create, name='fazenda_create'),
+    path('fazendas/nova/', views_fazenda.fazenda_create, name='fazenda_create'),
     path('fazendas/<int:pk>/', views.fazenda_detail, name='fazenda_detail'),
-    path('fazendas/<int:pk>/editar/', views.fazenda_edit, name='fazenda_edit'),
+    path('fazendas/<int:pk>/editar/', views_fazenda.fazenda_edit, name='fazenda_edit'),
     path('fazendas/<int:pk>/excluir/', views.fazenda_delete, name='fazenda_delete'),
     
     # Pastos URLs
@@ -139,6 +148,7 @@ urlpatterns = [
     path('estoque/insumo/novo/', views_estoque.insumo_create, name='insumo_create'),
     path('estoque/insumo/<int:pk>/editar/', views_estoque.insumo_edit, name='insumo_edit'),
     path('estoque/insumo/<int:pk>/excluir/', views_estoque.insumo_delete, name='insumo_delete'),
+    path('estoque/insumo/<int:pk>/toggle-status/', views_estoque.insumo_toggle_status, name='insumo_toggle_status'),
     path('estoque/entrada/', views_estoque.entrada_list, name='entrada_list'),
     path('estoque/entrada/nova/', views_estoque.entrada_estoque, name='entrada_estoque'),
     path('estoque/entrada/<int:pk>/editar/', views_estoque.entrada_edit, name='entrada_edit'),
