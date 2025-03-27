@@ -20,7 +20,8 @@ from . import views_importacao_simples
 from . import views_account
 from . import views_stripe
 from . import views_financeiro
-from . import views_fluxo_caixa
+# Removendo a importação que está causando erro no Vercel
+# from . import views_fluxo_caixa
 from . import auth_supabase
 from . import urls_mortes
 from . import views_debug
@@ -55,11 +56,12 @@ urlpatterns = [
     path('relatorios/dre/', views_relatorios.relatorio_dre, name='relatorio_dre'),
     path('relatorios/dre/imprimir/', views_impressao.imprimir_dre, name='imprimir_dre'),
     path('relatorios/dre/atualizar/', views_relatorios.atualizar_dre, name='atualizar_dre'),
-    path('relatorios/fluxo-caixa/', views_fluxo_caixa.relatorio_fluxo_caixa, name='relatorio_fluxo_caixa'),
-    path('relatorios/fluxo-caixa/imprimir/', views_impressao.imprimir_fluxo_caixa, name='fluxo_caixa_print'),
-    path('fluxo-caixa/', views_fluxo_caixa.relatorio_fluxo_caixa, name='fluxo_caixa'),
-    path('fluxo-caixa/mensal/', views_fluxo_caixa.fluxo_caixa_mensal, name='fluxo_caixa_mensal'),
-    path('fluxo-caixa/mensal/imprimir/', views_fluxo_caixa.fluxo_caixa_mensal_print, name='fluxo_caixa_mensal_print'),
+    # Comentando temporariamente as rotas de fluxo de caixa que estão causando erro
+    # path('relatorios/fluxo-caixa/', views_financeiro.relatorio_fluxo_caixa, name='relatorio_fluxo_caixa'),
+    # path('relatorios/fluxo-caixa/imprimir/', views_impressao.imprimir_fluxo_caixa, name='fluxo_caixa_print'),
+    # path('fluxo-caixa/', views_financeiro.relatorio_fluxo_caixa, name='fluxo_caixa'),
+    # path('fluxo-caixa/mensal/', views_financeiro.fluxo_caixa_mensal, name='fluxo_caixa_mensal'),
+    # path('fluxo-caixa/mensal/imprimir/', views_financeiro.fluxo_caixa_mensal_print, name='fluxo_caixa_mensal_print'),
     path('api/animais-por-lote/<int:lote_id>/', views_relatorios.animais_por_lote, name='animais_por_lote'),
     
     # Animais

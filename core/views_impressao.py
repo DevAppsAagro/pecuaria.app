@@ -7,8 +7,10 @@ from .models import Animal, Pesagem, ManejoSanitario, MovimentacaoAnimal, Rateio
 from .models_compras import CompraAnimal, Compra
 from .models_vendas import VendaAnimal, Venda
 from .models_abates import AbateAnimal
+from .models_reproducao import ManejoReproducao, EstacaoMonta
 from django.db.models import Sum, F, Q
 from core.models import Despesa, Contato, Fazenda
+from .views_relatorios import atualizar_dre_dados
 
 @login_required
 def imprimir_animal(request, pk):
@@ -116,6 +118,55 @@ def imprimir_animal(request, pk):
     pesagens = Pesagem.objects.filter(animal=animal).order_by('-data')
     manejos = ManejoSanitario.objects.filter(animal=animal).order_by('-data')
     movimentacoes = MovimentacaoAnimal.objects.filter(animal=animal).order_by('-data_movimentacao')
+    manejos_reprodutivos = ManejoReproducao.objects.filter(animal=animal).order_by('-data_concepcao')
+    
+    # Buscar filhos (bezerros) se o animal for fêmea
+    filhos = []
+    bezerros_organizados = []
+    estacao_origem = None
+    
+    if animal.categoria_animal.sexo == 'F':
+        # Buscar todos os filhos desta matriz
+        filhos = Animal.objects.filter(mae=animal, usuario=request.user)
+        
+        # Organizar bezerros por estação de monta
+        bezerros_por_estacao = {}
+        
+        for filho in filhos:
+            # Buscar o manejo reprodutivo que originou este bezerro
+            manejo_origem = ManejoReproducao.objects.filter(
+                animal=animal,
+                data_concepcao__lte=filho.data_nascimento,
+                resultado='NASCIMENTO'
+            ).order_by('-data_concepcao').first()
+            
+            estacao = None
+            if manejo_origem and manejo_origem.estacao_monta:
+                estacao = manejo_origem.estacao_monta
+            
+            # Adicionar à lista por estação
+            if estacao not in bezerros_por_estacao:
+                bezerros_por_estacao[estacao] = []
+            
+            bezerros_por_estacao[estacao].append(filho)
+        
+        # Converter para lista de dicionários para facilitar acesso no template
+        bezerros_organizados = [
+            {'estacao': estacao, 'bezerros': bezerros} 
+            for estacao, bezerros in bezerros_por_estacao.items()
+        ]
+    
+    # Se for um bezerro, buscar informação da estação de monta de origem
+    elif animal.mae:
+        # Buscar o manejo reprodutivo que originou este bezerro
+        manejo_origem = ManejoReproducao.objects.filter(
+            animal=animal.mae,
+            data_concepcao__lte=animal.data_nascimento,
+            resultado='NASCIMENTO'
+        ).order_by('-data_concepcao').first()
+        
+        if manejo_origem and manejo_origem.estacao_monta:
+            estacao_origem = manejo_origem.estacao_monta
     
     # Informações do cabeçalho
     cabecalho = {
@@ -134,6 +185,17 @@ def imprimir_animal(request, pk):
         'sistema': 'Sistema de Gestão Pecuária v1.0'
     }
     
+    # Obter data e hora local (UTC-3)
+    from datetime import datetime
+    import pytz
+    
+    # Definir o fuso horário do Brasil (UTC-3)
+    tz_brasil = pytz.timezone('America/Sao_Paulo')
+    
+    # Obter a data e hora atual no fuso horário do Brasil
+    data_hora_local = datetime.now(tz_brasil)
+    
+    # Contexto
     context = {
         'animal': animal,
         'dias_ativos': dias_ativos,
@@ -144,6 +206,7 @@ def imprimir_animal(request, pk):
         'pesagens': pesagens,
         'manejos': manejos,
         'movimentacoes': movimentacoes,
+        'manejos_reprodutivos': manejos_reprodutivos,
         'peso_atual': peso_atual,
         'arroba_atual': arroba_atual,
         'arroba_entrada': arroba_entrada,
@@ -158,8 +221,11 @@ def imprimir_animal(request, pk):
         'custo_variavel_diario': custo_variavel_diario,
         'lucro': lucro,
         'gmd': gmd,
+        'bezerros_organizados': bezerros_organizados,
+        'estacao_origem': estacao_origem,
         'cabecalho': cabecalho,
         'rodape': rodape,
+        'data_hora_local': data_hora_local,
     }
     
     return render(request, 'impressao/animal_detail_print.html', context)
@@ -386,16 +452,65 @@ def imprimir_pesagens(request):
         'endereco': 'Rodovia BR 101, Km 123'
     }
     
+    # Obter data e hora local (UTC-3)
+    from datetime import datetime
+    import pytz
+    
+    # Definir o fuso horário do Brasil (UTC-3)
+    tz_brasil = pytz.timezone('America/Sao_Paulo')
+    
+    # Obter a data e hora atual no fuso horário do Brasil
+    data_hora_local = datetime.now(tz_brasil)
+    
     # Obtém o lote selecionado se houver
     lote_selecionado = None
     if lote_id:
         lote_selecionado = Lote.objects.filter(id=lote_id).first()
+        if lote_selecionado and lote_selecionado.fazenda:
+            # Atualiza o cabeçalho com os dados da fazenda
+            cabecalho = {
+                'empresa': lote_selecionado.fazenda.nome,
+                'cnpj': lote_selecionado.fazenda.inscricao_estadual or '',
+                'endereco': f"{lote_selecionado.fazenda.cidade}/{lote_selecionado.fazenda.estado}"
+            }
     
     # Obtém o animal selecionado se houver
     animal_selecionado = None
     if animal_id:
         animal_selecionado = Animal.objects.filter(id=animal_id).first()
+        if animal_selecionado and animal_selecionado.fazenda_atual:
+            # Atualiza o cabeçalho com os dados da fazenda do animal
+            cabecalho = {
+                'empresa': animal_selecionado.fazenda_atual.nome,
+                'cnpj': animal_selecionado.fazenda_atual.inscricao_estadual or '',
+                'endereco': f"{animal_selecionado.fazenda_atual.cidade}/{animal_selecionado.fazenda_atual.estado}"
+            }
     
+    # Verifica se há animais de diferentes fazendas no relatório
+    fazendas_diferentes = False
+    fazendas_ids = set()
+    
+    for dados in dados_pesagens:
+        animal = Animal.objects.filter(brinco_visual=dados['animal']).first()
+        if animal and animal.fazenda_atual:
+            fazendas_ids.add(animal.fazenda_atual.id)
+    
+    fazendas_diferentes = len(fazendas_ids) > 1
+    
+    # Obtém a logo da fazenda, se disponível
+    fazenda_logo = None
+    if lote_selecionado and lote_selecionado.fazenda and lote_selecionado.fazenda.logo_url:
+        fazenda_logo = lote_selecionado.fazenda.logo_url
+    elif animal_selecionado and animal_selecionado.fazenda_atual and animal_selecionado.fazenda_atual.logo_url:
+        fazenda_logo = animal_selecionado.fazenda_atual.logo_url
+    elif len(fazendas_ids) == 1:
+        # Se todos os animais são da mesma fazenda, usa a logo dessa fazenda
+        fazenda_id = list(fazendas_ids)[0]
+        fazenda = Fazenda.objects.filter(id=fazenda_id).first()
+        if fazenda and fazenda.logo_url:
+            fazenda_logo = fazenda.logo_url
+    
+    # Contexto
     context = {
         'dados_pesagens': dados_pesagens,
         'dados_graficos': dados_graficos,
@@ -408,7 +523,11 @@ def imprimir_pesagens(request):
         },
         'lote_selecionado': lote_selecionado,
         'animal_selecionado': animal_selecionado,
-        'cabecalho': cabecalho
+        'cabecalho': cabecalho,
+        'fazenda_logo': fazenda_logo,
+        'fazendas_diferentes': fazendas_diferentes,
+        'versao_sistema': '1.0.0',  # Versão do sistema
+        'data_hora_local': data_hora_local,
     }
     
     return render(request, 'impressao/pesagens_print.html', context)
@@ -506,6 +625,16 @@ def despesas_print(request):
         'estado': request.user.profile.estado if hasattr(request.user, 'profile') else ''
     }
     
+    # Obter data e hora local (UTC-3)
+    from datetime import datetime
+    import pytz
+    
+    # Definir o fuso horário do Brasil (UTC-3)
+    tz_brasil = pytz.timezone('America/Sao_Paulo')
+    
+    # Obter a data e hora atual no fuso horário do Brasil
+    data_hora_local = datetime.now(tz_brasil)
+    
     return render(request, 'impressao/despesas_print.html', {
         'despesas': despesas,
         'valores_totais': valores_totais,
@@ -514,7 +643,8 @@ def despesas_print(request):
         'total_geral': total_geral,
         'total_pago': total_pago,
         'total_pendente': total_pendente,
-        'now': timezone.now()
+        'now': timezone.now(),
+        'data_hora_local': data_hora_local,
     })
 
 @login_required
@@ -548,26 +678,24 @@ def imprimir_compras(request):
     
     # Calcular totais por status
     totais_status = {
-        'PAGO': {'valor': 0, 'cor': 'success', 'icone': 'fa-check-circle'},
-        'PENDENTE': {'valor': 0, 'cor': 'warning', 'icone': 'fa-clock'},
-        'VENCIDO': {'valor': 0, 'cor': 'danger', 'icone': 'fa-exclamation-circle'},
-        'VENCE_HOJE': {'valor': 0, 'cor': 'info', 'icone': 'fa-calendar-check'},
+        'PAGO': {'valor': Decimal('0.00'), 'cor': 'success', 'icone': 'fa-check-circle'},
+        'PENDENTE': {'valor': Decimal('0.00'), 'cor': 'warning', 'icone': 'fa-clock'},
+        'VENCIDO': {'valor': Decimal('0.00'), 'cor': 'danger', 'icone': 'fa-exclamation-circle'},
+        'VENCE_HOJE': {'valor': Decimal('0.00'), 'cor': 'info', 'icone': 'fa-calendar-check'},
     }
 
     # Calcular totais
     for compra in compras:
-        valor_total = sum(item.valor_total for item in compra.animais.all())
-        
+        valor_total = compra.valor_total
         # Verificar status real da compra
         if compra.status == 'PAGO':
             totais_status['PAGO']['valor'] += valor_total
-        elif compra.status == 'PENDENTE':
-            if compra.data_vencimento == hoje:
-                totais_status['VENCE_HOJE']['valor'] += valor_total
-            elif compra.data_vencimento < hoje:
-                totais_status['VENCIDO']['valor'] += valor_total
-            else:
-                totais_status['PENDENTE']['valor'] += valor_total
+        elif compra.data_vencimento == hoje:
+            totais_status['VENCE_HOJE']['valor'] += valor_total
+        elif compra.data_vencimento < hoje:
+            totais_status['VENCIDO']['valor'] += valor_total
+        else:
+            totais_status['PENDENTE']['valor'] += valor_total
 
     # Formatar valores para exibição
     for status_info in totais_status.values():
@@ -585,7 +713,7 @@ def imprimir_compras(request):
             'data_fim': data_fim
         },
         'data_impressao': timezone.now(),
-        'usuario': request.user
+        'usuario': request.user,
     }
     
     return render(request, 'impressao/compras_print.html', context)
@@ -640,6 +768,7 @@ def vendas_print(request):
     for status in totais_status:
         totais_status[status]['valor_formatado'] = f"R$ {totais_status[status]['valor']:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
 
+    # Contexto
     context = {
         'vendas': vendas,
         'totais_status': totais_status,
@@ -710,12 +839,208 @@ def imprimir_vendas(request):
         'data_fim': data_fim if data_fim else None,
     }
 
+    # Obter data e hora local (UTC-3)
+    from datetime import datetime
+    import pytz
+    
+    # Definir o fuso horário do Brasil (UTC-3)
+    tz_brasil = pytz.timezone('America/Sao_Paulo')
+    
+    # Obter a data e hora atual no fuso horário do Brasil
+    data_hora_local = datetime.now(tz_brasil)
+    
+    # Contexto
     context = {
         'vendas': vendas,
         'totais_status': totais_status,
         'filtros': filtros,
         'data_impressao': timezone.now(),
         'usuario': request.user,
+        'data_hora_local': data_hora_local,
     }
 
     return render(request, 'impressao/vendas_print.html', context)
+
+@login_required
+def imprimir_dre(request):
+    """
+    View para impressão do relatório DRE
+    """
+    # Obter dados da fazenda do usuário
+    fazenda_id = request.GET.get('fazenda_id')
+    fazenda = None
+    fazenda_logo = None
+    
+    # Filtros
+    data_inicial_str = request.GET.get('data_inicial')
+    data_final_str = request.GET.get('data_final')
+    
+    # Dados do relatório
+    dados_dre = None
+    if data_inicial_str and data_final_str:
+        try:
+            data_inicial = datetime.strptime(data_inicial_str, '%Y-%m-%d').date()
+            data_final = datetime.strptime(data_final_str, '%Y-%m-%d').date()
+            dados_dre = atualizar_dre_dados(request.user, data_inicial, data_final, fazenda_id)
+            print(f"Dados DRE obtidos: {dados_dre}")
+        except ValueError as e:
+            print(f"Erro ao processar datas: {e}")
+        except Exception as e:
+            print(f"Erro ao obter dados do DRE: {e}")
+    
+    # Obter dados da fazenda para o cabeçalho
+    if fazenda_id:
+        try:
+            fazenda = Fazenda.objects.get(id=fazenda_id, usuario=request.user)
+            fazenda_logo = fazenda.logo_url
+        except Fazenda.DoesNotExist:
+            pass
+    
+    # Se não tiver fazenda específica, pegar a primeira do usuário
+    if not fazenda:
+        fazenda = Fazenda.objects.filter(usuario=request.user).first()
+        if fazenda:
+            fazenda_logo = fazenda.logo_url
+    
+    # Montar dados do cabeçalho
+    cabecalho = {
+        'empresa': fazenda.nome if fazenda else 'Todas as Fazendas',
+        'endereco': f"{fazenda.cidade}/{fazenda.estado}" if fazenda else '-',
+    }
+    
+    # Dados dos filtros para exibição
+    filtros = {
+        'data_inicial': data_inicial_str,
+        'data_final': data_final_str,
+        'fazenda': fazenda.nome if fazenda else None,
+    }
+    
+    # Versão do sistema
+    from django.conf import settings
+    versao_sistema = getattr(settings, 'VERSION', '1.0.0')
+    
+    # Contexto
+    context = {
+        'cabecalho': cabecalho,
+        'fazenda_logo': fazenda_logo,
+        'dados_dre': dados_dre,
+        'filtros': filtros,
+        'versao_sistema': versao_sistema,
+    }
+    
+    return render(request, 'impressao/dre_print.html', context)
+
+@login_required
+def imprimir_fluxo_caixa(request):
+    """
+    View para impressão do relatório de Fluxo de Caixa
+    """
+    # Obter os parâmetros do filtro
+    mes_ano_inicial = request.GET.get('mes_ano_inicial')
+    fazenda_id = request.GET.get('fazenda')
+    
+    # Variáveis para armazenar os dados
+    dados_fluxo = None
+    fazenda = None
+    fazenda_logo = None
+    data_inicial = None
+    data_final = None
+    mensagem_erro = None
+    
+    # Processar os dados se os filtros estiverem presentes
+    if mes_ano_inicial:
+        try:
+            # Converter o mês/ano para data inicial (primeiro dia do mês)
+            # O formato do campo month HTML é YYYY-MM
+            print(f"Valor do campo mes_ano_inicial: {mes_ano_inicial}")
+            
+            if '-' in mes_ano_inicial:
+                ano, mes = mes_ano_inicial.split('-')
+                print(f"Formato YYYY-MM detectado: ano={ano}, mes={mes}")
+            else:
+                mes, ano = mes_ano_inicial.split('/')
+                print(f"Formato MM/YYYY detectado: mes={mes}, ano={ano}")
+            
+            # Converter para inteiros e verificar se estão no intervalo válido
+            mes = int(mes)
+            ano = int(ano)
+            print(f"Após conversão: ano={ano}, mes={mes}")
+            
+            if mes < 1 or mes > 12:
+                raise ValueError(f"Mês inválido: {mes}. Deve estar entre 1 e 12.")
+                
+            data_inicial = datetime(ano, mes, 1).date()
+            print(f"Data inicial criada: {data_inicial}")
+            
+            # Calcular a data final (12 meses depois)
+            if mes == 12:
+                data_final = datetime(ano + 1, 12, 31).date()
+            else:
+                # Calcular mês e ano final (12 meses depois)
+                ano_final = ano + 1
+                mes_final = mes - 1
+                if mes_final == 0:
+                    mes_final = 12
+                    ano_final = ano
+                
+                print(f"Calculando data final: ano_final={ano_final}, mes_final={mes_final}")
+                
+                # Último dia do mês
+                from calendar import monthrange
+                ultimo_dia = monthrange(ano_final, mes_final)[1]
+                data_final = datetime(ano_final, mes_final, ultimo_dia).date()
+            
+            # Implementação temporária para evitar o erro
+            dados_fluxo = {
+                'entradas': [],
+                'saidas': [],
+                'saldo_inicial': 0,
+                'total_entradas': 0,
+                'total_saidas': 0,
+                'saldo_final': 0
+            }
+            
+            # Adicionar as datas calculadas ao contexto para uso no template
+            dados_fluxo['data_inicial'] = data_inicial
+            dados_fluxo['data_final'] = data_final
+            
+            # Obter a fazenda se o ID estiver presente
+            if fazenda_id:
+                fazenda = Fazenda.objects.get(id=fazenda_id, usuario=request.user)
+                fazenda_logo = fazenda.logo_url
+        except ValueError as e:
+            print(f"Erro ao processar datas: {e}")
+            mensagem_erro = f"Erro ao processar datas: {e}"
+        except Exception as e:
+            print(f"Erro ao processar dados do fluxo de caixa: {e}")
+            mensagem_erro = f"Erro ao processar dados: {e}"
+    
+    # Montar dados do cabeçalho
+    cabecalho = {
+        'empresa': fazenda.nome if fazenda else 'Todas as Fazendas',
+        'endereco': f"{fazenda.cidade}/{fazenda.estado}" if fazenda else '-',
+    }
+    
+    # Dados dos filtros para exibição
+    filtros = {
+        'data_inicial': data_inicial,
+        'data_final': data_final,
+        'fazenda': fazenda.nome if fazenda else None,
+    }
+    
+    # Versão do sistema
+    from django.conf import settings
+    versao_sistema = getattr(settings, 'VERSION', '1.0.0')
+    
+    # Contexto
+    context = {
+        'cabecalho': cabecalho,
+        'fazenda_logo': fazenda_logo,
+        'dados_fluxo': dados_fluxo,
+        'filtros': filtros,
+        'versao_sistema': versao_sistema,
+        'fazenda_selecionada': fazenda,
+        'mensagem_erro': mensagem_erro,
+    }
+    
+    return render(request, 'impressao/fluxo_caixa_print.html', context)
