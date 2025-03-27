@@ -28,6 +28,7 @@ class Fazenda(models.Model):
     area_total = models.DecimalField('Área Total (ha)', max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     valor_hectare = models.DecimalField('Valor do Hectare (R$)', max_digits=10, decimal_places=2, null=True, blank=True)
     custo_oportunidade = models.DecimalField('Custo de Oportunidade (R$)', max_digits=10, decimal_places=2, null=True, blank=True)
+    logo_url = models.URLField('URL da Logo', max_length=500, blank=True, null=True)  # URL da logo no Supabase
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     data_cadastro = models.DateField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
@@ -519,6 +520,7 @@ class Despesa(models.Model):
     desconto = models.DecimalField('Desconto', max_digits=10, decimal_places=2, default=0)
     observacao = models.TextField('Observação', blank=True, null=True)
     arquivo = models.FileField('Arquivo', upload_to='despesas/', blank=True, null=True)
+    boleto = models.FileField('Boleto', upload_to='despesas/boletos/', blank=True, null=True)
     conta_bancaria = models.ForeignKey('ContaBancaria', on_delete=models.PROTECT, verbose_name='Conta Bancária', null=True, blank=True)
     
     class Meta:
@@ -623,7 +625,7 @@ class ItemDespesa(models.Model):
 
     def realizar_rateio(self):
         # Se for item de estoque, não faz rateio
-        if self.categoria.alocacao == 'estoque':
+        if self.categoria.alocacao.lower() == 'estoque':
             print(f"Não realizando rateio para item {self.id} - É um item de estoque")
             return
             
@@ -632,7 +634,7 @@ class ItemDespesa(models.Model):
         print(f"Realizando rateio para item {self.id} - Categoria: {self.categoria.nome} - Tipo: {self.categoria.tipo} - Alocação: {self.categoria.alocacao}")
 
         # Verifica se o tipo de alocação é compatível com rateio
-        if self.categoria.alocacao not in ['fazenda', 'lote']:
+        if self.categoria.alocacao.lower() not in ['fazenda', 'lote']:
             print(f"Tipo de alocação {self.categoria.alocacao} não é compatível com rateio")
             return
 

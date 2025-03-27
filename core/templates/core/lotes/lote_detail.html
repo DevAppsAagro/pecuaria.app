@@ -208,5 +208,51 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- Lista de Animais -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Animais no Lote</h5>
+            <!-- Botões removidos para evitar o erro NoReverseMatch -->
+        </div>
+        <div class="card-body">
+            {% if animais %}
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Brinco</th>
+                            <th>Categoria</th>
+                            <th>Raça</th>
+                            <th>Peso</th>
+                            <th>GMD</th>
+                            <th>Dias no Lote</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for animal in animais %}
+                        <tr>
+                            <td>{{ animal.brinco_visual }}</td>
+                            <td>{{ animal.categoria_animal.nome }}</td>
+                            <td>{{ animal.raca.nome }}</td>
+                            <td>{{ animal.peso_atual|default:animal.peso_entrada|floatformat:1 }} kg</td>
+                            <td>{{ animal.gmd|floatformat:3 }} kg/dia</td>
+                            <td>{{ animal.dias_no_lote }}</td>
+                            <td>
+                                <a href="{% url 'animal_detail' animal.id %}" class="btn btn-sm btn-info">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+                <p class="text-muted mb-0">Nenhum animal neste lote</p>
+            {% endif %}
+        </div>
+    </div>
 </div>
 {% endblock %}

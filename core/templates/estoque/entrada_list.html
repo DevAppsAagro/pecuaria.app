@@ -154,7 +154,7 @@
                                 <th>Quantidade</th>
                                 <th>Valor Unitário</th>
                                 <th>Valor Total</th>
-                                <th>Fazenda</th>
+                                <th>Fazenda de Origem</th>
                                 <th>Observação</th>
                                 <th>Ações</th>
                             </tr>
@@ -167,7 +167,7 @@
                                 <td>{{ entrada.quantidade|floatformat:2 }} {{ entrada.insumo.unidade_medida.sigla }}</td>
                                 <td>R$ {{ entrada.valor_unitario|floatformat:2 }}</td>
                                 <td>R$ {{ entrada.valor_total|floatformat:2 }}</td>
-                                <td>{{ entrada.fazenda.nome }}</td>
+                                <td>{{ entrada.fazenda_origem.nome|default:"-" }}</td>
                                 <td>{{ entrada.observacao|default:"-" }}</td>
                                 <td>
                                     <div class="btn-group">

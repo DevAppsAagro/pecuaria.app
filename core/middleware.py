@@ -103,26 +103,71 @@ class SubscriptionMiddleware:
                 logger.info(f"Usuário {request.user.email} está no período de graça após sucesso do Stripe")
                 return self.get_response(request)
             
-            # Verificar diretamente no Stripe
-            has_active_subscription = False
-            try:
-                # Buscar cliente pelo email
-                customers = stripe.Customer.list(email=request.user.email)
+            # Verificar se existe cache da assinatura na sessão
+            subscription_cache = request.session.get('stripe_subscription_cache', {})
+            subscription_cache_time = subscription_cache.get('timestamp', 0)
+            has_active_subscription = subscription_cache.get('active', False)
+            
+            # Cache válido por 24 horas (86400 segundos) em vez de 1 hora
+            cache_validity_period = 86400  # 24 horas
+            
+            # Verificar se o cache é válido
+            if current_time - subscription_cache_time < cache_validity_period:
+                logger.info(f"Usando cache de assinatura para o usuário {request.user.email}")
+                if has_active_subscription:
+                    return self.get_response(request)
+                else:
+                    # Se não tem assinatura ativa no cache, redireciona para página de planos
+                    messages.warning(request, 'Sua assinatura não está ativa. Por favor, escolha um plano para continuar.')
+                    return redirect('planos')
+            else:
+                # Cache expirado ou não existe, verificar diretamente no Stripe
+                # Mas primeiro, verificar se já fizemos essa verificação recentemente para esta sessão
+                last_stripe_check = request.session.get('last_stripe_check', 0)
+                stripe_check_cooldown = 300  # 5 minutos de cooldown entre verificações diretas
                 
-                if customers and customers.data:
-                    customer = customers.data[0]
-                    logger.info(f"Cliente Stripe encontrado: {customer.id}")
+                if current_time - last_stripe_check < stripe_check_cooldown:
+                    logger.info(f"Verificação do Stripe em cooldown para {request.user.email}, usando último resultado conhecido")
+                    if has_active_subscription:
+                        return self.get_response(request)
+                    else:
+                        messages.warning(request, 'Sua assinatura não está ativa. Por favor, escolha um plano para continuar.')
+                        return redirect('planos')
+                
+                # Registrar que estamos fazendo uma verificação direta agora
+                request.session['last_stripe_check'] = current_time
+                
+                has_active_subscription = False
+                try:
+                    # Buscar cliente pelo email
+                    customers = stripe.Customer.list(email=request.user.email)
                     
-                    # Verificar assinaturas do cliente
-                    subscriptions = stripe.Subscription.list(
-                        customer=customer.id,
-                        status='active'
-                    )
-                    
-                    has_active_subscription = subscriptions and len(subscriptions.data) > 0
-                    logger.info(f"Assinaturas ativas encontradas: {len(subscriptions.data) if subscriptions else 0}")
-            except Exception as e:
-                logger.error(f"Erro ao verificar assinatura diretamente no Stripe: {str(e)}")
+                    if customers and customers.data:
+                        customer = customers.data[0]
+                        logger.info(f"Cliente Stripe encontrado: {customer.id}")
+                        
+                        # Verificar assinaturas do cliente
+                        subscriptions = stripe.Subscription.list(
+                            customer=customer.id,
+                            status='active'
+                        )
+                        
+                        has_active_subscription = subscriptions and len(subscriptions.data) > 0
+                        logger.info(f"Assinaturas ativas encontradas: {len(subscriptions.data) if subscriptions else 0}")
+                        
+                        # Atualizar o cache na sessão com validade de 24 horas
+                        request.session['stripe_subscription_cache'] = {
+                            'timestamp': current_time,
+                            'active': has_active_subscription,
+                            'customer_id': customer.id if has_active_subscription else None,
+                            'subscription_id': subscriptions.data[0].id if has_active_subscription and subscriptions.data else None
+                        }
+                except Exception as e:
+                    logger.error(f"Erro ao verificar assinatura diretamente no Stripe: {str(e)}")
+                    # Em caso de erro, manter o cache anterior se existir
+                    if subscription_cache and has_active_subscription:
+                        logger.info(f"Mantendo cache anterior devido a erro na API do Stripe para {request.user.email}")
+                        return self.get_response(request)
             
             # Se tem assinatura ativa no Stripe, permite acesso
             if has_active_subscription:

@@ -169,13 +169,39 @@
         overflow: visible !important;
     }
     
+    /* Ajuste para melhorar a visualização da tabela */
     .table-responsive {
-        overflow: visible !important;
+        overflow-x: auto !important;
     }
     
     .dropdown-menu.show {
         display: block !important;
     }
+    
+    /* Ajustes específicos para a coluna de destino */
+    .coluna-destino {
+        font-size: 0.85rem;
+        max-width: 250px;
+        word-wrap: break-word;
+        white-space: normal;
+    }
+    
+    /* Ajuste para melhor distribuição das colunas */
+    #despesas-table th, #despesas-table td {
+        vertical-align: middle;
+    }
+    
+    /* Garantir que todas as colunas tenham tamanhos adequados */
+    #despesas-table th:nth-child(1), #despesas-table td:nth-child(1) { width: 8%; } /* Nota Fiscal */
+    #despesas-table th:nth-child(2), #despesas-table td:nth-child(2) { width: 8%; } /* Data Emissão */
+    #despesas-table th:nth-child(3), #despesas-table td:nth-child(3) { width: 8%; } /* Vencimento */
+    #despesas-table th:nth-child(4), #despesas-table td:nth-child(4) { width: 12%; } /* Fornecedor */
+    #despesas-table th:nth-child(5), #despesas-table td:nth-child(5) { width: 10%; } /* Categoria */
+    #despesas-table th:nth-child(6), #despesas-table td:nth-child(6) { width: 10%; } /* Subcategoria */
+    #despesas-table th:nth-child(7), #despesas-table td:nth-child(7) { width: 20%; } /* Destino */
+    #despesas-table th:nth-child(8), #despesas-table td:nth-child(8) { width: 8%; } /* Valor */
+    #despesas-table th:nth-child(9), #despesas-table td:nth-child(9) { width: 8%; } /* Status */
+    #despesas-table th:nth-child(10), #despesas-table td:nth-child(10) { width: 8%; } /* Ações */
 </style>
 {% endblock %}
 
@@ -374,7 +400,7 @@
                                     <td>{{ despesa.contato.nome }}</td>
                                     <td>{{ despesa.itens.first.categoria.nome }}</td>
                                     <td>{{ despesa.itens.first.subcategoria.nome }}</td>
-                                    <td>
+                                    <td class="coluna-destino">
                                         {% for item in despesa.itens.all %}
                                             {% if item.fazenda_destino %}
                                                 <i class="fas fa-home"></i> {{ item.fazenda_destino.nome }}
@@ -454,22 +480,19 @@
             language: {
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
             },
-            order: [[1, 'desc']], // Ordena por data de emissão decrescente
-            columnDefs: [
-                {
-                    targets: -1,
-                    orderable: false,
-                    searchable: false
-                }
+            buttons: [
+                'copy', 'csv', 'excel', 'pdf', 'print'
             ],
-            // Adicionar configuração para reposicionar os elementos do dropdown
+            columnDefs: [
+                { responsivePriority: 1, targets: [0, 7, 8, 9] }, // Prioridade para Nota Fiscal, Valor, Status e Ações
+                { responsivePriority: 2, targets: [3, 6] },       // Prioridade secundária para Fornecedor e Destino
+                { responsivePriority: 3, targets: '_all' },       // Prioridade padrão para as demais colunas
+                { className: "coluna-destino", targets: 6 }       // Aplicar classe à coluna de destino
+            ],
             drawCallback: function() {
+                // Reposicionar dropdowns para evitar que sejam cortados
                 $('.dropdown-menu').css('position', 'absolute');
-                $('.btn-group').on('show.bs.dropdown', function() {
-                    setTimeout(function() {
-                        $('.dropdown-menu.show').css('z-index', '1100');
-                    }, 10);
-                });
+                $('.dropdown-menu').css('z-index', '1100');
             }
         });
 

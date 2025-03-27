@@ -29,12 +29,14 @@
 {% block content %}
 <div class="container-fluid p-2">
     <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
-            <h5 class="mb-0">DRE</h5>
-            <div>
-                <button type="button" class="btn btn-light btn-sm" onclick="exportarPDF()">
-                    <i class="fas fa-file-pdf"></i> PDF
-                </button>
+        <div class="card-header bg-light p-2">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Demonstrativo de Resultado do Exercício (DRE)</h5>
+                <div>
+                    <a href="{% url 'imprimir_dre' %}?{% if request.GET.data_inicial %}data_inicial={{ request.GET.data_inicial }}&{% endif %}{% if request.GET.data_final %}data_final={{ request.GET.data_final }}&{% endif %}{% if request.GET.fazenda_id %}fazenda_id={{ request.GET.fazenda_id }}{% endif %}" class="btn btn-sm btn-outline-secondary" target="_blank">
+                        <i class="fas fa-print"></i> Imprimir
+                    </a>
+                </div>
             </div>
         </div>
         <div class="card-body p-2">
@@ -51,10 +53,10 @@
                     </div>
                     <div class="col-md-3 mb-1">
                         <label class="form-label small mb-1">Fazenda</label>
-                        <select class="form-select form-select-sm" id="fazenda" name="fazenda">
+                        <select class="form-select form-select-sm" id="fazenda_id" name="fazenda_id">
                             <option value="">Todas</option>
                             {% for fazenda in fazendas %}
-                                <option value="{{ fazenda.id }}" {% if request.GET.fazenda|add:"0" == fazenda.id %}selected{% endif %}>{{ fazenda.nome }}</option>
+                                <option value="{{ fazenda.id }}" {% if request.GET.fazenda_id|add:"0" == fazenda.id %}selected{% endif %}>{{ fazenda.nome }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -320,49 +322,6 @@
             icon.classList.remove("fa-plus-square");
             icon.classList.add("fa-minus-square");
         }
-    }
-    
-    // Função para exportar para PDF
-    function exportarPDF() {
-        // Esconder os botões durante a exportação
-        const toggleIcons = document.querySelectorAll('.toggle-icon');
-        toggleIcons.forEach(icon => {
-            icon.style.display = 'none';
-        });
-        
-        // Mostrar todos os detalhes para o PDF
-        const detalhes = document.querySelectorAll('.detalhes-categoria');
-        detalhes.forEach(item => {
-            item.style.display = 'table-row-group';
-        });
-        
-        const element = document.getElementById('report-content');
-        const opt = {
-            margin: 10,
-            filename: 'DRE_Report.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-        
-        // Gerar PDF
-        html2pdf().set(opt).from(element).save().then(() => {
-            // Restaurar a visualização após gerar o PDF
-            toggleIcons.forEach(icon => {
-                icon.style.display = 'inline-block';
-            });
-            
-            // Ocultar os detalhes novamente
-            detalhes.forEach(item => {
-                item.style.display = 'none';
-            });
-            
-            // Mostrar mensagem de sucesso
-            toastr.success('PDF gerado com sucesso!', '', {
-                timeOut: 3000,
-                positionClass: 'toast-bottom-right'
-            });
-        });
     }
     
     // Configuração do toastr para mensagens temporárias

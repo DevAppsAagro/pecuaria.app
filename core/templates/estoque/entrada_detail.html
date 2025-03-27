@@ -49,6 +49,10 @@
                                     <th>Valor Total:</th>
                                     <td>R$ {{ entrada.valor_total|floatformat:2 }}</td>
                                 </tr>
+                                <tr>
+                                    <th>Fazenda de Origem:</th>
+                                    <td>{{ entrada.fazenda_origem.nome|default:"Não informada" }}</td>
+                                </tr>
                             </table>
                         </div>
                         <div class="col-md-6">

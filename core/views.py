@@ -1196,175 +1196,7 @@ def lote_detail(request, lote_id):
     
     return render(request, 'core/lotes/lote_detail.html', context)
 
-@login_required
-def animal_list(request):
-    from django.utils import timezone
-    from django.db.models import Count, Q, Max, F, OuterRef, Subquery
-    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-    from django.db.models.functions import Coalesce
-    from .views_estatisticas import get_estatisticas_animais, get_estatisticas_detalhadas
-    
-    # Cache as consultas comuns
-    user = request.user
-    
-    # Otimiza a subconsulta do peso mais recente
-    ultima_pesagem = (
-        Pesagem.objects
-        .filter(animal=OuterRef('pk'))
-        .order_by('-data')
-        .values('peso')[:1]
-    )
-    
-    # Query base otimizada
-    queryset = (
-        Animal.objects
-        .filter(usuario=user)
-        .select_related(
-            'raca',
-            'lote',
-            'categoria_animal',
-            'fazenda_atual',
-            'pasto_atual'
-        )
-        .annotate(
-            peso_atual=Coalesce(
-                Subquery(ultima_pesagem),
-                F('peso_entrada')
-            )
-        )
-        .only(  # Seleciona apenas os campos necessários
-            'brinco_visual',
-            'brinco_eletronico',
-            'data_nascimento',
-            'situacao',
-            'peso_entrada',
-            'raca__nome',
-            'lote__id_lote',
-            'categoria_animal__nome',
-            'fazenda_atual__nome',
-            'pasto_atual__id_pasto',
-            'pasto_atual__nome'
-        )
-        .defer('observacoes')  # Exclui campos grandes não utilizados
-    )
-    
-    # Cache das opções de filtro
-    categorias = (
-        CategoriaAnimal.objects
-        .filter(Q(usuario=None) | Q(usuario=user))
-        .only('id', 'nome')
-        .order_by('nome')
-    )
-    
-    racas = (
-        Raca.objects
-        .filter(Q(usuario=None) | Q(usuario=user))
-        .only('id', 'nome')
-        .order_by('nome')
-    )
-    
-    # Filtros otimizados
-    filtros = {}
-    
-    if request.GET.get('fazenda'):
-        filtros['fazenda'] = request.GET.get('fazenda')
-        queryset = queryset.filter(fazenda_atual_id=filtros['fazenda'])
-        
-        # Cache dos lotes e pastos filtrados
-        lotes = (
-            Lote.objects
-            .filter(fazenda_id=filtros['fazenda'], usuario=user)
-            .only('id', 'id_lote')
-        )
-        pastos = (
-            Pasto.objects
-            .filter(fazenda_id=filtros['fazenda'], fazenda__usuario=user)
-            .only('id', 'id_pasto', 'nome')
-        )
-    else:
-        lotes = (
-            Lote.objects
-            .filter(usuario=user)
-            .only('id', 'id_lote')
-        )
-        pastos = (
-            Pasto.objects
-            .filter(fazenda__usuario=user)
-            .only('id', 'id_pasto', 'nome')
-        )
-    
-    # Aplicar outros filtros
-    if request.GET.get('lote'):
-        filtros['lote'] = request.GET.get('lote')
-        queryset = queryset.filter(lote_id=filtros['lote'])
-    
-    if request.GET.get('pasto'):
-        filtros['pasto'] = request.GET.get('pasto')
-        queryset = queryset.filter(pasto_atual_id=filtros['pasto'])
-    
-    if request.GET.get('categoria'):
-        categoria_id = request.GET.get('categoria')
-        filtros['categoria'] = int(categoria_id)
-        queryset = queryset.filter(categoria_animal_id=filtros['categoria'])
-    
-    if request.GET.get('raca'):
-        raca_id = request.GET.get('raca')
-        filtros['raca'] = int(raca_id)
-        queryset = queryset.filter(raca_id=filtros['raca'])
-    
-    if request.GET.get('brinco'):
-        filtros['brinco'] = request.GET.get('brinco')
-        queryset = queryset.filter(
-            Q(brinco_visual__icontains=filtros['brinco']) |
-            Q(brinco_eletronico__icontains=filtros['brinco'])
-        )
 
-    # Obtém as estatísticas usando queryset otimizado
-    estatisticas = get_estatisticas_animais(request, queryset)
-    
-    # Obtém estatísticas detalhadas apenas se necessário
-    estatisticas_detalhadas = get_estatisticas_detalhadas(request, queryset)
-
-    # Paginação
-    items_per_page = 50
-    paginator = Paginator(queryset, items_per_page)
-    page = request.GET.get('page')
-    
-    try:
-        animais_paginados = paginator.page(page)
-    except PageNotAnInteger:
-        animais_paginados = paginator.page(1)
-    except EmptyPage:
-        animais_paginados = paginator.page(paginator.num_pages)
-
-    # Cache da query de fazendas
-    fazendas = (
-        Fazenda.objects
-        .filter(usuario=user)
-        .only('id', 'nome')
-    )
-
-    context = {
-        'animais': animais_paginados,
-        'fazendas': fazendas,
-        'lotes': lotes,
-        'pastos': pastos,
-        'categorias': categorias,
-        'racas': racas,
-        'filtros': filtros,
-        'estatisticas': estatisticas,
-        'estatisticas_detalhadas': estatisticas_detalhadas,
-        'categorias_chart': estatisticas['categorias'],
-        'total_ativos': estatisticas['stats']['ATIVO']['quantidade'],
-        'total_vendidos': estatisticas['stats']['VENDIDO']['quantidade'],
-        'total_mortos': estatisticas['stats']['MORTO']['quantidade'],
-        'total_abatidos': estatisticas['stats']['ABATIDO']['quantidade'],
-        'total_peso_kg': estatisticas['stats']['ATIVO']['peso_total'],
-        'total_peso_arroba': estatisticas['stats']['ATIVO']['peso_arroba'],
-        'active_tab': 'animais'
-    }
-    
-    return render(request, 'animais/animal_list.html', context)
 
 @login_required
 def animal_create(request):
@@ -3429,7 +3261,7 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
     model = Despesa
     template_name = 'financeiro/despesa_form.html'
     success_url = reverse_lazy('despesas_list')
-    fields = ['forma_pagamento', 'numero_nf', 'data_emissao', 'data_vencimento', 'data_pagamento', 'contato', 'arquivo', 'conta_bancaria']
+    fields = ['forma_pagamento', 'numero_nf', 'data_emissao', 'data_vencimento', 'data_pagamento', 'contato', 'arquivo', 'boleto', 'conta_bancaria']
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -3449,6 +3281,10 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
                 # Define o status baseado na data de pagamento
                 if self.object.data_pagamento:
                     self.object.status = 'PAGO'
+                
+                # Processa os arquivos de comprovante e boleto
+                from .supabase_utils import process_despesa_files
+                self.object = process_despesa_files(form, self.object, self.request)
                 
                 self.object.save()
 
@@ -3473,23 +3309,24 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
                     )
                     
                     # Define o destino apropriado baseado na alocação da categoria
-                    if categoria.alocacao == 'fazenda':
+                    alocacao = categoria.alocacao.lower()
+                    if alocacao == 'fazenda':
                         item_despesa.fazenda_destino_id = item_data['destino_id']
-                    elif categoria.alocacao == 'lote':
+                    elif alocacao == 'lote':
                         item_despesa.lote_destino_id = item_data['destino_id']
-                    elif categoria.alocacao == 'maquina':
+                    elif alocacao == 'maquina':
                         item_despesa.maquina_destino_id = item_data['destino_id']
-                    elif categoria.alocacao == 'benfeitoria':
+                    elif alocacao == 'benfeitoria':
                         item_despesa.benfeitoria_destino_id = item_data['destino_id']
-                    elif categoria.alocacao == 'pastagem':
+                    elif alocacao == 'pastagem':
                         item_despesa.pastagem_destino_id = item_data['destino_id']
-                    elif categoria.alocacao == 'estoque':
+                    elif alocacao == 'estoque':
                         item_despesa.fazenda_destino_id = item_data['destino_id']
                     
                     item_despesa.save()
 
                     # Se for um item de estoque, cria ou atualiza o insumo
-                    if categoria.alocacao == 'estoque' and 'insumo' in item_data:
+                    if categoria.alocacao.lower() == 'estoque' and 'insumo' in item_data:
                         insumo_data = item_data['insumo']
                         if insumo_data['id']:
                             insumo = Insumo.objects.get(id=insumo_data['id'])
@@ -3756,7 +3593,7 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
     model = Despesa
     template_name = 'financeiro/despesa_form.html'
     success_url = reverse_lazy('despesas_list')
-    fields = ['forma_pagamento', 'numero_nf', 'data_emissao', 'data_vencimento', 'data_pagamento', 'contato', 'arquivo', 'conta_bancaria']
+    fields = ['forma_pagamento', 'numero_nf', 'data_emissao', 'data_vencimento', 'data_pagamento', 'contato', 'arquivo', 'boleto', 'conta_bancaria']
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -3776,6 +3613,10 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
                 # Define o status baseado na data de pagamento
                 if self.object.data_pagamento:
                     self.object.status = 'PAGO'
+                
+                # Processa os arquivos de comprovante e boleto
+                from .supabase_utils import process_despesa_files
+                self.object = process_despesa_files(form, self.object, self.request)
                 
                 self.object.save()
 
@@ -3815,8 +3656,9 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
                     
                     item_despesa.save()
 
-                    # Se for um item de estoque, cria ou atualiza o insumo
-                    if categoria.alocacao == 'estoque' and 'insumo' in item_data:
+                    # Processa o item como estoque se for uma categoria de estoque
+                    from .categoria_utils import is_categoria_estoque
+                    if is_categoria_estoque(categoria) and 'insumo' in item_data:
                         insumo_data = item_data['insumo']
                         if insumo_data['id']:
                             insumo = Insumo.objects.get(id=insumo_data['id'])
@@ -3832,6 +3674,14 @@ class DespesaCreateView(LoginRequiredMixin, CreateView):
                         # Cria a movimentação de estoque
                         from .views_estoque import criar_entrada_estoque_from_despesa
                         criar_entrada_estoque_from_despesa(self.object, item_despesa, insumo)
+                
+                # Se a despesa já está sendo cadastrada como paga, realiza o rateio dos custos
+                if self.object.status == 'PAGO':
+                    # Realiza o rateio para cada item de despesa
+                    itens_despesa = self.object.itens.all()
+                    for item in itens_despesa:
+                        # Realiza o rateio considerando o valor do item
+                        item.realizar_rateio()
 
                 messages.success(self.request, 'Despesa criada e registrada com sucesso!')
                 return redirect(self.success_url)
@@ -4002,6 +3852,50 @@ def animal_detail(request, pk):
         peso_final = ultima_pesagem.peso if ultima_pesagem else peso_atual
         arrobas_final = peso_final / Decimal('30') if peso_final else 0
 
+    # Busca informações reprodutivas
+    manejos_reprodutivos = ManejoReproducao.objects.filter(animal=animal).order_by('-data_concepcao')
+
+    # Busca bezerros (filhos) para fêmeas
+    filhos = None
+    bezerros_organizados = []
+    if animal.categoria_animal.sexo == 'F':  # Se for fêmea
+        filhos = Animal.objects.filter(mae=animal)
+        
+        # Organiza bezerros por estação de monta
+        if filhos.exists():
+            # Agrupa bezerros por estação de monta
+            bezerros_por_estacao = {}
+            for filho in filhos:
+                # Tenta encontrar o manejo reprodutivo que resultou neste bezerro
+                manejo = ManejoReproducao.objects.filter(
+                    animal=animal,
+                    data_resultado=filho.data_nascimento,
+                    resultado='NASCIMENTO'
+                ).first()
+                
+                estacao = manejo.estacao_monta if manejo else None
+                
+                if estacao not in bezerros_por_estacao:
+                    bezerros_por_estacao[estacao] = []
+                
+                bezerros_por_estacao[estacao].append(filho)
+            
+            # Converte o dicionário para uma lista de tuplas (estacao, bezerros)
+            bezerros_organizados = [{'estacao': estacao, 'bezerros': bezerros} for estacao, bezerros in bezerros_por_estacao.items()]
+
+    # Busca informações sobre a estação de monta de origem (se for bezerro)
+    estacao_origem = None
+    if animal.data_nascimento and animal.mae:
+        # Tenta encontrar o manejo reprodutivo que resultou neste animal
+        estacao_origem = ManejoReproducao.objects.filter(
+            animal=animal.mae,
+            data_resultado=animal.data_nascimento,
+            resultado='NASCIMENTO'
+        ).first()
+        
+        if estacao_origem:
+            estacao_origem = estacao_origem.estacao_monta
+
     context = {
         'animal': animal,
         'movimentacoes': movimentacoes,
@@ -4030,7 +3924,12 @@ def animal_detail(request, pk):
         'abate': abate_animal,
         'venda': venda,
         'morte': morte,
-        'compra': compra_animal
+        'compra': compra_animal,
+        # Informações reprodutivas
+        'manejos_reprodutivos': manejos_reprodutivos,
+        'filhos': filhos,
+        'bezerros_organizados': bezerros_organizados,
+        'estacao_origem': estacao_origem,
     }
     
     return render(request, 'animais/animal_detail.html', context)
@@ -4038,15 +3937,29 @@ def animal_detail(request, pk):
 class DespesaUpdateView(LoginRequiredMixin, UpdateView):
     model = Despesa
     template_name = 'financeiro/despesa_form.html'
-    fields = ['numero_nf', 'data_emissao', 'data_vencimento', 'contato', 'forma_pagamento', 'arquivo']
+    fields = ['numero_nf', 'data_emissao', 'data_vencimento', 'contato', 'forma_pagamento', 'arquivo', 'boleto']
     success_url = reverse_lazy('despesas_list')
 
     def get_queryset(self):
         return Despesa.objects.filter(usuario=self.request.user)
 
     def form_valid(self, form):
-        form.instance.usuario = self.request.user
-        return super().form_valid(form)
+        try:
+            with transaction.atomic():
+                self.object = form.save(commit=False)
+                
+                # Processa os arquivos de comprovante e boleto
+                from .supabase_utils import process_despesa_files
+                self.object = process_despesa_files(form, self.object, self.request)
+                
+                self.object.save()
+                return super().form_valid(form)
+        except Exception as e:
+            messages.error(self.request, f"Erro ao atualizar despesa: {str(e)}")
+            return self.form_invalid(form)
+
+    def get_queryset(self):
+        return Despesa.objects.filter(usuario=self.request.user)
 
 class DespesaDeleteView(LoginRequiredMixin, DeleteView):
     model = Despesa
@@ -4054,7 +3967,7 @@ class DespesaDeleteView(LoginRequiredMixin, DeleteView):
     success_url = reverse_lazy('despesas_list')
 
     def get_queryset(self):
-        return Despesa.objects.filter(usuario=self.request.user)
+        return Despesa.objects.filter(usuario=self.request.user)        
 
 @login_required
 def get_subcategorias(request, categoria_id):

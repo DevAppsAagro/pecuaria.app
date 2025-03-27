@@ -1,0 +1,56 @@
+[
+  {
+    "model": "core.categoriacusto",
+    "fields": {
+      "nome": "Estoque",
+      "tipo": "DESPESA",
+      "alocacao": "estoque",
+      "usuario": null
+    }
+  },
+  {
+    "model": "core.categoriacusto",
+    "fields": {
+      "nome": "Ração",
+      "tipo": "DESPESA",
+      "alocacao": "estoque",
+      "usuario": null
+    }
+  },
+  {
+    "model": "core.categoriacusto",
+    "fields": {
+      "nome": "Medicamento",
+      "tipo": "DESPESA",
+      "alocacao": "estoque",
+      "usuario": null
+    }
+  },
+  {
+    "model": "core.categoriacusto",
+    "fields": {
+      "nome": "Vacina",
+      "tipo": "DESPESA",
+      "alocacao": "estoque",
+      "usuario": null
+    }
+  },
+  {
+    "model": "core.categoriacusto",
+    "fields": {
+      "nome": "Suplemento",
+      "tipo": "DESPESA",
+      "alocacao": "estoque",
+      "usuario": null
+    }
+  },
+  {
+    "model": "core.categoriacusto",
+    "fields": {
+      "nome": "Insumo",
+      "tipo": "DESPESA",
+      "alocacao": "estoque",
+      "usuario": null
+    }
+  }
+]

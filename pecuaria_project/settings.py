@@ -210,6 +210,11 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'core': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
     }
 }
 
@@ -221,6 +226,8 @@ SUPABASE_SERVICE_KEY = config('SUPABASE_SERVICE_KEY')  # Para operações admini
 # Storage settings
 SUPABASE_STORAGE_BUCKET = 'profile-photos'  # Bucket para fotos de perfil
 SUPABASE_RECEIPTS_BUCKET = 'payment-receipts'  # Bucket para comprovantes
+SUPABASE_FARM_LOGOS_BUCKET = 'logofazenda'  # Bucket para logos de fazendas
+SUPABASE_BOLETOS_BUCKET = 'boletoecomprovante'  # Bucket para boletos e comprovantes
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

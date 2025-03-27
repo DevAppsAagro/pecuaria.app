@@ -1,0 +1,488 @@
+{% extends 'base.html' %}
+{% block title %}Fluxo de Caixa{% endblock %}
+
+{% block head %}
+    <!-- Estilos específicos para o relatório de Fluxo de Caixa - Interface compacta -->
+    <style>
+        .table-sm td, .table-sm th {
+            padding: 0.25rem 0.5rem;
+        }
+        .small {
+            font-size: 90%;
+        }
+        .toggle-icon {
+            cursor: pointer;
+            margin-right: 5px;
+            font-size: 0.8rem;
+        }
+        .detalhes-categoria {
+            display: none;
+        }
+        .text-positive {
+            color: #28a745;
+        }
+        .text-negative {
+            color: #dc3545;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-2">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+            <h5 class="mb-0">Fluxo de Caixa</h5>
+            <div>
+                <a href="{% url 'fluxo_caixa_print' %}?{{ request.GET.urlencode }}" target="_blank" class="btn btn-light btn-sm">
+                    <i class="bi bi-printer"></i> Imprimir
+                </a>
+            </div>
+        </div>
+        <div class="card-body p-2">
+            <!-- Filtros -->
+            <form method="get" action="" id="filtroForm">
+                <div class="row g-2 mb-2">
+                    <div class="col-md-5 mb-1">
+                        <label class="form-label small mb-1">Mês/Ano</label>
+                        <input type="month" class="form-control form-control-sm" id="mes_ano" name="mes_ano" value="{{ request.GET.mes_ano }}">
+                        <small class="text-muted">O sistema calculará 12 meses a partir desta data</small>
+                    </div>
+                    <div class="col-md-5 mb-1">
+                        <label class="form-label small mb-1">Fazenda</label>
+                        <select class="form-select form-select-sm" id="fazenda" name="fazenda">
+                            <option value="">Todas</option>
+                            {% for fazenda in fazendas %}
+                                <option value="{{ fazenda.id }}" {% if request.GET.fazenda|add:"0" == fazenda.id %}selected{% endif %}>{{ fazenda.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end mb-1">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                            <i class="fas fa-sync-alt"></i> Atualizar
+                        </button>
+                    </div>
+                </div>
+            </form>
+            
+            <!-- Verifica se existem filtros aplicados -->
+            {% if request.GET.mes_ano %}
+            <!-- Período do relatório -->
+            <div class="alert alert-info py-2 small">
+                <strong>Período:</strong> {{ dados_fluxo.data_inicial|date:"d/m/Y" }} a {{ dados_fluxo.data_final|date:"d/m/Y" }}
+                {% if request.GET.fazenda %}
+                    {% for fazenda in fazendas %}
+                        {% if fazenda.id == request.GET.fazenda|add:"0" %}
+                            <strong>Fazenda:</strong> {{ fazenda.nome }}
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <strong>Fazenda:</strong> Todas
+                {% endif %}
+            </div>
+            
+            <!-- Conteúdo do relatório -->
+            <div id="report-content" class="table-responsive">
+                <table class="table table-bordered table-sm small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Descrição</th>
+                            <th class="text-end" style="width: 25%">Valor (R$)</th>
+                            <th class="text-end" style="width: 15%">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Saldo Inicial -->
+                        <tr class="table-secondary">
+                            <td class="fw-bold">1. SALDO INICIAL</td>
+                            <td class="text-end fw-bold">{% if dados_fluxo %}R$ {{ dados_fluxo.saldo_inicial|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saldo_inicial|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">-</td>
+                        </tr>
+
+                        <!-- Entradas -->
+                        <tr class="table-success">
+                            <td class="fw-bold">2. ENTRADAS DE CAIXA</td>
+                            <td class="text-end fw-bold">{% if dados_fluxo %}R$ {{ dados_fluxo.total_entradas|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.total_entradas|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">100%</td>
+                        </tr>
+                        
+                        <!-- Entradas Operacionais -->
+                        <tr>
+                            <td class="fw-bold">
+                                <span class="toggle-icon" onclick="toggleDetails('entradas-operacionais')">
+                                    <i class="fas fa-plus-square" id="icon-entradas-operacionais"></i>
+                                </span>
+                                2.1 Entradas Operacionais
+                            </td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.entradas_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.entradas_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_entradas_operacionais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Detalhamento das entradas operacionais -->
+                        <tbody id="entradas-operacionais" class="detalhes-categoria">
+                            <tr>
+                                <td class="ps-4">Vendas de Animais</td>
+                                <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.entradas_vendas|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.entradas_vendas|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                                <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_entradas_vendas|floatformat:2 }}{% else %}0{% endif %}%</td>
+                            </tr>
+                            <tr>
+                                <td class="ps-4">Abates</td>
+                                <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.entradas_abates|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.entradas_abates|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                                <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_entradas_abates|floatformat:2 }}{% else %}0{% endif %}%</td>
+                            </tr>
+                        </tbody>
+                        
+                        <!-- Entradas Não Operacionais -->
+                        <tr>
+                            <td>2.2 Entradas Não Operacionais</td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.entradas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.entradas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_entradas_nao_operacionais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Saídas -->
+                        <tr class="table-danger">
+                            <td class="fw-bold">3. SAÍDAS DE CAIXA</td>
+                            <td class="text-end fw-bold">{% if dados_fluxo %}R$ {{ dados_fluxo.total_saidas|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.total_saidas|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">{% if dados_fluxo %}{{ dados_fluxo.percentual_total_saidas|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Saídas Operacionais -->
+                        <tr>
+                            <td class="fw-bold">
+                                <span class="toggle-icon" onclick="toggleDetails('saidas-operacionais')">
+                                    <i class="fas fa-plus-square" id="icon-saidas-operacionais"></i>
+                                </span>
+                                3.1 Saídas Operacionais
+                            </td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_operacionais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Detalhamento das saídas operacionais -->
+                        <tbody id="saidas-operacionais" class="detalhes-categoria">
+                            <!-- Custos Fixos -->
+                            <tr>
+                                <td class="ps-4">
+                                    <span class="toggle-icon" onclick="toggleDetails('custos-fixos')">
+                                        <i class="fas fa-plus-square" id="icon-custos-fixos"></i>
+                                    </span>
+                                    Custos Fixos
+                                </td>
+                                <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_custos_fixos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_custos_fixos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                                <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_custos_fixos|floatformat:2 }}{% else %}0{% endif %}%</td>
+                            </tr>
+                            
+                            <!-- Detalhamento dos custos fixos -->
+                            <tbody id="custos-fixos" class="detalhes-categoria">
+                            {% if dados_fluxo and dados_fluxo.custos_fixos %}
+                                {% for categoria in dados_fluxo.custos_fixos %}
+                                    <tr>
+                                        <td class="ps-5">
+                                            <span class="toggle-icon" onclick="toggleDetails('cf-cat-{{ forloop.counter }}')">
+                                                <i class="fas fa-plus-square" id="icon-cf-cat-{{ forloop.counter }}"></i>
+                                            </span>
+                                            {{ categoria.nome }}
+                                        </td>
+                                        <td class="text-end">R$ {{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                        <td class="text-end">{{ categoria.percentual|floatformat:2 }}%</td>
+                                    </tr>
+                                    {% if categoria.subcategorias %}
+                                        <tbody id="cf-cat-{{ forloop.counter }}" class="detalhes-categoria">
+                                        {% for subcategoria in categoria.subcategorias %}
+                                            <tr>
+                                                <td class="ps-5 small">- {{ subcategoria.nome }}</td>
+                                                <td class="text-end small">R$ {{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                                <td class="text-end small">{{ subcategoria.percentual|floatformat:2 }}%</td>
+                                            </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                            </tbody>
+                            
+                            <!-- Custos Variáveis -->
+                            <tr>
+                                <td class="ps-4">
+                                    <span class="toggle-icon" onclick="toggleDetails('custos-variaveis')">
+                                        <i class="fas fa-plus-square" id="icon-custos-variaveis"></i>
+                                    </span>
+                                    Custos Variáveis
+                                </td>
+                                <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_custos_variaveis|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_custos_variaveis|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                                <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_custos_variaveis|floatformat:2 }}{% else %}0{% endif %}%</td>
+                            </tr>
+                            
+                            <!-- Detalhamento dos custos variáveis -->
+                            <tbody id="custos-variaveis" class="detalhes-categoria">
+                            {% if dados_fluxo and dados_fluxo.custos_variaveis %}
+                                {% for categoria in dados_fluxo.custos_variaveis %}
+                                    <tr>
+                                        <td class="ps-5">
+                                            <span class="toggle-icon" onclick="toggleDetails('cv-cat-{{ forloop.counter }}')">
+                                                <i class="fas fa-plus-square" id="icon-cv-cat-{{ forloop.counter }}"></i>
+                                            </span>
+                                            {{ categoria.nome }}
+                                        </td>
+                                        <td class="text-end">R$ {{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                        <td class="text-end">{{ categoria.percentual|floatformat:2 }}%</td>
+                                    </tr>
+                                    {% if categoria.subcategorias %}
+                                        <tbody id="cv-cat-{{ forloop.counter }}" class="detalhes-categoria">
+                                        {% for subcategoria in categoria.subcategorias %}
+                                            <tr>
+                                                <td class="ps-5 small">- {{ subcategoria.nome }}</td>
+                                                <td class="text-end small">R$ {{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                                <td class="text-end small">{{ subcategoria.percentual|floatformat:2 }}%</td>
+                                            </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                            </tbody>
+                        </tbody>
+                        
+                        <!-- Saídas para Investimentos -->
+                        <tr>
+                            <td class="fw-bold">
+                                <span class="toggle-icon" onclick="toggleDetails('saidas-investimentos')">
+                                    <i class="fas fa-plus-square" id="icon-saidas-investimentos"></i>
+                                </span>
+                                3.2 Saídas para Investimentos
+                            </td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_investimentos|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Detalhamento dos investimentos -->
+                        <tbody id="saidas-investimentos" class="detalhes-categoria">
+                            <tr>
+                                <td class="ps-4">Compra de Animais</td>
+                                <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_compra_animais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_compra_animais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                                <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_compra_animais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                            </tr>
+                            
+                            <!-- Outros investimentos -->
+                            {% if dados_fluxo and dados_fluxo.investimentos %}
+                                {% for investimento in dados_fluxo.investimentos %}
+                                    {% if investimento.nome != 'Compra de Animais' %}
+                                    <tr>
+                                        <td class="ps-4">
+                                            <span class="toggle-icon" onclick="toggleDetails('inv-cat-{{ forloop.counter }}')">
+                                                <i class="fas fa-plus-square" id="icon-inv-cat-{{ forloop.counter }}"></i>
+                                            </span>
+                                            {{ investimento.nome }}
+                                        </td>
+                                        <td class="text-end">R$ {{ investimento.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ investimento.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                        <td class="text-end">{{ investimento.percentual|floatformat:2 }}%</td>
+                                    </tr>
+                                    {% if investimento.subcategorias %}
+                                        <tbody id="inv-cat-{{ forloop.counter }}" class="detalhes-categoria">
+                                        {% for subcategoria in investimento.subcategorias %}
+                                            <tr>
+                                                <td class="ps-5 small">- {{ subcategoria.nome }}</td>
+                                                <td class="text-end small">R$ {{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                                <td class="text-end small">{{ subcategoria.percentual|floatformat:2 }}%</td>
+                                            </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </tbody>
+                        
+                        <!-- Saídas Não Operacionais -->
+                        <tr>
+                            <td>3.3 Saídas Não Operacionais</td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_nao_operacionais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Fluxo de Caixa Líquido -->
+                        <tr class="table-primary">
+                            <td class="fw-bold">4. FLUXO DE CAIXA LÍQUIDO (2-3)</td>
+                            <td class="text-end fw-bold {% if dados_fluxo and dados_fluxo.fluxo_liquido > 0 %}text-positive{% elif dados_fluxo and dados_fluxo.fluxo_liquido < 0 %}text-negative{% endif %}">
+                                {% if dados_fluxo %}R$ {{ dados_fluxo.fluxo_liquido|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.fluxo_liquido|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}
+                            </td>
+                            <td class="text-end fw-bold">{% if dados_fluxo %}{{ dados_fluxo.percentual_fluxo_liquido|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Saldo Final -->
+                        <tr class="table-info">
+                            <td class="fw-bold">5. SALDO FINAL (1+4)</td>
+                            <td class="text-end fw-bold {% if dados_fluxo and dados_fluxo.saldo_final > 0 %}text-positive{% elif dados_fluxo and dados_fluxo.saldo_final < 0 %}text-negative{% endif %}">
+                                {% if dados_fluxo %}R$ {{ dados_fluxo.saldo_final|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saldo_final|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}
+                            </td>
+                            <td class="text-end fw-bold">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Tabela de Fluxo de Caixa Mensal (12 meses) -->
+            <div class="mt-4" id="fluxo-mensal">
+                <h5 class="mb-3">Fluxo de Caixa - Próximos 12 Meses</h5>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Descrição</th>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <th class="text-center">{{ mes_nome }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Saldo Inicial -->
+                            <tr>
+                                <td>Saldo Inicial</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end">R$ {{ dados_fluxo.dados_por_categoria.saldo_inicial|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.dados_por_categoria.saldo_inicial|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            </tr>
+                            
+                            <!-- Entradas -->
+                            <tr class="table-success">
+                                <td>Entradas</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end">R$ {{ dados_fluxo.totais_entradas|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.totais_entradas|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            </tr>
+                            
+                            <!-- Entradas Vendas -->
+                            <tr>
+                                <td class="ps-3">Vendas</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end">R$ {{ dados_fluxo.dados_por_categoria.entradas_vendas|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.dados_por_categoria.entradas_vendas|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            </tr>
+                            
+                            <!-- Entradas Abates -->
+                            <tr>
+                                <td class="ps-3">Abates</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end">R$ {{ dados_fluxo.dados_por_categoria.entradas_abates|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.dados_por_categoria.entradas_abates|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            </tr>
+                            
+                            <!-- Entradas Não Operacionais -->
+                            <tr>
+                                <td class="ps-3">Não Operacionais</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end">R$ {{ dados_fluxo.dados_por_categoria.entradas_nao_operacionais|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.dados_por_categoria.entradas_nao_operacionais|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            </tr>
+                            
+                            <!-- Saídas -->
+                            <tr class="table-danger">
+                                <td>Saídas</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end">R$ {{ dados_fluxo.totais_saidas|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.totais_saidas|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            </tr>
+                            
+                            <!-- Saídas Custos Fixos -->
+                            <tr>
+                                <td class="ps-3">Custos Fixos</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end">R$ {{ dados_fluxo.dados_por_categoria.saidas_custos_fixos|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.dados_por_categoria.saidas_custos_fixos|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            </tr>
+                            
+                            <!-- Saídas Custos Variáveis -->
+                            <tr>
+                                <td class="ps-3">Custos Variáveis</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end">R$ {{ dados_fluxo.dados_por_categoria.saidas_custos_variaveis|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.dados_por_categoria.saidas_custos_variaveis|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            </tr>
+                            
+                            <!-- Saídas Compra de Animais -->
+                            <tr>
+                                <td class="ps-3">Compra de Animais</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end">R$ {{ dados_fluxo.dados_por_categoria.saidas_compra_animais|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.dados_por_categoria.saidas_compra_animais|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            </tr>
+                            
+                            <!-- Saídas Investimentos -->
+                            <tr>
+                                <td class="ps-3">Investimentos</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end">R$ {{ dados_fluxo.dados_por_categoria.saidas_investimentos|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.dados_por_categoria.saidas_investimentos|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            </tr>
+                            
+                            <!-- Saídas Não Operacionais -->
+                            <tr>
+                                <td class="ps-3">Não Operacionais</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end">R$ {{ dados_fluxo.dados_por_categoria.saidas_nao_operacionais|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.dados_por_categoria.saidas_nao_operacionais|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            </tr>
+                            
+                            <!-- Fluxo Líquido -->
+                            <tr class="table-primary">
+                                <td>Fluxo Líquido</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end {% if dados_fluxo.fluxo_liquido_mensal|get_dict_item:mes_nome > 0 %}text-positive{% elif dados_fluxo.fluxo_liquido_mensal|get_dict_item:mes_nome < 0 %}text-negative{% endif %}">
+                                    R$ {{ dados_fluxo.fluxo_liquido_mensal|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.fluxo_liquido_mensal|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            
+                            <!-- Saldo Final -->
+                            <tr class="table-info">
+                                <td>Saldo Final</td>
+                                {% for mes_nome in dados_fluxo.lista_meses %}
+                                <td class="text-end {% if dados_fluxo.saldo_final_mensal|get_dict_item:mes_nome > 0 %}text-positive{% elif dados_fluxo.saldo_final_mensal|get_dict_item:mes_nome < 0 %}text-negative{% endif %}">
+                                    R$ {{ dados_fluxo.saldo_final_mensal|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saldo_final_mensal|get_dict_item:mes_nome|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% else %}
+            <!-- Mensagem quando não houver filtros aplicados -->
+            <div class="card mb-2">
+                <div class="card-body p-3 text-center">
+                    <p class="mb-0">Selecione um período para visualizar o relatório de fluxo de caixa.</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    // Função para alternar a visibilidade dos detalhes
+    function toggleDetails(id) {
+        const element = document.getElementById(id);
+        const icon = document.getElementById(`icon-${id}`);
+        
+        if (element.style.display === "table-row-group" || element.style.display === "") {
+            element.style.display = "none";
+            icon.classList.remove("fa-minus-square");
+            icon.classList.add("fa-plus-square");
+        } else {
+            element.style.display = "table-row-group";
+            icon.classList.remove("fa-plus-square");
+            icon.classList.add("fa-minus-square");
+        }
+    }
+    
+    // Exibir mensagem de erro, se houver
+    document.addEventListener('DOMContentLoaded', function() {
+        const mensagemErro = "{{ mensagem_erro|default:'' }}";
+        if (mensagemErro) {
+            toastr.error(mensagemErro);
+        }
+    });
+</script>
+{% endblock %}
+{% endblock %}
+{% endblock %}

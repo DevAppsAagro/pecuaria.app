@@ -1,19 +1,23 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from .models import Animal, Lote, Pesagem, RateioCusto, Fazenda, CategoriaCusto, Despesa, MovimentacaoNaoOperacional
+from django.db import models
+from django.db.models import Q, ExpressionWrapper, DecimalField, Sum
+from django.utils import timezone
+from decimal import Decimal
+import json
+from datetime import datetime, date, timedelta
+
+# Importações dos modelos
+from .models import (
+    Animal, Lote, Pesagem, RateioCusto, Fazenda, CategoriaCusto, 
+    Despesa, MovimentacaoNaoOperacional, Pasto, Benfeitoria, 
+    ExtratoBancario, ManejoSanitario, ManejoReproducao
+)
 from .models_compras import Compra
 from .models_vendas import Venda
 from .models_abates import Abate
 from .models_estoque import RateioMovimentacao
-from decimal import Decimal
-import json
-from django.db import models
-from datetime import datetime, date
-from django.utils import timezone
-from datetime import timedelta
-from django.db.models import Q, ExpressionWrapper, DecimalField
-from django.db.models import Sum
 
 @login_required
 def relatorios_view(request):
@@ -321,6 +325,7 @@ def atualizar_dre_dados(usuario, data_inicial, data_final, fazenda_id=None):
     Função auxiliar para processar os dados do DRE
     """
     print(f"Período: {data_inicial} a {data_final}")
+    print(f"Fazenda ID: {fazenda_id}")
 
     # PARTE 1: DADOS PARA RESULTADO OPERACIONAL
     
@@ -533,15 +538,23 @@ def atualizar_dre_dados(usuario, data_inicial, data_final, fazenda_id=None):
         'data__range': [data_inicial, data_final],
         'usuario': usuario
     }
-    if fazenda_id:
-        filtro_compras['fazenda_id'] = fazenda_id
     
-    # Cálculo manual do total de compras de animais (valor_total é uma propriedade, não um campo)
+    # Compras não têm campo 'fazenda' diretamente, então não podemos filtrar por fazenda neste nível
     compras = Compra.objects.filter(**filtro_compras)
+    
+    # Filtramos os animais comprados depois por fazenda, se necessário
     total_compra_animais = 0
     for compra in compras:
-        # Usando a mesma lógica da propriedade valor_total
-        compra_total = compra.animais.aggregate(total=Sum('valor_total'))['total'] or 0
+        compra_total = 0
+        # Se temos um filtro de fazenda, verificamos se os animais estão nessa fazenda
+        if fazenda_id:
+            for animal_compra in compra.animais.all():
+                if animal_compra.animal.fazenda_atual_id == fazenda_id:
+                    compra_total += float(animal_compra.valor_total or 0)
+        else:
+            # Sem filtro de fazenda, somamos todos
+            compra_total = compra.animais.aggregate(total=Sum('valor_total'))['total'] or 0
+            
         total_compra_animais += float(compra_total)
     
     # Percentual de compra de animais em relação às receitas
@@ -751,3 +764,122 @@ def atualizar_dre(request):
             'success': False,
             'error': 'Método não permitido'
         })
+
+@login_required
+def atualizar_dre_dados_ajax(request):
+    """
+    Endpoint AJAX para obter os dados do DRE para o dashboard financeiro
+    """
+    usuario = request.user
+    data_inicial = request.GET.get('data_inicial')
+    data_final = request.GET.get('data_final')
+    fazenda_id = request.GET.get('fazenda_id')
+    
+    # Converter strings de data para objetos datetime
+    try:
+        data_inicial_dt = datetime.strptime(data_inicial, '%Y-%m-%d')
+        data_final_dt = datetime.strptime(data_final, '%Y-%m-%d')
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'Formato de data inválido'}, status=400)
+    
+    # Obter dados do DRE
+    dre_dados = atualizar_dre_dados(usuario, data_inicial, data_final, fazenda_id)
+    
+    # Processar dados para formato mensal (para o gráfico)
+    receitas_mensais = {}
+    custos_mensais = {}
+    
+    # Calcular o número de meses entre as datas
+    num_meses = (data_final_dt.year - data_inicial_dt.year) * 12 + data_final_dt.month - data_inicial_dt.month + 1
+    
+    # Inicializar dicionários para cada mês no período
+    current_date = data_inicial_dt
+    for _ in range(num_meses):
+        month_key = current_date.strftime('%b/%Y')
+        receitas_mensais[month_key] = 0
+        custos_mensais[month_key] = 0
+        current_date += relativedelta(months=1)
+    
+    # Processar receitas
+    for receita in dre_dados.get('receitas', []):
+        try:
+            data_receita = datetime.strptime(receita.get('data', ''), '%Y-%m-%d')
+            if data_inicial_dt <= data_receita <= data_final_dt:
+                month_key = data_receita.strftime('%b/%Y')
+                receitas_mensais[month_key] += float(receita.get('valor', 0))
+        except (ValueError, TypeError):
+            continue
+    
+    # Processar custos
+    for categoria in dre_dados.get('categorias_custos', []):
+        for custo in categoria.get('custos', []):
+            try:
+                data_custo = datetime.strptime(custo.get('data', ''), '%Y-%m-%d')
+                if data_inicial_dt <= data_custo <= data_final_dt:
+                    month_key = data_custo.strftime('%b/%Y')
+                    custos_mensais[month_key] += float(custo.get('valor', 0))
+            except (ValueError, TypeError):
+                continue
+    
+    # Calcular totais
+    receitas_totais = sum(receitas_mensais.values())
+    custos_totais = sum(custos_mensais.values())
+    
+    # Calcular lucro e margem
+    lucro = receitas_totais - custos_totais
+    margem = 0 if receitas_totais == 0 else round((lucro / receitas_totais) * 100, 2)
+    
+    # Preparar dados de distribuição de custos por categoria
+    categorias_custos = []
+    valores_custos = []
+    
+    for categoria in dre_dados.get('categorias_custos', []):
+        nome_categoria = categoria.get('nome', 'Sem categoria')
+        total_categoria = categoria.get('total', 0)
+        
+        if total_categoria > 0:  # Apenas incluir categorias com valores
+            categorias_custos.append(nome_categoria)
+            valores_custos.append(float(total_categoria))
+    
+    # Ordenar por valor (maior para menor) e limitar a 8 categorias
+    if categorias_custos:
+        # Criar pares (categoria, valor) e ordenar
+        pares_ordenados = sorted(zip(categorias_custos, valores_custos), key=lambda x: x[1], reverse=True)
+        
+        # Se houver mais de 8 categorias, consolidar o restante em "Outros"
+        if len(pares_ordenados) > 8:
+            top_categorias = pares_ordenados[:7]
+            outros_valor = sum(valor for _, valor in pares_ordenados[7:])
+            
+            # Desempacotar os pares ordenados de volta para as listas
+            categorias_custos, valores_custos = zip(*top_categorias)
+            categorias_custos = list(categorias_custos)
+            valores_custos = list(valores_custos)
+            
+            # Adicionar a categoria "Outros"
+            if outros_valor > 0:
+                categorias_custos.append("Outros")
+                valores_custos.append(outros_valor)
+        else:
+            # Desempacotar os pares ordenados
+            categorias_custos, valores_custos = zip(*pares_ordenados)
+            categorias_custos = list(categorias_custos)
+            valores_custos = list(valores_custos)
+    
+    # Formatar valores monetários para exibição
+    def formatar_valor(valor):
+        return f"{valor:,.2f}".replace(',', '.').replace('.', ',')
+    
+    # Preparar resposta JSON
+    response_data = {
+        'receitas_mensais': receitas_mensais,
+        'custos_mensais': custos_mensais,
+        'receitas_totais': formatar_valor(receitas_totais),
+        'custos_totais': formatar_valor(custos_totais),
+        'lucro': formatar_valor(lucro),
+        'margem': str(margem),
+        'categorias_custos': categorias_custos,
+        'valores_custos': valores_custos,
+    }
+    
+    return JsonResponse(response_data)

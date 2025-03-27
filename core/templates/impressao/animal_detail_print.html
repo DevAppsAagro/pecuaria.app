@@ -566,6 +566,99 @@
     </div>
     {% endif %}
 
+    {% if animal.categoria_animal.sexo == 'F' and manejos_reprodutivos or filhos %}
+    <div class="secao">
+        <h2>9. Informações Reprodutivas</h2>
+        
+        <!-- Histórico Reprodutivo -->
+        {% if manejos_reprodutivos %}
+        <h3 style="font-size: 13px; margin-top: 10px; margin-bottom: 5px;">Histórico Reprodutivo</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Data Concepção</th>
+                    <th>Estação de Monta</th>
+                    <th>Método</th>
+                    <th>Resultado</th>
+                    <th>Data Resultado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for manejo in manejos_reprodutivos %}
+                <tr>
+                    <td>{{ manejo.data_concepcao|date:"d/m/Y" }}</td>
+                    <td>{{ manejo.estacao_monta|default:"-" }}</td>
+                    <td>{{ manejo.get_metodo_display }}</td>
+                    <td>{{ manejo.get_resultado_display }}</td>
+                    <td>{{ manejo.data_resultado|date:"d/m/Y"|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        
+        <!-- Bezerros Nascidos -->
+        {% if bezerros_organizados %}
+        <h3 style="font-size: 13px; margin-top: 15px; margin-bottom: 5px;">Bezerros Nascidos</h3>
+        {% for item in bezerros_organizados %}
+        <h4 style="font-size: 12px; margin-top: 10px; margin-bottom: 5px;">Estação: {{ item.estacao|default:"Sem estação" }} - {{ item.bezerros|length }} bezerro(s)</h4>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Brinco</th>
+                    <th>Data Nascimento</th>
+                    <th>Raça</th>
+                    <th>Sexo</th>
+                    <th>Peso Nascimento</th>
+                    <th>Pai</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for bezerro in item.bezerros %}
+                <tr>
+                    <td>{{ bezerro.brinco_visual }}</td>
+                    <td>{{ bezerro.data_nascimento|date:"d/m/Y" }}</td>
+                    <td>{{ bezerro.raca.nome }}</td>
+                    <td>{{ bezerro.categoria_animal.get_sexo_display }}</td>
+                    <td>{{ bezerro.peso_entrada }} kg</td>
+                    <td>{% if bezerro.pai %}{{ bezerro.pai.brinco_visual }}{% else %}-{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endfor %}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if animal.mae or estacao_origem %}
+    <div class="secao">
+        <h2>{% if animal.categoria_animal.sexo == 'F' and manejos_reprodutivos or filhos %}10{% else %}9{% endif %}. Informações de Origem</h2>
+        <div class="info-grid">
+            {% if animal.mae %}
+            <div class="info-item">
+                <span class="info-label">Mãe:</span>
+                {{ animal.mae.brinco_visual }}
+            </div>
+            {% endif %}
+            
+            {% if animal.pai %}
+            <div class="info-item">
+                <span class="info-label">Pai:</span>
+                {{ animal.pai.brinco_visual }}
+            </div>
+            {% endif %}
+            
+            {% if estacao_origem %}
+            <div class="info-item">
+                <span class="info-label">Estação de Monta:</span>
+                {{ estacao_origem }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Rodapé -->
     <footer>
         <p>Responsável Técnico: {{ rodape.responsavel_tecnico }} - {{ rodape.crmv }}</p>

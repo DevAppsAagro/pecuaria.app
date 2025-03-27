@@ -101,8 +101,8 @@
                                     {% for categoria in categorias %}
                                     <option value="{{ categoria.id }}" 
                                             data-tipo="{{ categoria.tipo|upper }}"
-                                            data-alocacao="{{ categoria.alocacao }}">
-                                        {{ categoria.nome }}
+                                            data-alocacao="{{ categoria.alocacao|default:'fazenda' }}">
+                                        {{ categoria.nome }}{% if categoria.usuario == None %} (Global){% endif %}
                                     </option>
                                     {% endfor %}
                                 </select>
@@ -186,6 +186,18 @@
 {% block extra_js %}
 <script>
 $(document).ready(function() {
+    console.log('Documento carregado');
+    
+    // Log para verificar as categorias e seus atributos
+    $('.categoria-select option').each(function() {
+        if ($(this).val()) {  // Ignorar a opção "Selecione..."
+            console.log('Categoria:', $(this).text(), 
+                        'ID:', $(this).val(), 
+                        'data-alocacao:', $(this).attr('data-alocacao'),
+                        'data-tipo:', $(this).attr('data-tipo'));
+        }
+    });
+
     // Função para atualizar a lista de unidades de medida
     function atualizarUnidadesMedida() {
         $.get('{% url "get_unidades_medida" %}')
@@ -321,13 +333,31 @@ $(document).ready(function() {
 
         categoriaSelect.addEventListener('change', function() {
             const categoriaId = this.value;
-            const alocacao = this.options[this.selectedIndex].dataset.alocacao;
+            const selectedOption = this.options[this.selectedIndex];
+            const categoriaText = selectedOption.text;
+            
+            // Determina a alocação com base no texto da categoria ou no atributo data-alocacao
+            let alocacao = selectedOption.dataset.alocacao;
+            
+            // Para categorias globais, infere a alocação pelo nome
+            if (!alocacao) {
+                if (categoriaText.includes('Estoque') || categoriaText.includes('Insumo')) {
+                    alocacao = 'estoque';
+                    console.log('Alocação inferida como estoque pelo nome da categoria:', categoriaText);
+                }
+            }
+            
+            console.log('Categoria selecionada:', categoriaText);
+            console.log('Alocação:', alocacao);
+            console.log('É categoria de estoque?', isCategoriaEstoque(this));
             
             // Mostra/esconde campo de insumo baseado na alocação
             if (insumoField) {
-                insumoField.style.display = alocacao === 'estoque' ? 'block' : 'none';
+                const isEstoque = isCategoriaEstoque(this);
+                console.log('Campo de insumo deve ser exibido?', isEstoque);
+                insumoField.style.display = isEstoque ? 'block' : 'none';
                 
-                if (alocacao !== 'estoque') {
+                if (!isEstoque) {
                     // Se não for estoque, limpa e desabilita os campos de insumo
                     insumoSelect.value = '';
                     insumoInput.value = '';
@@ -363,6 +393,7 @@ $(document).ready(function() {
             subcategoriaSelect.innerHTML = '<option value="">Carregando...</option>';
             destinoSelect.innerHTML = '<option value="">Carregando...</option>';
             subcategoriaSelect.disabled = true;
+            destinoSelect.disabled = true;
             
             // Carrega subcategorias
             if (categoriaId) {
@@ -392,20 +423,7 @@ $(document).ready(function() {
                 
                 // Carrega destinos baseado no tipo de alocação
                 if (alocacao) {
-                    fetch(`/api/financeiro/destinos/?tipo_alocacao=${alocacao}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            destinoSelect.innerHTML = '<option value="">Selecione...</option>';
-                            data.forEach(destino => {
-                                destinoSelect.innerHTML += `<option value="${destino.id}">${destino.nome}</option>`;
-                            });
-                            destinoSelect.disabled = false;
-                        })
-                        .catch(error => {
-                            console.error('Erro ao carregar destinos:', error);
-                            destinoSelect.innerHTML = '<option value="">Erro ao carregar destinos</option>';
-                            destinoSelect.disabled = true;
-                        });
+                    carregarDestinos(alocacao, destinoSelect);
                 } else {
                     destinoSelect.innerHTML = '<option value="">Selecione a categoria primeiro...</option>';
                     destinoSelect.disabled = true;
@@ -428,6 +446,65 @@ $(document).ready(function() {
     // Configura os event listeners para o primeiro item
     setupItemEventListeners(itensContainer.querySelector('.item-row'));
 
+    // Função para verificar se uma categoria é do tipo estoque
+    function isCategoriaEstoque(categoriaSelect) {
+        if (!categoriaSelect || categoriaSelect.selectedIndex <= 0) return false;
+        
+        const selectedOption = categoriaSelect.options[categoriaSelect.selectedIndex];
+        if (!selectedOption) return false;
+        
+        // Verificar diretamente pelo texto da categoria para categorias globais
+        const categoriaText = selectedOption.text.toLowerCase();
+        const keywords = ['estoque', 'insumo', 'ração', 'medicamento', 'vacina', 'suplemento'];
+        for (const keyword of keywords) {
+            if (categoriaText.includes(keyword.toLowerCase())) {
+                console.log('Categoria identificada como estoque pelo nome:', selectedOption.text);
+                return true;
+            }
+        }
+        
+        // Para categorias do usuário, verificar pelo atributo data-alocacao
+        const alocacao = selectedOption.dataset.alocacao;
+        console.log('Verificando categoria:', selectedOption.text, 'Alocação:', alocacao);
+        
+        return alocacao === 'estoque';
+    }
+
+    // Função para carregar os destinos com base no tipo de alocação
+    function carregarDestinos(tipoAlocacao, destinoSelect) {
+        // Converte para minúsculas para garantir consistência
+        tipoAlocacao = tipoAlocacao.toLowerCase();
+        
+        console.log('Carregando destinos para alocação:', tipoAlocacao);
+        
+        // Limpa o select de destino
+        destinoSelect.innerHTML = '<option value="">Selecione...</option>';
+        
+        // Carrega os destinos apropriados com base no tipo de alocação
+        fetch(`/api/financeiro/destinos/?tipo_alocacao=${tipoAlocacao}`)
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(destino => {
+                    const option = document.createElement('option');
+                    option.value = destino.id;
+                    option.textContent = destino.nome;
+                    destinoSelect.appendChild(option);
+                });
+                destinoSelect.disabled = false;
+                
+                // Para categorias de estoque, o destino (fazenda) é obrigatório
+                // pois é necessário para criar a entrada no estoque
+                const itemRow = destinoSelect.closest('.item-row');
+                const categoriaSelect = itemRow.querySelector('.categoria-select');
+                if (isCategoriaEstoque(categoriaSelect)) {
+                    destinoSelect.setAttribute('required', 'required');
+                } else {
+                    destinoSelect.removeAttribute('required');
+                }
+            })
+            .catch(error => console.error('Erro ao carregar destinos:', error));
+    }
+
     // Event listener para submit do formulário
     form.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -436,40 +513,79 @@ $(document).ready(function() {
         const itens = [];
         document.querySelectorAll('.item-row').forEach(item => {
             const categoriaSelect = item.querySelector('.categoria-select');
-            const alocacao = categoriaSelect.options[categoriaSelect.selectedIndex].dataset.alocacao;
+            const selectedOption = categoriaSelect.options[categoriaSelect.selectedIndex];
+            const categoriaText = selectedOption.text;
+            
+            // Determina a alocação com base no texto da categoria ou no atributo data-alocacao
+            let alocacao = selectedOption.dataset.alocacao;
+            
+            // Para categorias globais, infere a alocação pelo nome
+            if (!alocacao) {
+                if (categoriaText.includes('Estoque') || categoriaText.includes('Insumo')) {
+                    alocacao = 'estoque';
+                    console.log('Alocação inferida como estoque pelo nome da categoria:', categoriaText);
+                }
+            }
+            
+            console.log('Processando item com categoria:', categoriaText);
+            console.log('Alocação:', alocacao);
+            console.log('É categoria de estoque?', isCategoriaEstoque(categoriaSelect));
             
             let insumoData = null;
-            if (alocacao === 'estoque') {
+            if (isCategoriaEstoque(categoriaSelect)) {
+                console.log('Categoria identificada como estoque');
                 const insumoSelect = item.querySelector('.insumo-select');
                 const insumoInput = item.querySelector('.insumo-input');
                 
                 if (insumoInput.style.display !== 'none') {
+                    // Modo de novo insumo
                     insumoData = {
                         id: null,
                         nome: insumoInput.value,
                         unidade_medida_id: item.querySelector('.unidade-medida-select').value
                     };
+                    console.log('Novo insumo:', insumoData);
                 } else {
+                    // Modo de insumo existente
                     insumoData = {
                         id: insumoSelect.value,
                         nome: insumoSelect.options[insumoSelect.selectedIndex].text
                     };
+                    console.log('Insumo existente:', insumoData);
+                }
+                
+                // Para categorias de estoque, o destino (fazenda) é obrigatório
+                // pois é necessário para criar a entrada no estoque
+                const destino = item.querySelector('.destino-select').value;
+                if (!destino) {
+                    alert('Para categorias de estoque, o destino é obrigatório.');
+                    return;
                 }
             }
             
-            itens.push({
-                categoria_id: item.querySelector('.categoria-select').value,
+            // Coleta os dados do item
+            const itemData = {
+                categoria_id: categoriaSelect.value,
                 subcategoria_id: item.querySelector('.subcategoria-select').value,
+                quantidade: parseFloat(item.querySelector('.quantidade-input').value),
+                valor_unitario: parseFloat(item.querySelector('.valor-unitario-input').value),
+                valor_total: parseFloat(item.querySelector('.valor-total-input').value),
                 destino_id: item.querySelector('.destino-select').value,
-                quantidade: item.querySelector('.quantidade-input').value,
-                valor_unitario: item.querySelector('.valor-unitario-input').value,
-                valor_total: item.querySelector('.valor-total-input').value,
-                insumo: insumoData
-            });
+                alocacao: alocacao  // Adiciona o tipo de alocação inferido
+            };
+            
+            // Adiciona os dados do insumo, se for uma categoria de estoque
+            if (insumoData) {
+                itemData.insumo = insumoData;
+            }
+            
+            console.log('Dados do item a serem enviados:', itemData);
+            itens.push(itemData);
         });
-
+        
         // Adiciona os dados dos itens ao hidden input
         document.getElementById('itensData').value = JSON.stringify(itens);
+        console.log('Dados dos itens:', JSON.stringify(itens));
 
         // Validar parcelas se forma de pagamento for parcelado
         if (formaPagamento.value === 'PR') {
@@ -480,8 +596,9 @@ $(document).ready(function() {
             }
         }
 
-        // Submit do formulário
-        this.submit();
+        // Submete o formulário
+        console.log('Enviando formulário...');
+        form.submit();
     });
 
     // Função para calcular datas das parcelas

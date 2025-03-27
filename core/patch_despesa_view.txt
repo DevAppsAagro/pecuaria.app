@@ -1,0 +1,38 @@
+Instruções para modificar a classe DespesaCreateView em views.py:
+
+1. Primeiro, adicione o import no topo do arquivo:
+```python
+from .categoria_utils import is_categoria_estoque
+from .despesa_utils import processar_item_estoque
+```
+
+2. Na função form_valid da classe DespesaCreateView (linha ~3773), substitua o bloco de código que verifica se a categoria é de estoque:
+
+Substitua este bloco:
+```python
+# Se for um item de estoque, cria ou atualiza o insumo
+if categoria.alocacao == 'estoque' and 'insumo' in item_data:
+    insumo_data = item_data['insumo']
+    if insumo_data['id']:
+        insumo = Insumo.objects.get(id=insumo_data['id'])
+    else:
+        insumo = Insumo.objects.create(
+            nome=insumo_data['nome'],
+            categoria=categoria,
+            subcategoria=subcategoria,
+            unidade_medida_id=insumo_data['unidade_medida_id'],
+            usuario=self.request.user
+        )
+    
+    # Cria a movimentação de estoque
+    from .views_estoque import criar_entrada_estoque_from_despesa
+    criar_entrada_estoque_from_despesa(self.object, item_despesa, insumo)
+```
+
+Por este:
+```python
+# Processa o item como estoque se for uma categoria de estoque
+processar_item_estoque(self.object, item_despesa, item_data, self.request.user)
+```
+
+Isso fará com que o sistema use a nova função utilitária para verificar se a categoria é de estoque, tanto para categorias do usuário quanto para categorias globais.

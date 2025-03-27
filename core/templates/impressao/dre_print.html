@@ -1,0 +1,476 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório DRE</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        /* Reset básico */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Configurações básicas */
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            background: white;
+            padding: 0;
+        }
+
+        /* Cabeçalho */
+        header {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-container {
+            width: 100px;
+            height: 100px;
+            margin-right: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .header-info {
+            flex: 1;
+        }
+
+        header h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        header p {
+            font-size: 12px;
+            margin: 2px 0;
+        }
+
+        /* Título do relatório */
+        .relatorio-titulo {
+            text-align: center;
+            font-size: 16px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        /* Filtros aplicados */
+        .filtros {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        /* Tabela de dados */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+
+        th, td {
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+
+        .text-end {
+            text-align: right;
+        }
+
+        .fw-bold {
+            font-weight: bold;
+        }
+
+        .ps-4 {
+            padding-left: 1.5rem;
+        }
+
+        .ps-5 {
+            padding-left: 3rem;
+        }
+
+        /* Cores para categorias */
+        .table-success {
+            background-color: #d1e7dd;
+        }
+
+        .table-danger {
+            background-color: #f8d7da;
+        }
+
+        .table-warning {
+            background-color: #fff3cd;
+        }
+
+        .table-info {
+            background-color: #cff4fc;
+        }
+
+        .table-primary {
+            background-color: #cfe2ff;
+        }
+
+        /* Rodapé */
+        footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            font-size: 10px;
+            color: #666;
+        }
+
+        .footer-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+        }
+
+        .footer-left, .footer-right {
+            font-size: 10px;
+        }
+
+        /* Botão de impressão */
+        .print-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        .print-button:hover {
+            background-color: #0056b3;
+        }
+        
+        /* Esconde elementos durante a impressão */
+        @media print {
+            .print-button {
+                display: none;
+            }
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+
+        /* Para impressão */
+        @media print {
+            body {
+                padding: 0;
+                margin: 0;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            @page {
+                size: A4;
+                margin: 1cm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Cabeçalho -->
+    <header>
+        <div class="logo-container">
+            {% if fazenda_logo %}
+                <img src="{{ fazenda_logo }}" alt="Logo da Fazenda">
+            {% else %}
+                <div style="width: 100px; height: 100px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; border: 1px solid #ddd;">
+                    <span style="font-size: 10px; color: #999;">Sem logo</span>
+                </div>
+            {% endif %}
+        </div>
+        <div class="header-info">
+            <h1>{{ cabecalho.empresa }}</h1>
+            <p>{{ cabecalho.endereco }}</p>
+            <p>Data de Emissão: <span id="data-hora-cabecalho">Carregando...</span></p>
+        </div>
+    </header>
+
+    <!-- Título -->
+    <div class="relatorio-titulo">
+        Demonstrativo de Resultado do Exercício (DRE)
+    </div>
+
+    <!-- Filtros Aplicados -->
+    <div class="filtros">
+        <h3 style="font-size: 14px; margin-bottom: 8px;">Filtros Aplicados:</h3>
+        <p>Período: {% if filtros.data_inicial %}{{ filtros.data_inicial }}{% else %}Início{% endif %} até {% if filtros.data_final %}{{ filtros.data_final }}{% else %}Hoje{% endif %}</p>
+        {% if filtros.fazenda %}<p>Fazenda: {{ filtros.fazenda }}</p>
+        {% else %}<p>Fazenda: Todas</p>{% endif %}
+    </div>
+
+    <!-- Tabela DRE -->
+    <table>
+        <thead>
+            <tr>
+                <th>Descrição</th>
+                <th class="text-end" style="width: 25%">Valor (R$)</th>
+                <th class="text-end" style="width: 15%">%</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Receitas -->
+            <tr class="table-success">
+                <td class="fw-bold">1. RECEITAS OPERACIONAIS</td>
+                <td class="text-end fw-bold">{% if dados_dre %}R$ {{ dados_dre.receitas_totais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.receitas_totais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end fw-bold">100%</td>
+            </tr>
+            
+            {% if dados_dre %}
+                <!-- Receitas de Vendas -->
+                <tr>
+                    <td class="ps-4">Vendas de Animais</td>
+                    <td class="text-end">R$ {{ dados_dre.receitas_vendas|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.receitas_vendas|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                    <td class="text-end">{{ dados_dre.percentual_vendas|floatformat:2 }}%</td>
+                </tr>
+                
+                <!-- Receitas de Abates -->
+                <tr>
+                    <td class="ps-4">Abates</td>
+                    <td class="text-end">R$ {{ dados_dre.receitas_abates|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.receitas_abates|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                    <td class="text-end">{{ dados_dre.percentual_abate|floatformat:2 }}%</td>
+                </tr>
+                
+                <!-- Total de Receitas -->
+                <tr class="fw-bold">
+                    <td>TOTAL RECEITAS</td>
+                    <td class="text-end">R$ {{ dados_dre.receitas_totais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.receitas_totais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                    <td class="text-end">100%</td>
+                </tr>
+            {% endif %}
+            
+            <!-- Custos e Despesas Operacionais -->
+            <tr class="table-danger">
+                <td class="fw-bold">2. CUSTOS E DESPESAS OPERACIONAIS</td>
+                <td class="text-end fw-bold">{% if dados_dre %}R$ {{ dados_dre.total_geral_custos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.total_geral_custos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end fw-bold">{% if dados_dre %}{{ dados_dre.percentual_geral_custos|floatformat:2 }}{% else %}0{% endif %}%</td>
+            </tr>
+            
+            <!-- Custos Fixos -->
+            <tr>
+                <td class="fw-bold ps-4">2.1 Custos Fixos</td>
+                <td class="text-end"></td>
+                <td class="text-end"></td>
+            </tr>
+            
+            {% if dados_dre and dados_dre.custos_fixos %}
+                {% for categoria in dados_dre.custos_fixos %}
+                    <tr>
+                        <td class="ps-5">{{ categoria.nome }}</td>
+                        <td class="text-end">R$ {{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                        <td class="text-end">{{ categoria.percentual|floatformat:2 }}%</td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+            
+            <tr class="fw-bold">
+                <td class="ps-4">Total Custos Fixos</td>
+                <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.total_custos_fixos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.total_custos_fixos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_custos_fixos|floatformat:2 }}{% else %}0{% endif %}%</td>
+            </tr>
+            
+            <!-- Custos Variáveis -->
+            <tr>
+                <td class="fw-bold ps-4">2.2 Custos Variáveis</td>
+                <td class="text-end"></td>
+                <td class="text-end"></td>
+            </tr>
+            
+            {% if dados_dre and dados_dre.custos_variaveis %}
+                {% for categoria in dados_dre.custos_variaveis %}
+                    <tr>
+                        <td class="ps-5">{{ categoria.nome }}</td>
+                        <td class="text-end">R$ {{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                        <td class="text-end">{{ categoria.percentual|floatformat:2 }}%</td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+            
+            <tr class="fw-bold">
+                <td>TOTAL CUSTOS OPERACIONAIS</td>
+                <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.total_geral_custos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.total_geral_custos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_geral_custos|floatformat:2 }}{% else %}0{% endif %}%</td>
+            </tr>
+            
+            <!-- Resultado Operacional -->
+            <tr class="table-primary">
+                <td class="fw-bold">3. RESULTADO OPERACIONAL</td>
+                <td class="text-end fw-bold">{% if dados_dre %}R$ {{ dados_dre.resultado_operacional|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.resultado_operacional|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end fw-bold">{% if dados_dre %}{{ dados_dre.percentual_resultado|floatformat:2 }}{% else %}0{% endif %}%</td>
+            </tr>
+            
+            <!-- Investimentos -->
+            <tr class="table-warning">
+                <td class="fw-bold">4. INVESTIMENTOS</td>
+                <td class="text-end fw-bold">{% if dados_dre %}R$ {{ dados_dre.total_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.total_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end fw-bold">{% if dados_dre %}{{ dados_dre.percentual_investimentos|floatformat:2 }}{% else %}0{% endif %}%</td>
+            </tr>
+            
+            <!-- Compra de Animais -->
+            <tr>
+                <td class="ps-4 fw-bold">4.1 Compra de Animais</td>
+                <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.total_compra_animais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.total_compra_animais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end">{% if dados_dre and dados_dre.percentual_compra_animais %}{{ dados_dre.percentual_compra_animais|floatformat:2 }}{% else %}0{% endif %}%</td>
+            </tr>
+            
+            <!-- Outros Investimentos -->
+            <tr>
+                <td class="ps-4 fw-bold">4.2 Outros Investimentos</td>
+                <td class="text-end"></td>
+                <td class="text-end"></td>
+            </tr>
+            
+            {% if dados_dre and dados_dre.investimentos %}
+                {% for categoria in dados_dre.investimentos %}
+                    <tr>
+                        <td class="ps-5">{{ categoria.nome }}</td>
+                        <td class="text-end">R$ {{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                        <td class="text-end">{{ categoria.percentual|floatformat:2 }}%</td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+            
+            <tr class="fw-bold">
+                <td>Total Investimentos</td>
+                <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.total_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.total_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_investimentos|floatformat:2 }}{% else %}0{% endif %}%</td>
+            </tr>
+            
+            <!-- Não Operacional -->
+            <tr class="table-info">
+                <td class="fw-bold">5. RESULTADO NÃO OPERACIONAL</td>
+                <td class="text-end fw-bold">{% if dados_dre %}R$ {{ dados_dre.resultado_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.resultado_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end fw-bold">{% if dados_dre %}{{ dados_dre.percentual_resultado_nao_op|floatformat:2 }}{% else %}0{% endif %}%</td>
+            </tr>
+            
+            <tr>
+                <td>Receitas Não Operacionais (Entradas)</td>
+                <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.receitas_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.receitas_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_receitas_nao_op|floatformat:2 }}{% else %}0{% endif %}%</td>
+            </tr>
+            
+            <tr>
+                <td>Despesas Não Operacionais (Saídas)</td>
+                <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.despesas_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.despesas_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_despesas_nao_op|floatformat:2 }}{% else %}0{% endif %}%</td>
+            </tr>
+            
+            <tr class="fw-bold">
+                <td>Resultado Não Operacional</td>
+                <td class="text-end">{% if dados_dre %}R$ {{ dados_dre.resultado_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.resultado_nao_op|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end">{% if dados_dre %}{{ dados_dre.percentual_resultado_nao_op|floatformat:2 }}{% else %}0{% endif %}%</td>
+            </tr>
+            
+            <!-- Resultado Final -->
+            <tr class="{% if dados_dre and dados_dre.resultado_final > 0 %}table-success{% else %}table-danger{% endif %}">
+                <td class="fw-bold">6. RESULTADO FINAL</td>
+                <td class="text-end fw-bold">{% if dados_dre %}R$ {{ dados_dre.resultado_final|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_dre.resultado_final|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                <td class="text-end fw-bold">{% if dados_dre %}{{ dados_dre.percentual_resultado_final|floatformat:2 }}{% else %}0{% endif %}%</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Rodapé -->
+    <footer>
+        <p>Relatório gerado em <span id="data-hora-local">Carregando...</span></p>
+        <div class="footer-info">
+            <div class="footer-left">
+                <p>PecuaristaPRO</p>
+                <p>Versão {{ versao_sistema|default:"1.0.0" }}</p>
+            </div>
+            <div class="footer-right">
+                <p>Desenvolvido por LWL Solutions Ltda</p>
+                <p>www.pecuaristapro.com</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Botão de Impressão -->
+    <button onclick="handlePrint()" class="print-button">
+        <i class="bi bi-printer"></i> Imprimir
+    </button>
+    
+    <!-- Botão de Configurações de Impressão -->
+    <button onclick="window.print()" class="print-button" style="right: 120px;">
+        <i class="bi bi-gear"></i> Configurações
+    </button>
+
+    <script>
+        // Função para formatar a data no formato brasileiro
+        function formatarDataHora(data) {
+            const dia = data.getDate().toString().padStart(2, '0');
+            const mes = (data.getMonth() + 1).toString().padStart(2, '0');
+            const ano = data.getFullYear();
+            const hora = data.getHours().toString().padStart(2, '0');
+            const minuto = data.getMinutes().toString().padStart(2, '0');
+            
+            return `${dia}/${mes}/${ano} às ${hora}:${minuto}`;
+        }
+
+        // Atualiza os elementos com a data e hora local do navegador
+        document.addEventListener('DOMContentLoaded', function() {
+            const dataHoraLocal = new Date();
+            const dataFormatada = formatarDataHora(dataHoraLocal);
+            
+            document.getElementById('data-hora-cabecalho').textContent = dataFormatada;
+            document.getElementById('data-hora-local').textContent = dataFormatada;
+        });
+        
+        // Função para lidar com a impressão
+        function handlePrint() {
+            // Esconde os botões
+            document.querySelectorAll('.print-button').forEach(function(button) {
+                button.classList.add('hidden');
+            });
+            
+            // Chama a impressão após um pequeno delay para garantir que os botões sumiram
+            setTimeout(function() {
+                window.print();
+                
+                // Restaura os botões após a impressão
+                window.onafterprint = function() {
+                    document.querySelectorAll('.print-button').forEach(function(button) {
+                        button.classList.remove('hidden');
+                    });
+                };
+            }, 100);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,282 @@
+{% extends 'base_print.html' %}
+{% block title %}Fluxo de Caixa - Impressão{% endblock %}
+
+{% block head %}
+<style>
+    /* Estilos específicos para impressão */
+    body {
+        font-size: 12px;
+    }
+    .table-sm td, .table-sm th {
+        padding: 0.25rem 0.5rem;
+    }
+    .text-positive {
+        color: #28a745;
+    }
+    .text-negative {
+        color: #dc3545;
+    }
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        .table-sm {
+            font-size: 11px;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-2">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+            <h5 class="mb-0">Fluxo de Caixa</h5>
+            <div class="no-print">
+                <button type="button" class="btn btn-light btn-sm" onclick="window.print()">
+                    <i class="bi bi-printer"></i> Imprimir
+                </button>
+                <button type="button" class="btn btn-light btn-sm" onclick="window.print()">
+                    <i class="bi bi-gear"></i>
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-2">
+            <!-- Informações do filtro -->
+            <div class="mb-3">
+                <strong>Período:</strong> {% if filtros.data_inicial %}{{ filtros.data_inicial|date:"d/m/Y" }}{% endif %} a {% if filtros.data_final %}{{ filtros.data_final|date:"d/m/Y" }}{% endif %}
+                {% if fazenda_selecionada %}<br><strong>Fazenda:</strong> {{ fazenda_selecionada.nome }}{% endif %}
+            </div>
+            
+            <!-- Conteúdo do relatório -->
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Descrição</th>
+                            <th class="text-end" style="width: 25%">Valor (R$)</th>
+                            <th class="text-end" style="width: 15%">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Saldo Inicial -->
+                        <tr class="table-secondary">
+                            <td class="fw-bold">1. SALDO INICIAL</td>
+                            <td class="text-end fw-bold">{% if dados_fluxo %}R$ {{ dados_fluxo.saldo_inicial|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saldo_inicial|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">-</td>
+                        </tr>
+
+                        <!-- Entradas -->
+                        <tr class="table-success">
+                            <td class="fw-bold">2. ENTRADAS DE CAIXA</td>
+                            <td class="text-end fw-bold">{% if dados_fluxo %}R$ {{ dados_fluxo.total_entradas|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.total_entradas|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">100%</td>
+                        </tr>
+                        
+                        <!-- Entradas Operacionais -->
+                        <tr>
+                            <td class="fw-bold">2.1 Entradas Operacionais</td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.entradas_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.entradas_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_entradas_operacionais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Detalhamento das entradas operacionais -->
+                        <tr>
+                            <td class="ps-4">Vendas de Animais</td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.entradas_vendas|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.entradas_vendas|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_entradas_vendas|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        <tr>
+                            <td class="ps-4">Abates</td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.entradas_abates|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.entradas_abates|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_entradas_abates|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Entradas Não Operacionais -->
+                        <tr>
+                            <td>2.2 Entradas Não Operacionais</td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.entradas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.entradas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_entradas_nao_operacionais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Saídas -->
+                        <tr class="table-danger">
+                            <td class="fw-bold">3. SAÍDAS DE CAIXA</td>
+                            <td class="text-end fw-bold">{% if dados_fluxo %}R$ {{ dados_fluxo.total_saidas|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.total_saidas|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">{% if dados_fluxo %}{{ dados_fluxo.percentual_total_saidas|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Saídas Operacionais -->
+                        <tr>
+                            <td class="fw-bold">3.1 Saídas Operacionais</td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_operacionais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Custos Fixos -->
+                        <tr>
+                            <td class="ps-4">Custos Fixos</td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_custos_fixos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_custos_fixos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_custos_fixos|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Detalhamento dos custos fixos -->
+                        {% if dados_fluxo and dados_fluxo.custos_fixos %}
+                            {% for categoria in dados_fluxo.custos_fixos %}
+                                <tr>
+                                    <td class="ps-5">{{ categoria.nome }}</td>
+                                    <td class="text-end">R$ {{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                    <td class="text-end">{{ categoria.percentual|floatformat:2 }}%</td>
+                                </tr>
+                                {% if categoria.subcategorias %}
+                                    {% for subcategoria in categoria.subcategorias %}
+                                        <tr>
+                                            <td class="ps-5 small">- {{ subcategoria.nome }}</td>
+                                            <td class="text-end small">R$ {{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                            <td class="text-end small">{{ subcategoria.percentual|floatformat:2 }}%</td>
+                                        </tr>
+                                    {% endfor %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <!-- Custos Variáveis -->
+                        <tr>
+                            <td class="ps-4">Custos Variáveis</td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_custos_variaveis|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_custos_variaveis|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_custos_variaveis|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Detalhamento dos custos variáveis -->
+                        {% if dados_fluxo and dados_fluxo.custos_variaveis %}
+                            {% for categoria in dados_fluxo.custos_variaveis %}
+                                <tr>
+                                    <td class="ps-5">{{ categoria.nome }}</td>
+                                    <td class="text-end">R$ {{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ categoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                    <td class="text-end">{{ categoria.percentual|floatformat:2 }}%</td>
+                                </tr>
+                                {% if categoria.subcategorias %}
+                                    {% for subcategoria in categoria.subcategorias %}
+                                        <tr>
+                                            <td class="ps-5 small">- {{ subcategoria.nome }}</td>
+                                            <td class="text-end small">R$ {{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                            <td class="text-end small">{{ subcategoria.percentual|floatformat:2 }}%</td>
+                                        </tr>
+                                    {% endfor %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <!-- Saídas para Investimentos -->
+                        <tr>
+                            <td class="fw-bold">3.2 Saídas para Investimentos</td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_investimentos|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Detalhamento dos investimentos -->
+                        <tr>
+                            <td class="ps-4">Compra de Animais</td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_compra_animais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_compra_animais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_compra_animais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Outros investimentos -->
+                        {% if dados_fluxo and dados_fluxo.investimentos %}
+                            {% for investimento in dados_fluxo.investimentos %}
+                                {% if investimento.nome != 'Compra de Animais' %}
+                                <tr>
+                                    <td class="ps-4">{{ investimento.nome }}</td>
+                                    <td class="text-end">R$ {{ investimento.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ investimento.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                    <td class="text-end">{{ investimento.percentual|floatformat:2 }}%</td>
+                                </tr>
+                                {% if investimento.subcategorias %}
+                                    {% for subcategoria in investimento.subcategorias %}
+                                        <tr>
+                                            <td class="ps-5 small">- {{ subcategoria.nome }}</td>
+                                            <td class="text-end small">R$ {{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ subcategoria.valor|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                            <td class="text-end small">{{ subcategoria.percentual|floatformat:2 }}%</td>
+                                        </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <!-- Saídas Não Operacionais -->
+                        <tr>
+                            <td>3.3 Saídas Não Operacionais</td>
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_nao_operacionais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Fluxo de Caixa Líquido -->
+                        <tr class="table-primary">
+                            <td class="fw-bold">4. FLUXO DE CAIXA LÍQUIDO (2-3)</td>
+                            <td class="text-end fw-bold {% if dados_fluxo and dados_fluxo.fluxo_liquido > 0 %}text-positive{% elif dados_fluxo and dados_fluxo.fluxo_liquido < 0 %}text-negative{% endif %}">
+                                {% if dados_fluxo %}R$ {{ dados_fluxo.fluxo_liquido|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.fluxo_liquido|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}
+                            </td>
+                            <td class="text-end fw-bold">{% if dados_fluxo %}{{ dados_fluxo.percentual_fluxo_liquido|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Saldo Final -->
+                        <tr class="table-info">
+                            <td class="fw-bold">5. SALDO FINAL (1+4)</td>
+                            <td class="text-end fw-bold {% if dados_fluxo and dados_fluxo.saldo_final > 0 %}text-positive{% elif dados_fluxo and dados_fluxo.saldo_final < 0 %}text-negative{% endif %}">
+                                {% if dados_fluxo %}R$ {{ dados_fluxo.saldo_final|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saldo_final|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}
+                            </td>
+                            <td class="text-end fw-bold">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    function handlePrint() {
+        // Configurar opções de impressão
+        const mediaQueryList = window.matchMedia('print');
+        
+        // Adicionar listener para eventos de impressão
+        mediaQueryList.addEventListener('change', function(mql) {
+            if (!mql.matches) {
+                // Após a impressão, restaurar elementos
+                document.querySelectorAll('.no-print').forEach(el => {
+                    el.style.display = '';
+                });
+            } else {
+                // Antes da impressão, esconder elementos
+                document.querySelectorAll('.no-print').forEach(el => {
+                    el.style.display = 'none';
+                });
+            }
+        });
+    }
+    
+    // Adicionar evento ao botão de impressão
+    document.addEventListener('DOMContentLoaded', function() {
+        const printButtons = document.querySelectorAll('.btn-print');
+        printButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                window.print();
+            });
+        });
+        
+        // Inicializar o handler de impressão
+        handlePrint();
+        
+        // Exibir mensagem de erro, se houver
+        const mensagemErro = "{{ mensagem_erro|default:'' }}";
+        if (mensagemErro) {
+            toastr.error(mensagemErro);
+        }
+    });
+</script>
+{% endblock %}
+{% endblock %}

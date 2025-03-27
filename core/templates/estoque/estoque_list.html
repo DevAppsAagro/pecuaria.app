@@ -80,9 +80,18 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Estoque</h2>
-        <a href="{% url 'insumo_create' %}" class="btn btn-sm btn-primary">
-            <i class="bi bi-plus-circle"></i> Novo Insumo
-        </a>
+        <div>
+            <a href="{% url 'estoque_list' %}{% if mostrar_inativos %}?mostrar_inativos=false{% else %}?mostrar_inativos=true{% endif %}" class="btn btn-sm btn-outline-secondary me-2">
+                {% if mostrar_inativos %}
+                <i class="bi bi-eye-slash"></i> Ocultar Inativos
+                {% else %}
+                <i class="bi bi-eye"></i> Mostrar Inativos
+                {% endif %}
+            </a>
+            <a href="{% url 'insumo_create' %}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-circle"></i> Novo Insumo
+            </a>
+        </div>
     </div>
 
     <!-- Cards informativos coloridos -->
@@ -153,8 +162,8 @@
                 </thead>
                 <tbody>
                     {% for insumo in insumos %}
-                    <tr>
-                        <td>{{ insumo.nome }}</td>
+                    <tr{% if not insumo.ativo %} class="table-secondary text-muted"{% endif %}>
+                        <td>{{ insumo.nome }}{% if not insumo.ativo %} <span class="badge bg-secondary">Inativo</span>{% endif %}</td>
                         <td>{{ insumo.categoria.nome }}</td>
                         <td>{{ insumo.subcategoria.nome }}</td>
                         <td>{{ insumo.unidade_medida.sigla }}</td>
@@ -166,6 +175,15 @@
                                 <a href="{% url 'insumo_edit' insumo.id %}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-pencil"></i>
                                 </a>
+                                {% if insumo.ativo %}
+                                <a href="{% url 'insumo_toggle_status' insumo.id %}" class="btn btn-sm btn-outline-warning" title="Desativar">
+                                    <i class="bi bi-toggle-on"></i>
+                                </a>
+                                {% else %}
+                                <a href="{% url 'insumo_toggle_status' insumo.id %}" class="btn btn-sm btn-outline-success" title="Ativar">
+                                    <i class="bi bi-toggle-off"></i>
+                                </a>
+                                {% endif %}
                                 <a href="{% url 'insumo_delete' insumo.id %}" class="btn btn-sm btn-outline-danger">
                                     <i class="bi bi-trash"></i>
                                 </a>

@@ -1,0 +1,334 @@
+{% extends 'base_print.html' %}
+{% block title %}Fluxo de Caixa Mensal - Impressão{% endblock %}
+
+{% block head %}
+<style>
+    /* Estilos específicos para impressão */
+    body {
+        font-size: 12px;
+    }
+    .table-sm td, .table-sm th {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.85rem;
+    }
+    .text-positive {
+        color: #28a745;
+    }
+    .text-negative {
+        color: #dc3545;
+    }
+    .table-responsive {
+        overflow-x: auto;
+    }
+    .sticky-col {
+        position: sticky;
+        left: 0;
+        background-color: white;
+        z-index: 1;
+    }
+    .sticky-col.table-secondary {
+        background-color: #e2e3e5;
+    }
+    .sticky-col.table-success {
+        background-color: #d4edda;
+    }
+    .sticky-col.table-danger {
+        background-color: #f8d7da;
+    }
+    .sticky-col.table-info {
+        background-color: #d1ecf1;
+    }
+    .sticky-col.table-primary {
+        background-color: #cce5ff;
+    }
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        .table-sm {
+            font-size: 11px;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-2">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+            <h5 class="mb-0">Fluxo de Caixa Mensal</h5>
+            <div class="no-print">
+                <button type="button" class="btn btn-light btn-sm" onclick="window.print()">
+                    <i class="bi bi-printer"></i> Imprimir
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-2">
+            <!-- Informações do filtro -->
+            <div class="mb-3">
+                <strong>Período:</strong> {% if filtros.data_inicial %}{{ filtros.data_inicial|date:"d/m/Y" }}{% endif %} a {% if filtros.data_final %}{{ filtros.data_final|date:"d/m/Y" }}{% endif %}
+                {% if fazenda_selecionada %}<br><strong>Fazenda:</strong> {{ fazenda_selecionada.nome }}{% endif %}
+            </div>
+            
+            <!-- Conteúdo do relatório -->
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="sticky-col">Descrição</th>
+                            {% if dados_fluxo.meses %}
+                                {% for mes in dados_fluxo.meses.keys %}
+                                    <th class="text-end">{{ mes }}</th>
+                                {% endfor %}
+                            {% endif %}
+                            <th class="text-end">Total (R$)</th>
+                            <th class="text-end">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Saldo Inicial -->
+                        <tr class="table-secondary">
+                            <td class="fw-bold sticky-col table-secondary">1. SALDO INICIAL</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    <td class="text-end fw-bold">R$ {{ dados.saldo_inicial|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados.saldo_inicial|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end fw-bold">{% if dados_fluxo %}R$ {{ dados_fluxo.saldo_inicial|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saldo_inicial|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">-</td>
+                        </tr>
+
+                        <!-- Entradas -->
+                        <tr class="table-success">
+                            <td class="fw-bold sticky-col table-success">2. ENTRADAS DE CAIXA</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    {% with total_entradas_mes=dados.entradas_vendas|add:dados.entradas_abates|add:dados.entradas_nao_operacionais %}
+                                        <td class="text-end fw-bold">R$ {{ total_entradas_mes|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ total_entradas_mes|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                    {% endwith %}
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end fw-bold">{% if dados_fluxo %}R$ {{ dados_fluxo.total_entradas|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.total_entradas|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">100%</td>
+                        </tr>
+                        
+                        <!-- Entradas Operacionais -->
+                        <tr>
+                            <td class="fw-bold sticky-col">2.1 Entradas Operacionais</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    {% with entradas_op_mes=dados.entradas_vendas|add:dados.entradas_abates %}
+                                        <td class="text-end">R$ {{ entradas_op_mes|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ entradas_op_mes|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                    {% endwith %}
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.entradas_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.entradas_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_entradas_operacionais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Detalhamento das entradas operacionais -->
+                        <tr>
+                            <td class="ps-4 sticky-col">Vendas de Animais</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    <td class="text-end">R$ {{ dados.entradas_vendas|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados.entradas_vendas|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.entradas_vendas|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.entradas_vendas|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_entradas_vendas|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        <tr>
+                            <td class="ps-4 sticky-col">Abates</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    <td class="text-end">R$ {{ dados.entradas_abates|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados.entradas_abates|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.entradas_abates|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.entradas_abates|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_entradas_abates|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Entradas Não Operacionais -->
+                        <tr>
+                            <td class="fw-bold sticky-col">2.2 Entradas Não Operacionais</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    <td class="text-end">R$ {{ dados.entradas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados.entradas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.entradas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.entradas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_entradas_nao_operacionais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Saídas -->
+                        <tr class="table-danger">
+                            <td class="fw-bold sticky-col table-danger">3. SAÍDAS DE CAIXA</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    {% with total_saidas_mes=dados.saidas_custos_fixos|add:dados.saidas_custos_variaveis|add:dados.saidas_compra_animais|add:dados.saidas_investimentos|add:dados.saidas_nao_operacionais %}
+                                        <td class="text-end fw-bold">R$ {{ total_saidas_mes|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ total_saidas_mes|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                    {% endwith %}
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end fw-bold">{% if dados_fluxo %}R$ {{ dados_fluxo.total_saidas|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.total_saidas|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end fw-bold">100%</td>
+                        </tr>
+                        
+                        <!-- Saídas Operacionais -->
+                        <tr>
+                            <td class="fw-bold sticky-col">3.1 Saídas Operacionais</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    {% with saidas_op_mes=dados.saidas_custos_fixos|add:dados.saidas_custos_variaveis|add:dados.saidas_compra_animais %}
+                                        <td class="text-end">R$ {{ saidas_op_mes|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ saidas_op_mes|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                    {% endwith %}
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_operacionais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Custos Fixos -->
+                        <tr>
+                            <td class="ps-4 sticky-col">Custos Fixos</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    <td class="text-end">R$ {{ dados.saidas_custos_fixos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados.saidas_custos_fixos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_custos_fixos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_custos_fixos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_custos_fixos|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Custos Variáveis -->
+                        <tr>
+                            <td class="ps-4 sticky-col">Custos Variáveis</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    <td class="text-end">R$ {{ dados.saidas_custos_variaveis|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados.saidas_custos_variaveis|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_custos_variaveis|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_custos_variaveis|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_custos_variaveis|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Compra de Animais -->
+                        <tr>
+                            <td class="ps-4 sticky-col">Compra de Animais</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    <td class="text-end">R$ {{ dados.saidas_compra_animais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados.saidas_compra_animais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_compra_animais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_compra_animais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_compra_animais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Saídas para Investimentos -->
+                        <tr>
+                            <td class="fw-bold sticky-col">3.2 Saídas para Investimentos</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    <td class="text-end">R$ {{ dados.saidas_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados.saidas_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_investimentos|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_investimentos|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Saídas Não Operacionais -->
+                        <tr>
+                            <td class="fw-bold sticky-col">3.3 Saídas Não Operacionais</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    <td class="text-end">R$ {{ dados.saidas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados.saidas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}</td>
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end">{% if dados_fluxo %}R$ {{ dados_fluxo.saidas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saidas_nao_operacionais|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}</td>
+                            <td class="text-end">{% if dados_fluxo %}{{ dados_fluxo.percentual_saidas_nao_operacionais|floatformat:2 }}{% else %}0{% endif %}%</td>
+                        </tr>
+                        
+                        <!-- Saldo do Período -->
+                        <tr class="table-info">
+                            <td class="fw-bold sticky-col table-info">4. SALDO DO PERÍODO (2-3)</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    {% with entradas_mes=dados.entradas_vendas|add:dados.entradas_abates|add:dados.entradas_nao_operacionais %}
+                                    {% with saidas_mes=dados.saidas_custos_fixos|add:dados.saidas_custos_variaveis|add:dados.saidas_compra_animais|add:dados.saidas_investimentos|add:dados.saidas_nao_operacionais %}
+                                    {% with saldo_mes=entradas_mes|sub:saidas_mes %}
+                                        <td class="text-end fw-bold {% if saldo_mes >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                                            R$ {{ saldo_mes|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ saldo_mes|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}
+                                        </td>
+                                    {% endwith %}
+                                    {% endwith %}
+                                    {% endwith %}
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end fw-bold {% if dados_fluxo.saldo_periodo >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                                {% if dados_fluxo %}R$ {{ dados_fluxo.saldo_periodo|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saldo_periodo|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}
+                            </td>
+                            <td class="text-end fw-bold">-</td>
+                        </tr>
+                        
+                        <!-- Saldo Final -->
+                        <tr class="table-primary">
+                            <td class="fw-bold sticky-col table-primary">5. SALDO FINAL (1+4)</td>
+                            {% if dados_fluxo.meses %}
+                                {% for mes, dados in dados_fluxo.meses.items %}
+                                    {% with entradas_mes=dados.entradas_vendas|add:dados.entradas_abates|add:dados.entradas_nao_operacionais %}
+                                    {% with saidas_mes=dados.saidas_custos_fixos|add:dados.saidas_custos_variaveis|add:dados.saidas_compra_animais|add:dados.saidas_investimentos|add:dados.saidas_nao_operacionais %}
+                                    {% with saldo_final_mes=dados.saldo_inicial|add:entradas_mes|sub:saidas_mes %}
+                                        <td class="text-end fw-bold {% if saldo_final_mes >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                                            R$ {{ saldo_final_mes|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ saldo_final_mes|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}
+                                        </td>
+                                    {% endwith %}
+                                    {% endwith %}
+                                    {% endwith %}
+                                {% endfor %}
+                            {% endif %}
+                            <td class="text-end fw-bold {% if dados_fluxo.saldo_final >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                                {% if dados_fluxo %}R$ {{ dados_fluxo.saldo_final|floatformat:2|default:"0,00"|stringformat:"s"|slice:":-3" }},{{ dados_fluxo.saldo_final|floatformat:2|default:"0,00"|stringformat:"s"|slice:"-2:" }}{% else %}R$ 0,00{% endif %}
+                            </td>
+                            <td class="text-end fw-bold">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    function handlePrint() {
+        window.print();
+    }
+    
+    // Adicionar evento ao botão de impressão
+    document.addEventListener('DOMContentLoaded', function() {
+        const printButtons = document.querySelectorAll('.btn-print');
+        printButtons.forEach(button => {
+            button.addEventListener('click', handlePrint);
+        });
+        
+        // Formatar data e hora local
+        const dataHoraElement = document.getElementById('data-hora-local');
+        if (dataHoraElement) {
+            const dataHoraLocal = new Date();
+            const options = { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            };
+            dataHoraElement.textContent = dataHoraLocal.toLocaleDateString('pt-BR', options);
+        }
+    });
+</script>
+{% endblock %}
+{% endblock %}

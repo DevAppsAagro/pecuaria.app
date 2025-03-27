@@ -38,7 +38,8 @@ urlpatterns = [
     path('', views_dashboard.dashboard, name='dashboard'),
     
     # Dashboard
-    path('dashboard/dados/', views_dashboard.dashboard_dados, name='dashboard_dados'),
+    # Comentando temporariamente para resolver erro no Vercel
+    # path('dashboard/dados/', views_dashboard.dashboard_dados, name='dashboard_dados'),
     path('api/dre/dados/', views_relatorios.atualizar_dre_dados_ajax, name='atualizar_dre_dados_ajax'),
     
     # Página em desenvolvimento

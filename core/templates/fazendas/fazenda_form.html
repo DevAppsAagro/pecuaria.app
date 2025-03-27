@@ -14,7 +14,7 @@
 
             <div class="card">
                 <div class="card-body">
-                    <form method="post" class="needs-validation" novalidate>
+                    <form method="post" class="needs-validation" novalidate enctype="multipart/form-data">
                         {% csrf_token %}
                         
                         <div class="row g-3">
@@ -31,6 +31,30 @@
                                 <label for="inscricao_estadual" class="form-label">Inscrição Estadual</label>
                                 <input type="text" class="form-control" id="inscricao_estadual" name="inscricao_estadual"
                                        value="{{ fazenda.inscricao_estadual|default:'' }}">
+                            </div>
+
+                            <!-- Campo para upload da logo -->
+                            <div class="col-md-12 mb-3">
+                                <label for="logo" class="form-label">Logo da Fazenda</label>
+                                <input type="file" class="form-control" id="logo" name="logo" accept="image/*">
+                                <small class="text-muted">Formatos aceitos: JPG, PNG, GIF. Tamanho máximo: 2MB</small>
+                                
+                                {% if fazenda.logo_url %}
+                                <div class="mt-2">
+                                    <div class="d-flex align-items-center">
+                                        <img src="{{ fazenda.logo_url }}" alt="Logo atual" class="img-thumbnail me-2" style="max-height: 100px; max-width: 200px;">
+                                        <div>
+                                            <p class="mb-1"><strong>Logo atual</strong></p>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="remover_logo" name="remover_logo">
+                                                <label class="form-check-label" for="remover_logo">
+                                                    Remover logo atual
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
                             </div>
 
                             <div class="col-md-6">
@@ -137,6 +161,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         form.classList.add('was-validated');
     });
+    
+    // Validação de tamanho do arquivo de logo
+    const logoInput = document.getElementById('logo');
+    if (logoInput) {
+        logoInput.addEventListener('change', function() {
+            const maxSize = 2 * 1024 * 1024; // 2MB
+            if (this.files[0] && this.files[0].size > maxSize) {
+                alert('O arquivo é muito grande. O tamanho máximo permitido é 2MB.');
+                this.value = '';
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

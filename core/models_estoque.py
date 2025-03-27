@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from .models import (
     CategoriaCusto, SubcategoriaCusto, UnidadeMedida,
-    Despesa, Lote, Pasto, Animal
+    Despesa, Lote, Pasto, Animal, Fazenda
 )
 from decimal import Decimal
 from django.core.validators import MinValueValidator
@@ -16,6 +16,7 @@ class Insumo(models.Model):
     saldo_estoque = models.DecimalField('Saldo em Estoque', max_digits=10, decimal_places=2, default=0)
     preco_medio = models.DecimalField('Preço Médio', max_digits=10, decimal_places=2, default=0)
     valor_total = models.DecimalField('Valor Total', max_digits=10, decimal_places=2, default=0)
+    ativo = models.BooleanField('Ativo', default=True)
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     data_cadastro = models.DateTimeField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
@@ -51,6 +52,7 @@ class MovimentacaoEstoque(models.Model):
     lote = models.ForeignKey('Lote', on_delete=models.SET_NULL, null=True, blank=True)
     pasto = models.ForeignKey('Pasto', on_delete=models.SET_NULL, null=True, blank=True)
     destino_lote = models.ForeignKey('Lote', on_delete=models.SET_NULL, null=True, blank=True, related_name='destino_movimentacoes')
+    fazenda_origem = models.ForeignKey('Fazenda', on_delete=models.SET_NULL, null=True, blank=True, related_name='movimentacoes_origem', verbose_name='Fazenda de Origem')
     consumo_pv = models.DecimalField('Consumo % Peso Vivo', max_digits=5, decimal_places=2, null=True, blank=True)
     observacao = models.TextField('Observação', blank=True, null=True)
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)

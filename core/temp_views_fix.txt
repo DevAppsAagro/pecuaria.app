@@ -1,0 +1,59 @@
+# Processa os itens da despesa
+itens_data = json.loads(self.request.POST.get('itens_despesa', '[]'))
+for item_data in itens_data:
+    categoria = CategoriaCusto.objects.get(
+        Q(id=item_data['categoria_id']) & (Q(usuario=self.request.user) | Q(usuario__isnull=True))
+    )
+    subcategoria = SubcategoriaCusto.objects.get(
+        Q(id=item_data['subcategoria_id']) & (Q(usuario=self.request.user) | Q(usuario__isnull=True))
+    )
+    
+    # Cria o item da despesa
+    item_despesa = ItemDespesa(
+        despesa=self.object,
+        categoria=categoria,
+        subcategoria=subcategoria,
+        quantidade=item_data['quantidade'],
+        valor_unitario=item_data['valor_unitario'],
+        valor_total=item_data['valor_total']
+    )
+    
+    # Define o destino apropriado baseado na alocação da categoria
+    # Se a categoria não tiver alocação definida, usa a alocação enviada pelo frontend
+    alocacao = categoria.alocacao.lower() if categoria.alocacao else item_data.get('alocacao', '').lower()
+    
+    if alocacao == 'fazenda':
+        item_despesa.fazenda_destino_id = item_data['destino_id']
+    elif alocacao == 'lote':
+        item_despesa.lote_destino_id = item_data['destino_id']
+    elif alocacao == 'maquina':
+        item_despesa.maquina_destino_id = item_data['destino_id']
+    elif alocacao == 'benfeitoria':
+        item_despesa.benfeitoria_destino_id = item_data['destino_id']
+    elif alocacao == 'pastagem':
+        item_despesa.pastagem_destino_id = item_data['destino_id']
+    elif alocacao == 'estoque':
+        item_despesa.fazenda_destino_id = item_data['destino_id']
+    
+    item_despesa.save()
+
+    # Se for um item de estoque, cria ou atualiza o insumo
+    # Verifica tanto a alocação da categoria quanto a alocação enviada pelo frontend
+    is_estoque = categoria.alocacao.lower() == 'estoque' if categoria.alocacao else alocacao == 'estoque'
+    
+    if is_estoque and 'insumo' in item_data:
+        insumo_data = item_data['insumo']
+        if insumo_data['id']:
+            insumo = Insumo.objects.get(id=insumo_data['id'])
+        else:
+            insumo = Insumo.objects.create(
+                nome=insumo_data['nome'],
+                categoria=categoria,
+                subcategoria=subcategoria,
+                unidade_medida_id=insumo_data['unidade_medida_id'],
+                usuario=self.request.user
+            )
+        
+        # Cria a movimentação de estoque
+        from .views_estoque import criar_entrada_estoque_from_despesa
+        criar_entrada_estoque_from_despesa(self.object, item_despesa, insumo)

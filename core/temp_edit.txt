@@ -1,0 +1,14 @@
+                    # Define o destino apropriado baseado na alocação da categoria
+                    alocacao = categoria.alocacao.lower()
+                    if alocacao == 'fazenda':
+                        item_despesa.fazenda_destino_id = item_data['destino_id']
+                    elif alocacao == 'lote':
+                        item_despesa.lote_destino_id = item_data['destino_id']
+                    elif alocacao == 'maquina':
+                        item_despesa.maquina_destino_id = item_data['destino_id']
+                    elif alocacao == 'benfeitoria':
+                        item_despesa.benfeitoria_destino_id = item_data['destino_id']
+                    elif alocacao == 'pastagem':
+                        item_despesa.pastagem_destino_id = item_data['destino_id']
+                    elif alocacao == 'estoque':
+                        item_despesa.fazenda_destino_id = item_data['destino_id']

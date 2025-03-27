@@ -24,47 +24,6 @@
         {% endfor %}
     {% endif %}
 
-    <!-- Card de Resumo acima da tabela -->
-    {% if lotes %}
-    <div class="card mb-4">
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="d-flex justify-content-between">
-                        <h5 class="card-title"><i class="bi bi-calculator me-2"></i>Resumo</h5>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h6 class="card-subtitle mb-2 text-muted">Total de Lotes</h6>
-                                    <h3 class="mb-0">{{ lotes|length }}</h3>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h6 class="card-subtitle mb-2 text-muted">Por Finalidade</h6>
-                                    <div class="small">
-                                        {% regroup lotes|dictsort:"finalidade" by finalidade as finalidades %}
-                                            {% for finalidade in finalidades %}
-                                                <div class="d-flex justify-content-between">
-                                                    <span>{{ finalidade.grouper|default:"Sem finalidade" }}:</span>
-                                                    <strong>{{ finalidade.list|length }}</strong>
-                                                </div>
-                                            {% endfor %}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
     <div class="card">
         <div class="card-body">
             {% if lotes %}
