@@ -164,6 +164,45 @@
     .input-group-append {
         display: flex;
     }
+    
+    /* Estilos para notificações */
+    .notificacao {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 10px 15px;
+        background-color: #f8f9fa;
+        border-left: 4px solid #007bff;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        border-radius: 4px;
+        z-index: 9999;
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity 0.3s, transform 0.3s;
+        font-size: 14px;
+        max-width: 300px;
+    }
+    
+    .notificacao.visivel {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    
+    .notificacao.info {
+        border-left-color: #007bff;
+    }
+    
+    .notificacao.success {
+        border-left-color: #28a745;
+    }
+    
+    .notificacao.warning {
+        border-left-color: #ffc107;
+    }
+    
+    .notificacao.error {
+        border-left-color: #dc3545;
+    }
 </style>
 
 <!-- Div para notificações temporárias -->
@@ -960,6 +999,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 pastoAbaixoSelect.value = pastoAbaixoValue;
             })
             .catch(error => console.error('Erro ao carregar pastos:', error));
+    }
+
+    // Função para mostrar notificações temporárias
+    function mostrarNotificacao(mensagem, tipo = 'info', duracao = 3000) {
+        // Criar elemento de notificação
+        const notificacao = document.createElement('div');
+        notificacao.className = `notificacao ${tipo}`;
+        notificacao.textContent = mensagem;
+        
+        // Adicionar ao corpo do documento
+        document.body.appendChild(notificacao);
+        
+        // Mostrar com animação
+        setTimeout(() => {
+            notificacao.classList.add('visivel');
+        }, 10);
+        
+        // Remover após a duração especificada
+        setTimeout(() => {
+            notificacao.classList.remove('visivel');
+            setTimeout(() => {
+                document.body.removeChild(notificacao);
+            }, 300); // Tempo da animação de saída
+        }, duracao);
     }
 
     // Funções para conexão Bluetooth
