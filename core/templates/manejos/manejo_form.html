@@ -989,7 +989,20 @@ document.addEventListener('DOMContentLoaded', function() {
             bastaoDevice = await navigator.bluetooth.requestDevice({
                 // Aceitar qualquer dispositivo Bluetooth disponível
                 acceptAllDevices: true,
-                optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e', 'battery_service', '0000180a-0000-1000-8000-00805f9b34fb', 'device_information']
+                // Incluir serviços SPP e outros comuns
+                optionalServices: [
+                    // Serviço UART padrão
+                    '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+                    // Serviço SPP (Serial Port Profile)
+                    '00001101-0000-1000-8000-00805f9b34fb',
+                    // Outros serviços comuns
+                    'battery_service',
+                    '0000180a-0000-1000-8000-00805f9b34fb',
+                    'device_information',
+                    // Serviços genéricos
+                    '00001800-0000-1000-8000-00805f9b34fb',
+                    '00001801-0000-1000-8000-00805f9b34fb'
+                ]
             });
             
             bastaoStatusDiv.textContent = "Conectando ao bastão...";
@@ -1010,28 +1023,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('Nenhum serviço disponível no dispositivo');
             }
             
-            // Tentar obter serviço UART primeiro
+            // Lista de serviços a tentar, em ordem de prioridade
+            const servicesToTry = [
+                // Serviço SPP (Serial Port Profile)
+                '00001101-0000-1000-8000-00805f9b34fb',
+                // Serviço UART padrão
+                '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+                // Outros serviços comuns
+                '0000180a-0000-1000-8000-00805f9b34fb',
+                'device_information'
+            ];
+            
+            // Tentar obter serviço em ordem de prioridade
             let service = null;
-            try {
-                service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
-                console.log('Serviço UART encontrado');
-            } catch (e) {
-                // Se não encontrar, tente outros serviços conhecidos
-                for (const serviceUuid of ['0000180a-0000-1000-8000-00805f9b34fb', 'device_information']) {
-                    try {
-                        service = await server.getPrimaryService(serviceUuid);
-                        console.log('Usando serviço alternativo:', serviceUuid);
-                        break;
-                    } catch (err) {
-                        console.log('Serviço não encontrado:', serviceUuid);
-                    }
+            
+            // Primeiro tenta os serviços conhecidos
+            for (const serviceUuid of servicesToTry) {
+                try {
+                    service = await server.getPrimaryService(serviceUuid);
+                    console.log('Serviço encontrado:', serviceUuid);
+                    break;
+                } catch (err) {
+                    console.log('Serviço não encontrado:', serviceUuid);
                 }
-                
-                // Se ainda não encontrou, use o primeiro serviço disponível
-                if (!service && services.length > 0) {
-                    service = services[0];
-                    console.log('Usando primeiro serviço disponível:', service.uuid);
-                }
+            }
+            
+            // Se não encontrou nenhum dos serviços conhecidos, usa o primeiro disponível
+            if (!service && services.length > 0) {
+                service = services[0];
+                console.log('Usando primeiro serviço disponível:', service.uuid);
             }
             
             if (!service) {
@@ -1054,15 +1074,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('Nenhuma característica disponível no serviço');
             }
             
+            // Lista de características a tentar para RX, em ordem de prioridade
+            const rxCharacteristicsToTry = [
+                // Característica RX UART padrão
+                '6e400003-b5a3-f393-e0a9-e50e24dcca9e',
+                // Característica SPP
+                '00001101-0000-1000-8000-00805f9b34fb'
+            ];
+            
             // Tentar encontrar uma característica que suporte notificações primeiro
             bastaoCharacteristic = null;
             
-            // Procurar por características UART RX primeiro
-            try {
-                bastaoCharacteristic = await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
-                console.log('Característica UART RX encontrada');
-            } catch (e) {
-                // Procurar por qualquer característica que suporte notificações
+            // Primeiro tenta as características conhecidas
+            for (const charUuid of rxCharacteristicsToTry) {
+                try {
+                    bastaoCharacteristic = await service.getCharacteristic(charUuid);
+                    console.log('Característica encontrada:', charUuid);
+                    break;
+                } catch (err) {
+                    console.log('Característica não encontrada:', charUuid);
+                }
+            }
+            
+            // Se não encontrou, procura por qualquer característica que suporte notificações
+            if (!bastaoCharacteristic) {
                 const notifyCharacteristics = characteristics.filter(
                     char => char.properties.notify || char.properties.indicate
                 );
