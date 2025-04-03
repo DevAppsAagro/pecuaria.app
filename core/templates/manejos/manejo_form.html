@@ -970,13 +970,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const bastaoStatusDiv = document.getElementById('bastaoStatus');
             bastaoStatusDiv.textContent = "Procurando dispositivos...";
             
-            // Solicitar dispositivo Bluetooth com serviço genérico de UART
+            // Solicitar dispositivo Bluetooth com opções mais abrangentes
             const bastaoDevice = await navigator.bluetooth.requestDevice({
-                // Aceitar qualquer dispositivo que anuncie um serviço genérico de UART
-                filters: [
-                    { services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] } // Serviço UART Nordic
-                ],
-                optionalServices: ['battery_service']
+                // Aceitar qualquer dispositivo Bluetooth disponível
+                acceptAllDevices: true,
+                optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e', 'battery_service', '0000180a-0000-1000-8000-00805f9b34fb']
             });
             
             bastaoStatusDiv.textContent = "Conectando ao bastão...";
@@ -989,21 +987,63 @@ document.addEventListener('DOMContentLoaded', function() {
             // Conectar ao GATT server
             const server = await bastaoDevice.gatt.connect();
             
-            // Obter serviço UART
-            const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+            // Tentar obter serviço UART
+            let service;
+            try {
+                service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+            } catch (e) {
+                // Se não encontrar o serviço UART específico, tente listar os serviços disponíveis
+                console.log('Serviço UART não encontrado, listando serviços disponíveis...');
+                const services = await server.getPrimaryServices();
+                if (services.length > 0) {
+                    service = services[0]; // Use o primeiro serviço disponível
+                    console.log('Usando serviço alternativo:', service.uuid);
+                } else {
+                    throw new Error('Nenhum serviço disponível no dispositivo');
+                }
+            }
             
-            // Obter características para RX (receber dados do bastão)
-            const bastaoCharacteristic = await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+            // Tentar obter características para RX
+            let bastaoCharacteristic;
+            try {
+                bastaoCharacteristic = await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+            } catch (e) {
+                // Se não encontrar a característica específica, tente listar as características disponíveis
+                console.log('Característica RX não encontrada, listando características disponíveis...');
+                const characteristics = await service.getCharacteristics();
+                if (characteristics.length > 0) {
+                    // Filtrar características que suportam notificações
+                    const notifyCharacteristics = characteristics.filter(
+                        char => char.properties.notify || char.properties.indicate
+                    );
+                    
+                    if (notifyCharacteristics.length > 0) {
+                        bastaoCharacteristic = notifyCharacteristics[0];
+                        console.log('Usando característica alternativa:', bastaoCharacteristic.uuid);
+                    } else if (characteristics.length > 0) {
+                        bastaoCharacteristic = characteristics[0];
+                        console.log('Usando primeira característica disponível:', bastaoCharacteristic.uuid);
+                    } else {
+                        throw new Error('Nenhuma característica disponível no serviço');
+                    }
+                } else {
+                    throw new Error('Nenhuma característica disponível no serviço');
+                }
+            }
             
-            // Iniciar notificações
-            await bastaoCharacteristic.startNotifications();
-            const bastaoNotificationsStarted = true;
-            
-            // Adicionar listener para receber dados
-            bastaoCharacteristic.addEventListener('characteristicvaluechanged', handleBastaoValueChanged);
-            
-            bastaoStatusDiv.textContent = "Conectado a " + bastaoDevice.name;
-            mostrarNotificacao("Bastão conectado com sucesso!");
+            // Iniciar notificações se a característica suportar
+            if (bastaoCharacteristic.properties.notify) {
+                await bastaoCharacteristic.startNotifications();
+                const bastaoNotificationsStarted = true;
+                
+                // Adicionar listener para receber dados
+                bastaoCharacteristic.addEventListener('characteristicvaluechanged', handleBastaoValueChanged);
+                
+                bastaoStatusDiv.textContent = "Conectado a " + bastaoDevice.name;
+                mostrarNotificacao("Bastão conectado com sucesso!");
+            } else {
+                throw new Error('A característica não suporta notificações');
+            }
             
         } catch (error) {
             console.error('Erro ao conectar ao bastão:', error);
@@ -1061,12 +1101,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const balancaStatusDiv = document.getElementById('balancaStatus');
             balancaStatusDiv.textContent = "Procurando balança...";
             
-            // Solicitar dispositivo Bluetooth com nome específico da balança
+            // Solicitar dispositivo Bluetooth com opções mais abrangentes
             const balancaDevice = await navigator.bluetooth.requestDevice({
+                // Primeiro tenta filtrar pelo nome específico da balança
                 filters: [
-                    { name: 'BTBOV3000' }
+                    { namePrefix: 'BT' }
                 ],
-                optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] // Serviço UART Nordic
+                // Se não encontrar, aceita qualquer dispositivo
+                optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e', 'battery_service', '0000180a-0000-1000-8000-00805f9b34fb']
             });
             
             balancaStatusDiv.textContent = "Conectando à balança...";
@@ -1079,24 +1121,66 @@ document.addEventListener('DOMContentLoaded', function() {
             // Conectar ao GATT server
             const server = await balancaDevice.gatt.connect();
             
-            // Obter serviço UART
-            const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+            // Tentar obter serviço UART
+            let service;
+            try {
+                service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+            } catch (e) {
+                // Se não encontrar o serviço UART específico, tente listar os serviços disponíveis
+                console.log('Serviço UART não encontrado, listando serviços disponíveis...');
+                const services = await server.getPrimaryServices();
+                if (services.length > 0) {
+                    service = services[0]; // Use o primeiro serviço disponível
+                    console.log('Usando serviço alternativo:', service.uuid);
+                } else {
+                    throw new Error('Nenhum serviço disponível no dispositivo');
+                }
+            }
             
-            // Obter características para RX (receber dados da balança)
-            const balancaCharacteristic = await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+            // Tentar obter características para RX
+            let balancaCharacteristic;
+            try {
+                balancaCharacteristic = await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+            } catch (e) {
+                // Se não encontrar a característica específica, tente listar as características disponíveis
+                console.log('Característica RX não encontrada, listando características disponíveis...');
+                const characteristics = await service.getCharacteristics();
+                if (characteristics.length > 0) {
+                    // Filtrar características que suportam notificações
+                    const notifyCharacteristics = characteristics.filter(
+                        char => char.properties.notify || char.properties.indicate
+                    );
+                    
+                    if (notifyCharacteristics.length > 0) {
+                        balancaCharacteristic = notifyCharacteristics[0];
+                        console.log('Usando característica alternativa:', balancaCharacteristic.uuid);
+                    } else if (characteristics.length > 0) {
+                        balancaCharacteristic = characteristics[0];
+                        console.log('Usando primeira característica disponível:', balancaCharacteristic.uuid);
+                    } else {
+                        throw new Error('Nenhuma característica disponível no serviço');
+                    }
+                } else {
+                    throw new Error('Nenhuma característica disponível no serviço');
+                }
+            }
             
-            // Iniciar notificações
-            await balancaCharacteristic.startNotifications();
-            const balancaNotificationsStarted = true;
-            
-            // Adicionar listener para receber dados
-            balancaCharacteristic.addEventListener('characteristicvaluechanged', handleBalancaValueChanged);
-            
-            balancaStatusDiv.textContent = "Conectado a " + balancaDevice.name;
-            mostrarNotificacao("Balança conectada com sucesso!");
-            
-            // Habilitar campo de peso
-            pesoInput.disabled = false;
+            // Iniciar notificações se a característica suportar
+            if (balancaCharacteristic.properties.notify) {
+                await balancaCharacteristic.startNotifications();
+                const balancaNotificationsStarted = true;
+                
+                // Adicionar listener para receber dados
+                balancaCharacteristic.addEventListener('characteristicvaluechanged', handleBalancaValueChanged);
+                
+                balancaStatusDiv.textContent = "Conectado a " + balancaDevice.name;
+                mostrarNotificacao("Balança conectada com sucesso!");
+                
+                // Habilitar campo de peso
+                pesoInput.disabled = false;
+            } else {
+                throw new Error('A característica não suporta notificações');
+            }
             
         } catch (error) {
             console.error('Erro ao conectar à balança:', error);
@@ -1111,7 +1195,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 2000);
         }
     }
-    
+
     // Função para tratar desconexão da balança
     function onBalancaDisconnected() {
         const balancaNotificationsStarted = false;
