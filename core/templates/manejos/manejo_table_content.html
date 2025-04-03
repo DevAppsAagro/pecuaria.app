@@ -1,0 +1,103 @@
+{% load static %}
+<div class="table-responsive">
+    <table class="table table-striped" id="manejoTable">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Animal</th>
+                <th>Tipo de Manejo</th>
+                <th>Peso (kg)</th>
+                <th>Insumo</th>
+                <th>Detalhes</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% comment %} Combinando manejos e pesagens do mesmo animal e data {% endcomment %}
+            {% for manejo in manejos %}
+                {% with pesagem_relacionada=manejo.pesagem_relacionada %}
+                <tr class="manejo-row">
+                    <td>{{ manejo.data|date:"d/m/Y" }}</td>
+                    <td>{{ manejo.animal.brinco_visual }}</td>
+                    <td>{{ manejo.tipo_manejo }}</td>
+                    <td>
+                        {% if pesagem_relacionada %}
+                            {{ pesagem_relacionada.peso|floatformat:3 }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ manejo.insumo }}</td>
+                    <td>
+                        {% if manejo.observacao %}
+                        <button type="button" class="btn btn-sm btn-info" 
+                                data-bs-toggle="tooltip" data-bs-placement="top" 
+                                title="{{ manejo.observacao }}">
+                            <i class="fas fa-info-circle"></i>
+                        </button>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-warning" 
+                                    data-id="{{ manejo.id }}" data-action="edit-manejo">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger" 
+                                    data-url="{% url 'manejo_delete' manejo.id %}" data-type="manejo" data-action="delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            {% if pesagem_relacionada %}
+                            <button type="button" class="btn btn-sm btn-warning" 
+                                    data-id="{{ pesagem_relacionada.id }}" data-action="edit-pesagem">
+                                <i class="fas fa-weight"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endwith %}
+            {% endfor %}
+            
+            {% comment %} Exibindo pesagens que não têm manejo relacionado {% endcomment %}
+            {% for pesagem in pesagens_sem_manejo %}
+            <tr class="pesagem-row">
+                <td>{{ pesagem.data|date:"d/m/Y" }}</td>
+                <td>{{ pesagem.animal.brinco_visual }}</td>
+                <td>Pesagem</td>
+                <td>{{ pesagem.peso|floatformat:3 }}</td>
+                <td>-</td>
+                <td>-</td>
+                <td>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-sm btn-warning" 
+                                data-id="{{ pesagem.id }}" data-action="edit-pesagem">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-danger" 
+                                data-url="{% url 'pesagem_delete' pesagem.id %}" data-type="pesagem" data-action="delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            
+            {% if not manejos and not pesagens_sem_manejo %}
+            <tr>
+                <td colspan="7" class="text-center">Nenhum manejo registrado</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    // Inicializa tooltips para os novos elementos carregados
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+</script>

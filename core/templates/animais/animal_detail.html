@@ -541,11 +541,13 @@
             {% endif %}
             
             <!-- Informações Reprodutivas -->
+            {% if manejos_reprodutivos or bezerros_organizados or animal.mae or animal.pai or estacao_origem %}
             <div class="row mt-4">
                 <div class="col-12">
                     <h6 class="text-muted mb-3">Informações Reprodutivas</h6>
                     
                     <!-- Informações de matriz -->
+                    {% if manejos_reprodutivos %}
                     <div class="row mb-4">
                         <div class="col-md-12">
                             <h6 class="text-muted">Histórico Reprodutivo</h6>
@@ -565,7 +567,6 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% if manejos_reprodutivos %}
                                         {% for manejo in manejos_reprodutivos %}
                                         <tr>
                                             <td>
@@ -602,21 +603,15 @@
                                             </td>
                                         </tr>
                                         {% endfor %}
-                                        {% else %}
-                                        <tr>
-                                            <td colspan="8" class="text-center">
-                                                <p class="text-muted my-2">Sem histórico reprodutivo registrado</p>
-                                                <a href="#" class="btn btn-sm btn-primary">Adicionar Manejo Reprodutivo</a>
-                                            </td>
-                                        </tr>
-                                        {% endif %}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                     
                     <!-- Bezerros nascidos por estação -->
+                    {% if bezerros_organizados %}
                     <div class="row mb-3">
                         <div class="col-12">
                             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -624,7 +619,6 @@
                                 <a href="#" class="btn btn-sm btn-primary">Registrar Bezerro</a>
                             </div>
                             
-                            {% if bezerros_organizados %}
                             <div class="accordion" id="accordionBezerros">
                                 {% for item in bezerros_organizados %}
                                 <div class="accordion-item">
@@ -680,14 +674,9 @@
                                 </div>
                                 {% endfor %}
                             </div>
-                            {% else %}
-                            <div class="alert alert-light text-center py-3">
-                                <p class="text-muted mb-2">Sem bezerros registrados</p>
-                                <small class="d-block text-muted mb-2">Registre os bezerros nascidos desta matriz para acompanhar seu desempenho reprodutivo</small>
-                            </div>
-                            {% endif %}
                         </div>
                     </div>
+                    {% endif %}
                     
                     <!-- Informações gerais de pais -->
                     {% if animal.mae or animal.pai or estacao_origem %}
@@ -733,6 +722,7 @@
                     {% endif %}
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>

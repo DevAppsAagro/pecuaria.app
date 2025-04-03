@@ -1,0 +1,1366 @@
+{% extends 'base.html' %}
+
+{% block extra_head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    /* Estilos para o mapa */
+    #map {
+        height: 400px;
+        width: 100%;
+        border-radius: 0.25rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    
+    /* Estilos para legenda */
+    .legenda {
+        padding: 0.75rem;
+        background: white;
+        border-radius: 0.25rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    
+    /* Estilo para labels dos pastos no mapa */
+    .pasto-label {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        font-weight: bold;
+        color: #333;
+        text-shadow: 1px 1px 1px #fff;
+    }
+    
+    /* Estilos compactos para botões e controles */
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    /* Notificações temporárias */
+    .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+    }
+    
+    /* Estilos para o dashboard */
+    .pasto-label {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        font-weight: bold;
+        color: #333;
+        font-size: 12px;
+        text-shadow: 
+            -1px -1px 0 #fff,
+            1px -1px 0 #fff,
+            -1px 1px 0 #fff,
+            1px 1px 0 #fff;
+    }
+    
+    /* Estilos para cards */
+    .card {
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        overflow: hidden;
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+    }
+    
+    .card-header {
+        font-weight: 600;
+    }
+    
+    /* Estilos para cards de contagem */
+    .card-count {
+        text-align: center;
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .card-count .card-body {
+        padding: 1.5rem 1rem;
+        z-index: 2;
+        position: relative;
+    }
+    
+    .card-count::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0.2;
+        z-index: 1;
+    }
+    
+    .card-count.active::before {
+        background-color: #4e73df;
+    }
+    
+    .card-count.sold::before {
+        background-color: #1cc88a;
+    }
+    
+    .card-count.slaughtered::before {
+        background-color: #36b9cc;
+    }
+    
+    .card-count.dead::before {
+        background-color: #e74a3b;
+    }
+    
+    .card-count .count-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Estilos para gráficos */
+    .chart-container {
+        position: relative;
+        height: 250px;
+        width: 100%;
+    }
+    
+    /* Cores para indicadores */
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+        color: white;
+    }
+    
+    .bg-gradient-success {
+        background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);
+        color: white;
+    }
+    
+    .bg-gradient-info {
+        background: linear-gradient(135deg, #36b9cc 0%, #258391 100%);
+        color: white;
+    }
+    
+    .bg-gradient-warning {
+        background: linear-gradient(135deg, #f6c23e 0%, #dda20a 100%);
+        color: white;
+    }
+    
+    .bg-gradient-danger {
+        background: linear-gradient(135deg, #e74a3b 0%, #be2617 100%);
+        color: white;
+    }
+    
+    /* Estilos gerais */
+    body {
+        font-family: 'Nunito', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-size: 0.9rem;
+    }
+    
+    /* Estilos para cards */
+    .card {
+        border-radius: 0.35rem;
+        box-shadow: 0 0.15rem 0.5rem rgba(0, 0, 0, 0.075);
+        transition: all 0.2s ease-in-out;
+    }
+    
+    .card:hover {
+        box-shadow: 0 0.3rem 0.8rem rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+    }
+    
+    .card-header {
+        font-weight: 600;
+    }
+    
+    /* Estilos para cards de contagem */
+    .card-count {
+        position: relative;
+        overflow: hidden;
+        border-radius: 0.35rem;
+    }
+    
+    .card-count .count-icon {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        font-size: 1.5rem;
+        opacity: 0.15;
+    }
+    
+    .card-count:hover .count-icon {
+        opacity: 0.25;
+        transform: scale(1.1);
+        transition: all 0.2s ease-in-out;
+    }
+    
+    /* Cores para os cards de status */
+    .card-status-active {
+        border-left: 4px solid #1cc88a;
+    }
+    
+    .card-status-sold {
+        border-left: 4px solid #4e73df;
+    }
+    
+    .card-status-slaughtered {
+        border-left: 4px solid #f6c23e;
+    }
+    
+    .card-status-dead {
+        border-left: 4px solid #e74a3b;
+    }
+    
+    /* Estilos para gráficos circulares */
+    .progress-circle {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .progress-circle svg {
+        transform: rotate(-90deg);
+    }
+    
+    .progress-circle-bar {
+        transition: stroke-dashoffset 0.5s ease-in-out;
+    }
+    
+    /* Gradientes para cabeçalhos */
+    .bg-gradient-primary {
+        background: linear-gradient(to right, #4e73df, #224abe);
+        color: white;
+    }
+    
+    .bg-gradient-success {
+        background: linear-gradient(to right, #1cc88a, #13855c);
+        color: white;
+    }
+    
+    .bg-gradient-info {
+        background: linear-gradient(to right, #36b9cc, #258391);
+        color: white;
+    }
+    
+    .bg-gradient-warning {
+        background: linear-gradient(to right, #f6c23e, #dda20a);
+        color: white;
+    }
+    
+    .bg-gradient-danger {
+        background: linear-gradient(to right, #e74a3b, #be2617);
+        color: white;
+    }
+    
+    /* Estilos para containers de gráficos */
+    .chart-container {
+        position: relative;
+        height: 220px;
+        width: 100%;
+    }
+    
+    /* Estilos para notificações */
+    #notification {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 9999;
+        max-width: 300px;
+    }
+    
+    /* Estilos responsivos para dispositivos móveis */
+    @media (max-width: 768px) {
+        .card-body {
+            padding: 0.75rem;
+        }
+        
+        h3 {
+            font-size: 1.5rem;
+        }
+        
+        .chart-container {
+            height: 180px;
+        }
+        
+        .progress-circle svg {
+            width: 80px;
+            height: 80px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="fas fa-tachometer-alt me-2"></i>Dashboard</h4>
+        <span class="text-muted small">Atualizado: <span id="timestamp">{{ timestamp }}</span></span>
+    </div>
+    
+    <!-- Filtros -->
+    <div class="card mb-3">
+        <div class="card-body p-2">
+            <form id="filterForm" class="row g-2">
+                <div class="col-md-4">
+                    <label for="fazenda" class="form-label small mb-1">Fazenda</label>
+                    <select id="fazenda" class="form-select form-select-sm">
+                        <option value="">Todas as Fazendas</option>
+                        {% for fazenda in fazendas %}
+                            <option value="{{ fazenda.id }}">{{ fazenda.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="periodo" class="form-label small mb-1">Período</label>
+                    <select id="periodo" class="form-select form-select-sm">
+                        <option value="30">Últimos 30 dias</option>
+                        <option value="90">Últimos 3 meses</option>
+                        <option value="180">Últimos 6 meses</option>
+                        <option value="365">Últimos 12 meses</option>
+                        <option value="0">Todo o período</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="button" id="btnFiltrar" class="btn btn-primary btn-sm w-100">
+                        <i class="fas fa-filter me-1"></i>Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Contagem de Animais -->
+    <div class="row mb-3">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total de Animais</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="total-animais">{{ contagem_animais.total }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-cow fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Ativos</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="animais-ativos">{{ contagem_animais.ativos }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Vendidos</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="animais-vendidos">{{ contagem_animais.vendidos }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Abatidos</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="animais-abatidos">{{ contagem_animais.abatidos }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-skull fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Seção de Mapa -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold text-primary">Mapa de Pastos</h6>
+            <div class="dropdown no-arrow">
+                <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                </a>
+                <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="dropdownMenuLink">
+                    <div class="dropdown-header">Opções:</div>
+                    <a class="dropdown-item" href="#" id="btn-atualizar-mapa">Atualizar Mapa</a>
+                    <a class="dropdown-item" href="#" id="btn-mostrar-todos">Mostrar Todos</a>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div id="map" style="height: 400px; width: 100%; border-radius: 0.25rem;"></div>
+            <div class="mt-3">
+                <div class="legenda">
+                    <h6 class="font-weight-bold">Legenda</h6>
+                    <div id="legenda-pastos"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Seção Financeira -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-gradient-primary py-2 px-3">
+                    <h5 class="mb-0 text-white"><i class="fas fa-dollar-sign me-2"></i>Financeiro</h5>
+                </div>
+                <div class="card-body p-2">
+                    <!-- Cards de resumo financeiro -->
+                    <div class="row mb-3">
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card border-left-primary shadow h-100 py-2">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                                Saldo Total</div>
+                                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="saldo-total">R$ {{ dados_financeiros.saldo_total|floatformat:2 }}</div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-wallet fa-2x text-gray-300"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card border-left-success shadow h-100 py-2">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                                Receitas</div>
+                                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="total-receitas">R$ {{ dados_financeiros.total_receitas|floatformat:2 }}</div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-arrow-up fa-2x text-gray-300"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card border-left-danger shadow h-100 py-2">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                                Despesas</div>
+                                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="total-despesas">R$ {{ dados_financeiros.total_despesas|floatformat:2 }}</div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-arrow-down fa-2x text-gray-300"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card border-left-info shadow h-100 py-2">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                                Resultado</div>
+                                            <div class="h5 mb-0 font-weight-bold {% if dados_financeiros.resultado >= 0 %}text-success{% else %}text-danger{% endif %}" id="resultado">R$ {{ dados_financeiros.resultado|floatformat:2 }}</div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-calculator fa-2x text-gray-300"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Gráficos financeiros -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-gradient-info py-1 px-3">
+                                    <h6 class="mb-0 text-white"><i class="fas fa-chart-line me-1"></i>Entradas e Saídas</h6>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="chart-container" style="height: 220px;">
+                                        <canvas id="graficoEntradasSaidas"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-gradient-warning py-1 px-3">
+                                    <h6 class="mb-0 text-white"><i class="fas fa-chart-pie me-1"></i>Categorias de Custo</h6>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div class="chart-container" style="height: 220px;">
+                                        <canvas id="graficoCategorias"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Indicadores Globais -->
+    <div class="row">
+        <!-- GMD -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">GMD (kg/dia)</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <div class="progress-circle" id="progresso-gmd"></div>
+                        </div>
+                        <div class="col-md-6 text-center">
+                            <h2 class="font-weight-bold text-primary" id="valor-gmd">{{ indicadores_globais.gmd|floatformat:3 }}</h2>
+                            <p class="text-muted">Ganho Médio Diário</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Produção por Hectare -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-success">Produção por Hectare (kg/ha)</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <div class="progress-circle" id="progresso-prod-hectare"></div>
+                        </div>
+                        <div class="col-md-6 text-center">
+                            <h2 class="font-weight-bold text-success" id="valor-prod-hectare">{{ indicadores_globais.producao_hectare|floatformat:2 }}</h2>
+                            <p class="text-muted">Produção por Hectare</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Dados de Pesagem -->
+    <div class="row">
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Última Pesagem</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="ultima-pesagem">{{ dados_pesagem.ultima_data|default:'-' }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Peso Médio</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="peso-medio">{% if dados_pesagem.peso_medio %}{{ dados_pesagem.peso_medio|floatformat:2 }} kg{% else %}0 kg{% endif %}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-weight fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Animais Pesados</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="total-pesado">{{ dados_pesagem.total_pesado }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-list-ol fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Distribuição por Lotes e Pastos -->
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-gradient-primary py-2 px-3">
+                    <h5 class="mb-0 text-white"><i class="fas fa-layer-group me-2"></i>Distribuição por Lotes</h5>
+                </div>
+                <div class="card-body p-2">
+                    <div class="chart-container" style="height: 220px;">
+                        <canvas id="graficoLotes"></canvas>
+                    </div>
+                    <div id="semDadosLotes" class="text-center py-3 d-none">
+                        <p class="text-muted mb-0">Não há dados de lotes disponíveis.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-gradient-warning py-2 px-3">
+                    <h5 class="mb-0 text-white"><i class="fas fa-map me-2"></i>Distribuição por Pastos</h5>
+                </div>
+                <div class="card-body p-2">
+                    <div class="chart-container" style="height: 220px;">
+                        <canvas id="graficoPastos"></canvas>
+                    </div>
+                    <div id="semDadosPastos" class="text-center py-3 d-none">
+                        <p class="text-muted mb-0">Não há dados de pastos disponíveis.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Log de Depuração -->
+    <div class="card mb-3">
+        <div class="card-header py-1 px-2">
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="small">Log</span>
+                <button id="btnLimparLog" class="btn btn-sm btn-outline-secondary py-0 px-1">Limpar</button>
+            </div>
+        </div>
+        <div class="card-body p-2">
+            <div id="logArea" style="max-height: 150px; overflow-y: auto; font-family: monospace; font-size: 11px;"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // Configurações para os gráficos
+    function configurarChartJS() {
+        // Verificar se Chart.defaults.global existe (versão antiga do Chart.js)
+        if (Chart.defaults.global) {
+            Chart.defaults.global.defaultFontFamily = "'Nunito', 'Helvetica', 'Arial', sans-serif";
+            Chart.defaults.global.defaultFontColor = '#858796';
+            Chart.defaults.global.defaultFontSize = 11;
+            Chart.defaults.global.responsive = true;
+            Chart.defaults.global.maintainAspectRatio = false;
+        } 
+        // Verificar se Chart.defaults.font existe (versão mais recente do Chart.js)
+        else if (Chart.defaults.font) {
+            Chart.defaults.font.family = "'Nunito', 'Helvetica', 'Arial', sans-serif";
+            Chart.defaults.font.size = 11;
+            Chart.defaults.color = '#858796';
+            Chart.defaults.responsive = true;
+            Chart.defaults.maintainAspectRatio = false;
+        }
+    }
+    
+    // Variáveis globais
+    let graficoLotes = null;
+    let graficoPastos = null;
+    let graficoFinanceiro = null;
+    let map = null;
+    let pastosLayer = null;
+    let atualizacaoAutomatica = true;
+    let intervaloAtualizacao = null;
+    
+    // Função para inicializar o mapa
+    function inicializarMapa() {
+        // Verificar se o mapa já foi inicializado
+        if (map) {
+            map.remove();
+        }
+        
+        // Inicializar o mapa
+        map = L.map('map', {
+            center: [-15.7801, -47.9292], // Centro do Brasil (Brasília)
+            zoom: 5
+        });
+        
+        // Adicionar camada de tiles (OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        
+        // Criar camada para os pastos
+        pastosLayer = L.featureGroup().addTo(map);
+        
+        // Carregar dados dos pastos
+        carregarDadosPastos();
+    }
+    
+    // Função para carregar dados dos pastos
+    function carregarDadosPastos() {
+        registrarLog('Carregando dados dos pastos...');
+        
+        // Obter ID da fazenda selecionada
+        const fazendaId = document.getElementById('filtro-fazenda').value;
+        
+        // Fazer requisição AJAX para obter dados dos pastos
+        fetch(`/api/pastos/?fazenda_id=${fazendaId || ''}`)
+            .then(response => response.json())
+            .then(data => {
+                registrarLog(`Dados dos pastos carregados: ${data.length} pastos encontrados`);
+                desenharPastos(data);
+            })
+            .catch(error => {
+                console.error('Erro ao carregar dados dos pastos:', error);
+                registrarLog(`Erro ao carregar dados dos pastos: ${error.message}`);
+            });
+    }
+    
+    // Função para desenhar os pastos no mapa
+    function desenharPastos(pastos) {
+        // Limpar camada de pastos
+        pastosLayer.clearLayers();
+        
+        // Verificar se há pastos
+        if (!pastos || pastos.length === 0) {
+            registrarLog('Nenhum pasto encontrado para exibir no mapa');
+            return;
+        }
+        
+        // Objeto para armazenar cores das fazendas
+        const coresFazendas = {};
+        
+        // Gerar cores para as fazendas
+        pastos.forEach(pasto => {
+            if (!coresFazendas[pasto.fazenda_id]) {
+                // Gerar cor baseada no ID da fazenda
+                coresFazendas[pasto.fazenda_id] = `#${Math.floor(Math.random()*16777215).toString(16)}`;
+            }
+        });
+        
+        // Desenhar cada pasto
+        pastos.forEach(pasto => {
+            try {
+                // Verificar se temos coordenadas válidas
+                if (!pasto.coordenadas || !Array.isArray(pasto.coordenadas) || pasto.coordenadas.length === 0) {
+                    registrarLog(`Pasto sem coordenadas: ${pasto.id_pasto}`);
+                    return;
+                }
+                
+                // Cor do polígono baseada na fazenda
+                const cor = coresFazendas[pasto.fazenda_id] || '#3388ff';
+                
+                // Criar polígono com os pontos
+                const polygon = L.polygon(pasto.coordenadas, {
+                    color: cor,
+                    fillColor: cor,
+                    fillOpacity: 0.5,
+                    weight: 2
+                }).addTo(pastosLayer);
+                
+                // Adicionar popup
+                polygon.bindPopup(`
+                    <strong>${pasto.fazenda_nome}</strong><br>
+                    Nome: ${pasto.nome || 'Sem nome'}<br>
+                    ID do Pasto: ${pasto.id_pasto}<br>
+                    Área: ${pasto.area.toFixed(2)} ha<br>
+                    ${pasto.capacidade_ua ? 'Capacidade: ' + pasto.capacidade_ua.toFixed(2) + ' UA/ha<br>' : ''}
+                    ${pasto.variedade_capim ? 'Capim: ' + pasto.variedade_capim : ''}
+                `);
+                
+                // Adicionar label
+                if (pasto.nome) {
+                    const center = polygon.getBounds().getCenter();
+                    L.marker(center, {
+                        icon: L.divIcon({
+                            className: 'pasto-label',
+                            html: pasto.nome,
+                            iconSize: [100, 20],
+                            iconAnchor: [50, 10]
+                        })
+                    }).addTo(pastosLayer);
+                }
+            } catch (error) {
+                console.error('Erro ao desenhar pasto:', error, pasto);
+                registrarLog(`Erro ao desenhar pasto ${pasto.id_pasto}: ${error.message}`);
+            }
+        });
+        
+        // Ajustar o zoom do mapa para mostrar todos os pastos
+        if (pastosLayer.getLayers().length > 0) {
+            map.fitBounds(pastosLayer.getBounds(), { padding: [20, 20] });
+        }
+        
+        // Criar legenda
+        criarLegendaPastos(pastos, coresFazendas);
+    }
+    
+    // Função para criar legenda dos pastos
+    function criarLegendaPastos(pastos, coresFazendas) {
+        const legendaElement = document.getElementById('legenda-pastos');
+        if (!legendaElement) return;
+        
+        let legendaHtml = '';
+        const fazendas = {};
+        
+        // Coletar informações das fazendas
+        pastos.forEach(pasto => {
+            if (!fazendas[pasto.fazenda_id]) {
+                fazendas[pasto.fazenda_id] = {
+                    nome: pasto.fazenda_nome,
+                    cor: coresFazendas[pasto.fazenda_id]
+                };
+            }
+        });
+        
+        // Criar HTML da legenda
+        for (const id in fazendas) {
+            legendaHtml += `
+                <div class="d-flex align-items-center mb-1">
+                    <div style="width: 16px; height: 16px; background-color: ${fazendas[id].cor}; margin-right: 8px; border-radius: 2px;"></div>
+                    <div>${fazendas[id].nome}</div>
+                </div>
+            `;
+        }
+        
+        // Atualizar legenda
+        legendaElement.innerHTML = legendaHtml;
+    }
+    
+    // Chamar a função de configuração quando o documento estiver pronto
+    document.addEventListener('DOMContentLoaded', function() {
+        configurarChartJS();
+        
+        // Carregar dados iniciais dos gráficos
+        try {
+            // Usar JSON.parse para converter as strings JSON em objetos JavaScript
+            window.dadosLotes = JSON.parse('{{ distribuicao_lotes|escapejs }}');
+            window.dadosPastos = JSON.parse('{{ distribuicao_pastos|escapejs }}');
+            
+            console.log("Dados iniciais carregados:", {
+                lotes: window.dadosLotes,
+                pastos: window.dadosPastos
+            });
+            
+            // Converter valores para números
+            const valorGmd = parseFloat('{{ indicadores_globais.gmd|default:0|escapejs }}');
+            const valorProdHectare = parseFloat('{{ indicadores_globais.producao_hectare|default:0|escapejs }}');
+            
+            inicializarProgressoCircular('progresso-gmd', valorGmd, 1.5, '#4e73df'); // 1.5 kg/dia como referência máxima
+            inicializarProgressoCircular('progresso-prod-hectare', valorProdHectare, 1000, '#1cc88a'); // 1000 kg/ha como referência máxima
+            
+            // Inicializar gráficos com dados iniciais
+            inicializarGraficos();
+            
+            // Inicializar mapa
+            inicializarMapa();
+            
+            registrarLog('Gráficos e mapa inicializados com sucesso');
+        } catch (erro) {
+            console.error('Erro ao inicializar gráficos e mapa:', erro);
+            registrarLog(`Erro ao inicializar gráficos e mapa: ${erro.message}`);
+        }
+    });
+    
+    // Função para inicializar os gráficos
+    function inicializarGraficos() {
+        console.log("Inicializando gráficos...");
+        
+        // Verificar se os elementos existem
+        const canvasLotes = document.getElementById('graficoLotes');
+        const canvasPastos = document.getElementById('graficoPastos');
+        
+        if (!canvasLotes || !canvasPastos) {
+            console.error("Elementos de canvas não encontrados");
+            return;
+        }
+        
+        // Verificar se os dados estão disponíveis
+        if (!window.dadosLotes || !window.dadosPastos) {
+            console.error("Dados dos gráficos não disponíveis");
+            return;
+        }
+        
+        console.log("Dados dos lotes:", window.dadosLotes);
+        console.log("Dados dos pastos:", window.dadosPastos);
+        
+        // Gráfico de distribuição por lotes
+        const ctxLotes = canvasLotes.getContext('2d');
+        if (graficoLotes) {
+            graficoLotes.destroy();
+        }
+        
+        if (window.dadosLotes && window.dadosLotes.length > 0) {
+            graficoLotes = new Chart(ctxLotes, {
+                type: 'pie',
+                data: {
+                    labels: window.dadosLotes.map(item => item.nome),
+                    datasets: [{
+                        data: window.dadosLotes.map(item => item.quantidade),
+                        backgroundColor: window.dadosLotes.map(item => item.cor),
+                        hoverBorderColor: '#ffffff',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                boxWidth: 12
+                            }
+                        }
+                    }
+                }
+            });
+            console.log("Gráfico de lotes inicializado");
+        } else {
+            console.warn("Sem dados para o gráfico de lotes");
+        }
+        
+        // Gráfico de distribuição por pastos
+        const ctxPastos = canvasPastos.getContext('2d');
+        if (graficoPastos) {
+            graficoPastos.destroy();
+        }
+        
+        if (window.dadosPastos && window.dadosPastos.length > 0) {
+            graficoPastos = new Chart(ctxPastos, {
+                type: 'pie',
+                data: {
+                    labels: window.dadosPastos.map(item => item.nome),
+                    datasets: [{
+                        data: window.dadosPastos.map(item => item.quantidade),
+                        backgroundColor: window.dadosPastos.map(item => item.cor),
+                        hoverBorderColor: '#ffffff',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                boxWidth: 12
+                            }
+                        }
+                    }
+                }
+            });
+            console.log("Gráfico de pastos inicializado");
+        } else {
+            console.warn("Sem dados para o gráfico de pastos");
+        }
+    }
+    
+    // Função para formatar valores monetários
+    function formatarMoeda(valor) {
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+    }
+    
+    // Função para formatar números com casas decimais
+    function formatarNumero(valor, casas = 2) {
+        return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas }).format(valor);
+    }
+    
+    // Função para atualizar os indicadores circulares
+    function atualizarProgressoCircular(elementoId, valor, valorMaximo, cor) {
+        const elemento = document.getElementById(elementoId);
+        if (!elemento) return;
+        
+        const circulo = elemento.querySelector('.progress-circle-bar');
+        const texto = elemento.querySelector('.progress-circle-value');
+        
+        if (!circulo || !texto) return;
+        
+        const porcentagem = Math.min(100, Math.max(0, (valor / valorMaximo) * 100));
+        const circunferencia = 2 * Math.PI * 54; // 2πr, onde r=54
+        const offset = circunferencia - (porcentagem / 100) * circunferencia;
+        
+        circulo.style.strokeDasharray = circunferencia;
+        circulo.style.strokeDashoffset = offset;
+        texto.textContent = `${Math.round(porcentagem)}%`;
+    }
+    
+    // Função para criar ou atualizar o gráfico de lotes
+    function atualizarGraficoLotes(dados) {
+        const ctx = document.getElementById('graficoLotes').getContext('2d');
+        
+        if (graficoLotes) {
+            graficoLotes.destroy();
+        }
+        
+        if (!dados || dados.length === 0) {
+            document.getElementById('semDadosLotes').classList.remove('d-none');
+            return;
+        }
+        
+        document.getElementById('semDadosLotes').classList.add('d-none');
+        
+        const labels = dados.map(item => item.nome);
+        const valores = dados.map(item => item.quantidade);
+        const cores = [
+            '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
+            '#6f42c1', '#fd7e14', '#20c9a6', '#5a5c69', '#858796'
+        ];
+        
+        graficoLotes = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: valores,
+                    backgroundColor: cores.slice(0, valores.length),
+                    hoverBackgroundColor: cores.slice(0, valores.length).map(cor => {
+                        return cor.replace('rgb', 'rgba').replace(')', ', 0.8)');
+                    }),
+                    hoverBorderColor: "rgba(234, 236, 244, 1)",
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                tooltips: {
+                    backgroundColor: "rgb(255,255,255)",
+                    bodyFontColor: "#858796",
+                    borderColor: '#dddfeb',
+                    borderWidth: 1,
+                    xPadding: 15,
+                    yPadding: 15,
+                    displayColors: false,
+                    caretPadding: 10,
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            const label = data.labels[tooltipItem.index];
+                            const value = data.datasets[0].data[tooltipItem.index];
+                            return `${label}: ${value} animais`;
+                        }
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 10
+                    }
+                },
+                cutoutPercentage: 70,
+            }
+        });
+    }
+    
+    // Função para criar ou atualizar o gráfico de pastos
+    function atualizarGraficoPastos(dados) {
+        const ctx = document.getElementById('graficoPastos').getContext('2d');
+        
+        if (graficoPastos) {
+            graficoPastos.destroy();
+        }
+        
+        if (!dados || dados.length === 0) {
+            document.getElementById('semDadosPastos').classList.remove('d-none');
+            return;
+        }
+        
+        document.getElementById('semDadosPastos').classList.add('d-none');
+        
+        const labels = dados.map(item => item.nome);
+        const valores = dados.map(item => item.quantidade);
+        const cores = [
+            '#1cc88a', '#4e73df', '#36b9cc', '#f6c23e', '#e74a3b',
+            '#6f42c1', '#fd7e14', '#20c9a6', '#5a5c69', '#858796'
+        ];
+        
+        graficoPastos = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: valores,
+                    backgroundColor: cores.slice(0, valores.length),
+                    hoverBackgroundColor: cores.slice(0, valores.length).map(cor => {
+                        return cor.replace('rgb', 'rgba').replace(')', ', 0.8)');
+                    }),
+                    hoverBorderColor: "rgba(234, 236, 244, 1)",
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                tooltips: {
+                    backgroundColor: "rgb(255,255,255)",
+                    bodyFontColor: "#858796",
+                    borderColor: '#dddfeb',
+                    borderWidth: 1,
+                    xPadding: 15,
+                    yPadding: 15,
+                    displayColors: false,
+                    caretPadding: 10,
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            const label = data.labels[tooltipItem.index];
+                            const value = data.datasets[0].data[tooltipItem.index];
+                            return `${label}: ${value} animais`;
+                        }
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 10
+                    }
+                },
+                cutoutPercentage: 70,
+            }
+        });
+    }
+    
+    // Função para mostrar notificação temporária
+    function mostrarNotificacao(mensagem, tipo = 'info') {
+        const notificacao = document.getElementById('notification');
+        if (!notificacao) return;
+        
+        notificacao.innerHTML = `
+            <div class="alert alert-${tipo} alert-dismissible fade show shadow-sm" role="alert">
+                ${mensagem}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        `;
+        
+        // Esconder a notificação após 5 segundos
+        setTimeout(() => {
+            const alerta = notificacao.querySelector('.alert');
+            if (alerta) {
+                alerta.classList.remove('show');
+                setTimeout(() => {
+                    notificacao.innerHTML = '';
+                }, 150);
+            }
+        }, 5000);
+    }
+    
+    // Função para registrar log no console
+    function registrarLog(mensagem) {
+        console.log(`[${new Date().toLocaleTimeString()}] ${mensagem}`);
+        
+        const logElement = document.getElementById('log-eventos');
+        if (logElement) {
+            const novoItem = document.createElement('div');
+            novoItem.className = 'log-item';
+            novoItem.innerHTML = `<small><i class="fas fa-clock mr-1"></i>${new Date().toLocaleTimeString()}</small> ${mensagem}`;
+            
+            // Adicionar no início da lista
+            logElement.insertBefore(novoItem, logElement.firstChild);
+            
+            // Limitar a 20 itens
+            if (logElement.children.length > 20) {
+                logElement.removeChild(logElement.lastChild);
+            }
+        }
+    }
+    
+    // Função principal para atualizar o dashboard
+    function atualizarDashboard() {
+        registrarLog('Iniciando atualização do dashboard...');
+        
+        // Fazer requisição AJAX para obter os dados
+        fetch('{% url "obter_dados_dashboard_simples" %}')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro ao obter dados do dashboard');
+                }
+                return response.json();
+            })
+            .then(dados => {
+                registrarLog('Dados recebidos com sucesso');
+                
+                // Atualizar contadores de animais
+                if (dados.contagem_animais) {
+                    document.getElementById('total-animais').textContent = dados.contagem_animais.total || 0;
+                    document.getElementById('animais-ativos').textContent = dados.contagem_animais.ativos || 0;
+                    document.getElementById('animais-vendidos').textContent = dados.contagem_animais.vendidos || 0;
+                    document.getElementById('animais-abatidos').textContent = dados.contagem_animais.abatidos || 0;
+                    document.getElementById('animais-mortos').textContent = dados.contagem_animais.mortos || 0;
+                }
+                
+                // Atualizar gráficos de distribuição
+                if (dados.distribuicao_lotes) {
+                    atualizarGraficoLotes(dados.distribuicao_lotes);
+                }
+                
+                if (dados.distribuicao_pastos) {
+                    atualizarGraficoPastos(dados.distribuicao_pastos);
+                }
+                
+                // Atualizar dados financeiros
+                if (dados.dados_financeiros) {
+                    document.getElementById('saldo-total').textContent = formatarMoeda(dados.dados_financeiros.saldo_total || 0);
+                    document.getElementById('total-receitas').textContent = formatarMoeda(dados.dados_financeiros.total_receitas || 0);
+                    document.getElementById('total-despesas').textContent = formatarMoeda(dados.dados_financeiros.total_despesas || 0);
+                    document.getElementById('resultado').textContent = formatarMoeda(dados.dados_financeiros.resultado || 0);
+                    
+                    // Atualizar classe baseado no valor do resultado
+                    const resultadoElement = document.getElementById('resultado');
+                    if (resultadoElement) {
+                        if (dados.dados_financeiros.resultado >= 0) {
+                            resultadoElement.classList.remove('text-danger');
+                            resultadoElement.classList.add('text-success');
+                        } else {
+                            resultadoElement.classList.remove('text-success');
+                            resultadoElement.classList.add('text-danger');
+                        }
+                    }
+                }
+                
+                // Atualizar indicadores globais
+                if (dados.indicadores_globais) {
+                    const valorGmd = dados.indicadores_globais.gmd || 0;
+                    document.getElementById('valor-gmd').textContent = formatarNumero(valorGmd, 3);
+                    atualizarProgressoCircular('progresso-gmd', valorGmd, 1.5, '#4e73df'); // 1.5 kg/dia como referência máxima
+                    
+                    const valorProdHectare = dados.indicadores_globais.producao_hectare || 0;
+                    document.getElementById('valor-prod-hectare').textContent = formatarNumero(valorProdHectare, 2);
+                    atualizarProgressoCircular('progresso-prod-hectare', valorProdHectare, 1000, '#1cc88a'); // 1000 kg/ha como referência máxima
+                }
+                
+                // Atualizar dados de pesagem
+                if (dados.dados_pesagem) {
+                    document.getElementById('ultima-pesagem').textContent = dados.dados_pesagem.ultima_data || '-';
+                    document.getElementById('peso-medio').textContent = dados.dados_pesagem.peso_medio ? `${formatarNumero(dados.dados_pesagem.peso_medio)} kg` : '0 kg';
+                    document.getElementById('total-pesado').textContent = dados.dados_pesagem.total_pesado || '0';
+                }
+                
+                // Atualizar timestamp da última atualização
+                ultimaAtualizacao = new Date();
+                document.getElementById('ultima-atualizacao').textContent = ultimaAtualizacao.toLocaleTimeString();
+                
+                registrarLog('Dashboard atualizado com sucesso');
+            })
+            .catch(erro => {
+                console.error('Erro ao atualizar dashboard:', erro);
+                registrarLog(`Erro ao atualizar dashboard: ${erro.message}`);
+                mostrarNotificacao(`Erro ao atualizar dashboard: ${erro.message}`, 'danger');
+            });
+    }
+    
+    // Configurar atualização automática a cada 5 minutos
+    document.addEventListener('DOMContentLoaded', function() {
+        // Configurar intervalo de atualização
+        intervaloAtualizacao = setInterval(() => {
+            if (atualizacaoAutomatica) {
+                registrarLog('Executando atualização automática...');
+                atualizarDashboard();
+            }
+        }, 300000); // 5 minutos
+        
+        // Configurar Chart.js
+    });
+    
+    // Função para atualizar os dados via AJAX
+    function atualizarDados() {
+        fetch('/dashboard/dados-simples/')
+            .then(response => response.json())
+            .then(data => {
+                // Atualizar contadores
+                document.getElementById('total-animais').textContent = data.total_animais;
+                document.getElementById('animais-ativos').textContent = data.animais_ativos;
+                document.getElementById('animais-vendidos').textContent = data.animais_vendidos;
+                document.getElementById('animais-abatidos').textContent = data.animais_abatidos;
+                document.getElementById('animais-mortos').textContent = data.animais_mortos;
+                
+                // Atualizar gráficos
+                atualizarGraficoLotes(data.distribuicao_lotes);
+                atualizarGraficoPastos(data.distribuicao_pastos);
+                
+                // Atualizar timestamp
+                document.getElementById('timestamp').textContent = new Date().toLocaleString();
+                
+                // Mostrar notificação
+                exibirNotificacao('Dashboard atualizado com sucesso', 'success');
+            })
+            .catch(error => {
+                console.error('Erro ao atualizar dados:', error);
+                exibirNotificacao('Erro ao atualizar dados', 'danger');
+            });
+    }
+    
+    // Função para exibir notificação temporária
+    function exibirNotificacao(mensagem, tipo) {
+        // Criar elemento de notificação
+        const notificacao = document.createElement('div');
+        notificacao.className = `alert alert-${tipo} alert-dismissible fade show`;
+        notificacao.innerHTML = `
+            ${mensagem}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+        `;
+        
+        // Adicionar ao container de notificações
+        const container = document.getElementById('notificacoes');
+        if (container) {
+            container.appendChild(notificacao);
+            
+            // Remover após 5 segundos
+            setTimeout(() => {
+                notificacao.classList.remove('show');
+                setTimeout(() => {
+                    container.removeChild(notificacao);
+                }, 150);
+            }, 5000);
+        }
+    }
+</script>
+{% endblock %}

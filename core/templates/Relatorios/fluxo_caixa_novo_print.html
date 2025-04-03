@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluxo de Caixa - Impressão</title>
+    <style>
+        /* Reset básico */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        /* Configurações básicas */
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            background: white;
+            padding: 20px;
+            font-size: 12px;
+        }
+        
+        /* Cabeçalho */
+        header {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo-container {
+            width: 100px;
+            height: 100px;
+            margin-right: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .logo-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        .header-info {
+            flex: 1;
+        }
+        
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        
+        p {
+            margin: 5px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        
+        .text-end {
+            text-align: right;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .fw-bold {
+            font-weight: bold;
+        }
+        
+        .bg-header {
+            background-color: #e9ecef;
+        }
+        
+        .bg-success {
+            background-color: #d4edda;
+        }
+        
+        .bg-danger {
+            background-color: #f8d7da;
+        }
+        
+        .bg-info {
+            background-color: #d1ecf1;
+        }
+        
+        .text-success {
+            color: #28a745;
+        }
+        
+        .text-danger {
+            color: #dc3545;
+        }
+        
+        .ps-3 {
+            padding-left: 15px;
+        }
+        
+        .ps-4 {
+            padding-left: 25px;
+        }
+        
+        .sticky-col {
+            position: sticky;
+            left: 0;
+            background-color: #fff;
+            z-index: 1;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 10px;
+            color: #6c757d;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+        
+        @media print {
+            body {
+                padding: 0;
+                margin: 1cm;
+            }
+            
+            table {
+                page-break-inside: auto;
+            }
+            
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+            
+            thead {
+                display: table-header-group;
+            }
+            
+            tfoot {
+                display: table-footer-group;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Cabeçalho -->
+    <header>
+        <div class="logo-container">
+            {% if fazenda_selecionada.logo %}
+                <img src="{{ fazenda_selecionada.logo.url }}" alt="Logo da Fazenda">
+            {% else %}
+                <div style="width: 100px; height: 100px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; border: 1px solid #ddd;">
+                    <span style="font-size: 10px; color: #999;">Sem logo</span>
+                </div>
+            {% endif %}
+        </div>
+        <div class="header-info">
+            <h1>FLUXO DE CAIXA</h1>
+            <p>Período: {{ filtros.mes_ano }} (12 meses)</p>
+            {% if fazenda_selecionada %}
+            <p>Fazenda: {{ fazenda_selecionada.nome }}</p>
+            {% else %}
+            <p>Todas as Fazendas</p>
+            {% endif %}
+            <p>Data de Emissão: {% now "d/m/Y H:i" %}</p>
+        </div>
+    </header>
+
+    <table>
+        <thead>
+            <tr>
+                <th class="sticky-col">Descrição</th>
+                {% for mes in dados_fluxo.meses %}
+                <th class="text-center">{{ mes.nome }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Saldo Inicial -->
+            <tr class="bg-header">
+                <td class="fw-bold sticky-col">1. SALDO INICIAL</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                <td class="text-end fw-bold">R$ {{ dados_mes|get_dict_item:'saldo_inicial'|floatformat:2 }}</td>
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Entradas -->
+            <tr class="bg-success">
+                <td class="fw-bold sticky-col">2. ENTRADAS DE CAIXA</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                {% with entradas_vendas=dados_mes|get_dict_item:'entradas_vendas' %}
+                {% with entradas_abates=dados_mes|get_dict_item:'entradas_abates' %}
+                {% with entradas_nao_op=dados_mes|get_dict_item:'entradas_nao_operacionais' %}
+                {% with entradas_total=entradas_vendas|safe_add:entradas_abates|safe_add:entradas_nao_op %}
+                <td class="text-end fw-bold">R$ {{ entradas_total|floatformat:2 }}</td>
+                {% endwith %}
+                {% endwith %}
+                {% endwith %}
+                {% endwith %}
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Entradas Operacionais -->
+            <tr>
+                <td class="ps-3 sticky-col">2.1 Entradas Operacionais</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                {% with entradas_vendas=dados_mes|get_dict_item:'entradas_vendas' %}
+                {% with entradas_abates=dados_mes|get_dict_item:'entradas_abates' %}
+                {% with entradas_op=entradas_vendas|safe_add:entradas_abates %}
+                <td class="text-end">R$ {{ entradas_op|floatformat:2 }}</td>
+                {% endwith %}
+                {% endwith %}
+                {% endwith %}
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Vendas de Animais -->
+            <tr>
+                <td class="ps-4 sticky-col">Vendas de Animais</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                <td class="text-end">R$ {{ dados_mes|get_dict_item:'entradas_vendas'|floatformat:2 }}</td>
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Abates -->
+            <tr>
+                <td class="ps-4 sticky-col">Abates</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                <td class="text-end">R$ {{ dados_mes|get_dict_item:'entradas_abates'|floatformat:2 }}</td>
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Entradas Não Operacionais -->
+            <tr>
+                <td class="ps-3 sticky-col">2.2 Entradas Não Operacionais</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                <td class="text-end">R$ {{ dados_mes|get_dict_item:'entradas_nao_operacionais'|floatformat:2 }}</td>
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Saídas -->
+            <tr class="bg-danger">
+                <td class="fw-bold sticky-col">3. SAÍDAS DE CAIXA</td>
+                {% for mes in dados_fluxo.meses %}
+                    <td class="text-end fw-bold">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'saidas_total'|floatformat:2 }}</td>
+                {% endfor %}
+            </tr>
+            
+            <!-- Saídas Operacionais -->
+            <tr>
+                <td class="ps-3 sticky-col">3.1 Saídas Operacionais</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                {% with custos_fixos=dados_mes|get_dict_item:'saidas_custos_fixos' %}
+                {% with custos_var=dados_mes|get_dict_item:'saidas_custos_variaveis' %}
+                {% with saidas_op=custos_fixos|safe_add:custos_var %}
+                <td class="text-end">R$ {{ saidas_op|floatformat:2 }}</td>
+                {% endwith %}
+                {% endwith %}
+                {% endwith %}
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Custos Fixos -->
+            <tr>
+                <td class="ps-4 sticky-col">Custos Fixos</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                <td class="text-end">R$ {{ dados_mes|get_dict_item:'saidas_custos_fixos'|floatformat:2 }}</td>
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Custos Variáveis -->
+            <tr>
+                <td class="ps-4 sticky-col">Custos Variáveis</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                <td class="text-end">R$ {{ dados_mes|get_dict_item:'saidas_custos_variaveis'|floatformat:2 }}</td>
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Compra de Animais -->
+            <tr>
+                <td class="ps-4 sticky-col">Compra de Animais</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                <td class="text-end">R$ {{ dados_mes|get_dict_item:'saidas_compra_animais'|floatformat:2 }}</td>
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Outros Investimentos -->
+            <tr>
+                <td class="ps-4 sticky-col">Outros Investimentos</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                <td class="text-end">R$ {{ dados_mes|get_dict_item:'saidas_outros_investimentos'|floatformat:2 }}</td>
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Investimentos -->
+            <tr>
+                <td class="ps-3 sticky-col">3.2 Investimentos</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                {% with investimentos=dados_mes|get_dict_item:'saidas_investimentos' %}
+                {% with outros_investimentos=dados_mes|get_dict_item:'saidas_outros_investimentos' %}
+                {% with total_investimentos=investimentos|safe_add:outros_investimentos %}
+                <td class="text-end">R$ {{ total_investimentos|floatformat:2 }}</td>
+                {% endwith %}
+                {% endwith %}
+                {% endwith %}
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Saídas Não Operacionais -->
+            <tr>
+                <td class="ps-3 sticky-col">3.3 Saídas Não Operacionais</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                <td class="text-end">R$ {{ dados_mes|get_dict_item:'saidas_nao_operacionais'|floatformat:2 }}</td>
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Fluxo Líquido -->
+            <tr class="bg-info">
+                <td class="fw-bold sticky-col">4. FLUXO LÍQUIDO (2-3)</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                {% with fluxo_liquido=dados_mes|get_dict_item:'fluxo_liquido' %}
+                <td class="text-end fw-bold {% if fluxo_liquido >= 0 %}text-success{% else %}text-danger{% endif %}">R$ {{ fluxo_liquido|floatformat:2 }}</td>
+                {% endwith %}
+                {% endwith %}
+                {% endfor %}
+            </tr>
+            
+            <!-- Saldo Acumulado -->
+            <tr class="bg-header">
+                <td class="fw-bold sticky-col">5. SALDO ACUMULADO (1+4)</td>
+                {% for mes in dados_fluxo.meses %}
+                {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                {% with saldo_acumulado=dados_mes|get_dict_item:'saldo_acumulado' %}
+                <td class="text-end fw-bold {% if saldo_acumulado >= 0 %}text-success{% else %}text-danger{% endif %}">R$ {{ saldo_acumulado|floatformat:2 }}</td>
+                {% endwith %}
+                {% endwith %}
+                {% endfor %}
+            </tr>
+        </tbody>
+    </table>
+    
+    <div class="footer">
+        <p>Relatório gerado em {% now "d/m/Y H:i" %}</p>
+        <p>pecuaristapro.com | Desenvolvido por LWL Solutions Ltda.</p>
+        <p>&copy; {% now "Y" %} - Todos os direitos reservados</p>
+    </div>
+</body>
+</html>

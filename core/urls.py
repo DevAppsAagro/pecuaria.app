@@ -1,6 +1,5 @@
 from django.urls import path, include
 from . import views
-from .views_dashboard import dashboard
 from . import views_relatorios
 from . import views_estoque
 from . import views_nao_operacional
@@ -9,39 +8,40 @@ from . import views_compras
 from . import views_vendas
 from . import views_parcelas
 from . import views_abates
-from . import views_dashboard
 from . import views_impressao
 from . import views_reproducao
 from . import views_relatorios_reproducao
+from . import views_animal
+from . import views_dashboard_simples
 from . import views_config
 from . import importacao_views
 from . import views_importacao
 from . import views_importacao_simples
+from . import views_importacao_manejos
 from . import views_account
 from . import views_stripe
 from . import views_financeiro
-# Removendo a importação que está causando erro no Vercel
-# from . import views_fluxo_caixa
+from . import views_fluxo_caixa
 from . import auth_supabase
 from . import urls_mortes
 from . import views_debug
+from . import views_manejos
 from .api import manejo_api
-from . import views_animal  # Importando o novo arquivo com a função animal_list otimizada
 
 urlpatterns = [
     # Auth
     path('auth/redefinir-senha/<str:token>/', auth_supabase.password_reset_confirm_view, name='password_reset_confirm'),
     path('auth/update-password/', auth_supabase.update_password_view, name='update_password'),
+    path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     
     # Dashboard
-    path('', views_dashboard.dashboard, name='dashboard'),
-    
-    # Dashboard
-    # Comentando temporariamente para resolver erro no Vercel
-    # path('dashboard/dados/', views_dashboard.dashboard_dados, name='dashboard_dados'),
-    path('api/dre/dados/', views_relatorios.atualizar_dre_dados_ajax, name='atualizar_dre_dados_ajax'),
-    
+    path('', views_dashboard_simples.dashboard_simples, name='dashboard'),
+    path('dashboard/', views_dashboard_simples.dashboard_simples, name='dashboard_redirect'),
+    path('dashboard/simples/', views_dashboard_simples.dashboard_simples, name='dashboard_simples'),
+    path('dashboard/dados-simples/', views_dashboard_simples.dashboard_dados_simples, name='dashboard_dados_simples'),
+    path('dashboard/obter-dados/', views_dashboard_simples.obter_dados_dashboard_simples, name='obter_dados_dashboard_simples'),
+  
     # Página em desenvolvimento
     path('em-desenvolvimento/', views.em_desenvolvimento, name='em_desenvolvimento'),
     
@@ -57,16 +57,14 @@ urlpatterns = [
     path('relatorios/dre/', views_relatorios.relatorio_dre, name='relatorio_dre'),
     path('relatorios/dre/imprimir/', views_impressao.imprimir_dre, name='imprimir_dre'),
     path('relatorios/dre/atualizar/', views_relatorios.atualizar_dre, name='atualizar_dre'),
-    # Comentando temporariamente as rotas de fluxo de caixa que estão causando erro
-    # path('relatorios/fluxo-caixa/', views_financeiro.relatorio_fluxo_caixa, name='relatorio_fluxo_caixa'),
-    # path('relatorios/fluxo-caixa/imprimir/', views_impressao.imprimir_fluxo_caixa, name='fluxo_caixa_print'),
-    # path('fluxo-caixa/', views_financeiro.relatorio_fluxo_caixa, name='fluxo_caixa'),
-    # path('fluxo-caixa/mensal/', views_financeiro.fluxo_caixa_mensal, name='fluxo_caixa_mensal'),
-    # path('fluxo-caixa/mensal/imprimir/', views_financeiro.fluxo_caixa_mensal_print, name='fluxo_caixa_mensal_print'),
+    # Rotas para o fluxo de caixa
+    path('relatorios/fluxo-caixa/', views_fluxo_caixa.relatorio_fluxo_caixa, name='relatorio_fluxo_caixa'),
+    path('relatorios/fluxo-caixa/imprimir/', views_fluxo_caixa.imprimir_fluxo_caixa, name='imprimir_fluxo_caixa'),
+    path('fluxo-caixa/', views_fluxo_caixa.relatorio_fluxo_caixa, name='fluxo_caixa'),
     path('api/animais-por-lote/<int:lote_id>/', views_relatorios.animais_por_lote, name='animais_por_lote'),
     
     # Animais
-    path('animais/', views_animal.animal_list, name='animal_list'),  # Atualizando o caminho para usar a função animal_list do arquivo views_animal.py
+    path('animais/', views_animal.animal_list, name='animal_list'),  
     path('animais/novo/', views.animal_create, name='animal-create'),
     path('animais/<int:pk>/', views.animal_detail, name='animal_detail'),
     path('animais/<int:animal_id>/debug/', views_debug.debug_reprodutivo, name='animal_debug'),
@@ -110,14 +108,17 @@ urlpatterns = [
     path('lotes/<int:lote_id>/', views.lote_detail, name='lote_detail'),
     
     # Manejos e Pesagens
-    path('manejos/', views.manejo_list, name='manejos'),  
+    path('manejos/', views_manejos.manejo_list, name='manejos'),  
     path('manejos/criar/', views.manejo_create, name='manejo_create'),
     path('manejos/<int:pk>/update/', views.manejo_update, name='manejo_update'),
     path('manejos/<int:pk>/delete/', views.manejo_delete, name='manejo_delete'),
+    path('manejos/import/', views_importacao_manejos.manejo_import, name='importar_manejos'),
+    path('manejos/json/', views_manejos.manejos_json, name='manejos_json'),
     path('manejos/pesagem/<int:pk>/editar/', views.editar_pesagem, name='editar_pesagem'),
     path('manejos/pesagem/<int:pk>/excluir/', views.excluir_pesagem, name='excluir_pesagem'),
     path('manejos/sanitario/<int:pk>/editar/', views.editar_manejo, name='editar_manejo'),
     path('manejos/sanitario/<int:pk>/excluir/', views.excluir_manejo, name='excluir_manejo'),
+    path('manejos/template-download/', views_importacao_manejos.manejo_template_download, name='manejo_template_download'),
     path('pesagens/<int:pk>/update/', views.pesagem_update, name='pesagem_update'),
     path('pesagens/<int:pk>/delete/', views.pesagem_delete, name='pesagem_delete'),
     path('api/buscar_animal/<str:brinco>/', manejo_api.buscar_animal, name='buscar_animal'),
@@ -260,9 +261,9 @@ urlpatterns = [
     path('config/selecionar-fazenda/', views_config.selecionar_fazenda, name='selecionar_fazenda'),
     
     # Planos e Assinaturas (Stripe)
-    path('planos/', views_stripe.planos, name='planos'),  # Redirecionado para o Stripe
-    path('checkout/<str:price_id>/', views_stripe.checkout_session, name='checkout_plano'),  # Redirecionado para o Stripe
-    path('assinatura/', views_stripe.portal_stripe, name='assinatura'),  # Redirecionado para o portal do Stripe
+    path('planos/', views_stripe.planos, name='planos'),  
+    path('checkout/<str:price_id>/', views_stripe.checkout_session, name='checkout_plano'),  
+    path('assinatura/', views_stripe.portal_stripe, name='assinatura'),  
     
     # Stripe Endpoints
     path('stripe/plans/', views_stripe.planos, name='stripe_plans'),
@@ -288,9 +289,26 @@ urlpatterns = [
     path('api/lotes-por-fazenda/<int:fazenda_id>/', views_reproducao.get_lotes_por_fazenda, name='get_lotes_por_fazenda'),
     path('api/lotes/<int:lote_id>/', views.lote_detail, name='lote_detail'),
     
-    # APIs para filtros dinâmicos
-    path('api/pastos-por-fazenda/<int:fazenda_id>/', views.get_pastos_por_fazenda, name='api_pastos_por_fazenda'),
-    path('api/lotes-por-fazenda/<int:fazenda_id>/', views.get_lotes_por_fazenda, name='api_lotes_por_fazenda'),
+    # APIs para o mapa
+    path('fazenda/get_pastos/<int:fazenda_id>/', views_fazenda.get_pastos, name='get_pastos'),
+    path('fazenda/get_benfeitorias/<int:fazenda_id>/', views_fazenda.get_benfeitorias_fazenda, name='get_benfeitorias_fazenda'),
+    path('benfeitoria/coordenadas/salvar/', views_fazenda.salvar_coordenadas_benfeitoria, name='salvar_coordenadas_benfeitoria'),
+    path('benfeitoria/coordenadas/<int:benfeitoria_id>/', views_fazenda.get_coordenadas_benfeitoria, name='get_coordenadas_benfeitoria'),
+    
+    # API para buscar subcategorias por categoria
+    path('core/get_subcategorias_por_categoria/<int:categoria_id>/', views.get_subcategorias_por_categoria, name='get_subcategorias_por_categoria'),
+    
+    # Adicionando URL para a página de verificação de email
+    path('verificar-email/', views.verificar_email_view, name='verificar_email'),
+    
+    # Incluir URLs de mortes de animais
+    path('', include(urls_mortes.urlpatterns)),
+    
+    # Adicionando URL para a página de teste
+    path('teste/', views_dashboard_simples.pagina_teste, name='pagina_teste'),
+    
+    # Adicionando URL para a página de diagnóstico simples
+    path('diagnostico-simples/', views_dashboard_simples.diagnostico_simples, name='diagnostico_simples'),
     
     # Configurações - Raças
     path('configuracoes/racas/', views.raca_list, name='raca_list'),
@@ -347,7 +365,6 @@ urlpatterns = [
     path('conta/perfil/', views_account.profile_view, name='profile'),
     
     # Auth URLs
-    path('login/', views.login_view, name='login'),
     path('register/', views.register_view, name='register'),
     path('auth/verify-email/', views.verificar_email_view, name='verify-email'),
     path('auth/redefinir-senha/<str:token>/', views.redefinir_senha_view, name='redefinir_senha'),
@@ -357,18 +374,10 @@ urlpatterns = [
     path('aguardando-pagamento/', views.awaiting_payment, name='awaiting_payment'),
     path('configuracoes/', views.configuracoes, name='configuracoes'),
     
-    # APIs para o mapa
-    path('fazenda/get_pastos/<int:fazenda_id>/', views_fazenda.get_pastos, name='get_pastos'),
-    path('fazenda/get_benfeitorias/<int:fazenda_id>/', views_fazenda.get_benfeitorias_fazenda, name='get_benfeitorias_fazenda'),
-    path('benfeitoria/coordenadas/salvar/', views_fazenda.salvar_coordenadas_benfeitoria, name='salvar_coordenadas_benfeitoria'),
-    path('benfeitoria/coordenadas/<int:benfeitoria_id>/', views_fazenda.get_coordenadas_benfeitoria, name='get_coordenadas_benfeitoria'),
+    # APIs para filtros dinâmicos
+    path('api/pastos-por-fazenda/<int:fazenda_id>/', views.get_pastos_por_fazenda, name='api_pastos_por_fazenda'),
+    path('api/lotes-por-fazenda/<int:fazenda_id>/', views.get_lotes_por_fazenda, name='api_lotes_por_fazenda'),
     
-    # API para buscar subcategorias por categoria
-    path('core/get_subcategorias_por_categoria/<int:categoria_id>/', views.get_subcategorias_por_categoria, name='get_subcategorias_por_categoria'),
-    
-    # Adicionando URL para a página de verificação de email
-    path('verificar-email/', views.verificar_email_view, name='verificar_email'),
-    
-    # Incluir URLs de mortes de animais
-    path('', include(urls_mortes.urlpatterns)),
+    # API para pastos
+    path('api/pastos/', views_dashboard_simples.api_pastos, name='api_pastos'),
 ]

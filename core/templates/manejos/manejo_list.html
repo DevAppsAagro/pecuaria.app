@@ -2,461 +2,620 @@
 {% load static %}
 
 {% block content %}
-{% csrf_token %}
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>{{ title }}</h2>
-        <a href="{% url 'manejo_create' %}" class="btn btn-success">
-            <i class="fas fa-plus"></i> Novo Manejo
-        </a>
+<div class="container-fluid">
+    <!-- Notificação temporária -->
+    <div id="notification" class="position-fixed top-0 end-0 p-3 m-3 text-white rounded shadow-sm" style="z-index: 9999; max-width: 300px; opacity: 0; transition: opacity 0.3s ease-in-out;">
+        Mensagem de notificação
     </div>
-
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">Histórico de Manejos</h3>
+    
+    <style>
+        #notification {
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        
+        #notification.show {
+            opacity: 1;
+        }
+    </style>
+    
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>{{ title }}</h2>
+            <div>
+                <button type="button" class="btn btn-primary btn-sm me-2" data-bs-toggle="modal" data-bs-target="#importModal">
+                    <i class="fas fa-file-import"></i> Importar
+                </button>
+                <a href="{% url 'manejo_create' %}" class="btn btn-success btn-sm">
+                    <i class="fas fa-plus"></i> Novo
+                </a>
+            </div>
         </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped" id="manejoTable">
-                    <thead>
-                        <tr>
-                            <th>Data</th>
-                            <th>Animal</th>
-                            <th>Tipo de Manejo</th>
-                            <th>Peso (kg)</th>
-                            <th>Insumo</th>
-                            <th>Detalhes</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for pesagem in pesagens %}
-                        <tr class="pesagem-row">
-                            <td>{{ pesagem.data|date:"d/m/Y" }}</td>
-                            <td>{{ pesagem.animal.brinco_visual }}</td>
-                            <td>Pesagem</td>
-                            <td>{{ pesagem.peso|floatformat:3 }}</td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td>
-                                <div class="btn-group">
-                                    <button type="button" class="btn btn-sm btn-warning" 
-                                            data-id="{{ pesagem.id }}" data-action="edit-pesagem">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-danger" 
-                                            data-url="{% url 'pesagem_delete' pesagem.id %}" data-type="pesagem" data-action="delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        
-                        {% for manejo in manejos %}
-                        <tr class="manejo-row">
-                            <td>{{ manejo.data|date:"d/m/Y" }}</td>
-                            <td>{{ manejo.animal.brinco_visual }}</td>
-                            <td>{{ manejo.tipo_manejo }}</td>
-                            <td>-</td>
-                            <td>{{ manejo.insumo }}</td>
-                            <td>
-                                {% if manejo.observacao %}
-                                <button type="button" class="btn btn-sm btn-info" 
-                                        data-bs-toggle="tooltip" data-bs-placement="top" 
-                                        title="{{ manejo.observacao }}">
-                                    <i class="fas fa-info-circle"></i>
-                                </button>
+
+        {% if error_message %}
+        <div class="alert alert-danger mb-3">
+            <h5>{{ error_message }}</h5>
+            {% if error_details %}
+            <div class="mt-2">
+                <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#errorDetails">
+                    Ver detalhes
+                </button>
+                <div class="collapse mt-2" id="errorDetails">
+                    <div class="card card-body">
+                        <pre class="small">{{ error_details }}</pre>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Filtros -->
+        <div class="card mb-3">
+            <div class="card-body py-2">
+                <form method="get" class="row g-2 align-items-center" id="filtroForm">
+                    <div class="col-auto">
+                        <label for="dias" class="col-form-label">Período:</label>
+                    </div>
+                    <div class="col-auto">
+                        <select class="form-select form-select-sm" id="dias" name="dias">
+                            <option value="7" {% if dias == 7 %}selected{% endif %}>Últimos 7 dias</option>
+                            <option value="15" {% if dias == 15 %}selected{% endif %}>Últimos 15 dias</option>
+                            <option value="30" {% if dias == 30 %}selected{% endif %}>Últimos 30 dias</option>
+                            <option value="90" {% if dias == 90 %}selected{% endif %}>Últimos 3 meses</option>
+                            <option value="180" {% if dias == 180 %}selected{% endif %}>Últimos 6 meses</option>
+                            <option value="365" {% if dias == 365 %}selected{% endif %}>Último ano</option>
+                            <option value="999999" {% if dias > 1000 %}selected{% endif %}>Todos</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control form-control-sm" id="busca" name="busca" 
+                                   placeholder="Buscar animal..." value="{{ busca|default:'' }}">
+                            <button class="btn btn-outline-secondary btn-sm" type="submit">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-auto ms-auto">
+                        <span class="badge bg-primary">Total: {{ total_manejos }} manejos, {{ total_pesagens }} pesagens</span>
+                    </div>
+                    <input type="hidden" id="currentPage" name="page" value="1">
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Histórico de Manejos</h3>
+            </div>
+            <div class="card-body">
+                <!-- Conteúdo da tabela que será atualizado via AJAX -->
+                <div id="manejoTableContainer">
+                    {% if html_content %}
+                        {{ html_content|safe }}
+                    {% else %}
+                        <!-- O conteúdo será carregado via AJAX -->
+                        <div class="text-center my-4">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Carregando...</span>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Paginação -->
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div id="contadorRegistros" class="text-muted">
+                        Total: {{ total_manejos }} manejos, {{ total_pesagens }} pesagens
+                    </div>
+                    <nav>
+                        <ul class="pagination pagination-sm">
+                            {% if manejos.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="#" data-page="{{ manejos.previous_page_number }}">Anterior</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">Anterior</span>
+                            </li>
+                            {% endif %}
+                            
+                            {% for i in manejos.paginator.page_range %}
+                                {% if manejos.number == i %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ i }}</span>
+                                </li>
                                 {% else %}
-                                -
+                                <li class="page-item">
+                                    <a class="page-link" href="#" data-page="{{ i }}">{{ i }}</a>
+                                </li>
                                 {% endif %}
-                            </td>
-                            <td>
-                                <div class="btn-group">
-                                    <button type="button" class="btn btn-sm btn-warning" 
-                                            data-id="{{ manejo.id }}" data-action="edit-manejo">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-danger" 
-                                            data-url="{% url 'manejo_delete' manejo.id %}" data-type="manejo" data-action="delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        
-                        {% if not pesagens and not manejos %}
-                        <tr>
-                            <td colspan="7" class="text-center">Nenhum manejo registrado</td>
-                        </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
+                            {% endfor %}
+                            
+                            {% if manejos.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="#" data-page="{{ manejos.next_page_number }}">Próxima</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">Próxima</span>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Modal de Edição de Pesagem -->
-<div class="modal fade" id="editarPesagemModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Editar Pesagem</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="formEditarPesagem">
-                    <input type="hidden" id="pesagem_id">
-                    <div class="mb-3">
-                        <label for="edit_data_pesagem" class="form-label">Data</label>
-                        <input type="date" class="form-control" id="edit_data_pesagem" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="edit_animal_pesagem" class="form-label">Animal (Brinco)</label>
-                        <input type="text" class="form-control" id="edit_animal_pesagem" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="edit_peso" class="form-label">Peso (kg)</label>
-                        <input type="number" class="form-control" id="edit_peso" step="0.001" required>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="salvarPesagem()">Salvar</button>
+    <!-- Modal de Edição de Pesagem -->
+    <div class="modal fade" id="editarPesagemModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar Pesagem</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formEditarPesagem">
+                        <input type="hidden" id="pesagem_id">
+                        <div class="mb-3">
+                            <label for="edit_data_pesagem" class="form-label">Data</label>
+                            <input type="date" class="form-control" id="edit_data_pesagem" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_animal_pesagem" class="form-label">Animal (Brinco)</label>
+                            <input type="text" class="form-control" id="edit_animal_pesagem" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_peso" class="form-label">Peso (kg)</label>
+                            <input type="number" class="form-control" id="edit_peso" step="0.001" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarPesagem()">Salvar</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Modal de Edição de Manejo -->
-<div class="modal fade" id="editarManejoModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Editar Manejo Sanitário</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="formEditarManejo">
-                    <input type="hidden" id="manejo_id">
-                    <div class="mb-3">
-                        <label for="edit_data_manejo" class="form-label">Data</label>
-                        <input type="date" class="form-control" id="edit_data_manejo" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="edit_animal_manejo" class="form-label">Animal (Brinco)</label>
-                        <input type="text" class="form-control" id="edit_animal_manejo" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="edit_tipo_manejo" class="form-label">Tipo de Manejo</label>
-                        <input type="text" class="form-control" id="edit_tipo_manejo" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="edit_insumo" class="form-label">Insumo</label>
-                        <input type="text" class="form-control" id="edit_insumo" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="edit_dias_proximo" class="form-label">Dias para Próximo Manejo</label>
-                        <input type="number" class="form-control" id="edit_dias_proximo">
-                    </div>
-                    <div class="mb-3">
-                        <label for="edit_observacao" class="form-label">Observação</label>
-                        <textarea class="form-control" id="edit_observacao" rows="3"></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="salvarManejo()">Salvar</button>
+    <!-- Modal de Edição de Manejo -->
+    <div class="modal fade" id="editarManejoModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar Manejo Sanitário</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formEditarManejo">
+                        <input type="hidden" id="manejo_id">
+                        <div class="mb-3">
+                            <label for="edit_data_manejo" class="form-label">Data</label>
+                            <input type="date" class="form-control" id="edit_data_manejo" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_animal_manejo" class="form-label">Animal (Brinco)</label>
+                            <input type="text" class="form-control" id="edit_animal_manejo" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_tipo_manejo" class="form-label">Tipo de Manejo</label>
+                            <input type="text" class="form-control" id="edit_tipo_manejo" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_insumo" class="form-label">Insumo</label>
+                            <input type="text" class="form-control" id="edit_insumo" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_dias_proximo" class="form-label">Dias para Próximo Manejo</label>
+                            <input type="number" class="form-control" id="edit_dias_proximo">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_observacao" class="form-label">Observação</label>
+                            <textarea class="form-control" id="edit_observacao" rows="3"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarManejo()">Salvar</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Modal de Confirmação de Exclusão -->
-<div class="modal fade" id="confirmDeleteModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Confirmar Exclusão</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                Tem certeza que deseja excluir este registro?
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-danger" onclick="excluirRegistro()">Excluir</button>
+    <!-- Modal de Confirmação de Exclusão -->
+    <div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmar Exclusão</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    Tem certeza que deseja excluir este registro?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" onclick="excluirRegistro()">Excluir</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
+
+    <!-- Modal de Importação de Manejos -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Importar Manejos</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <p>Siga os passos abaixo para importar manejos em lote:</p>
+                        <ol class="ps-3">
+                            <li>Baixe o modelo de planilha</li>
+                            <li>Preencha com os dados dos manejos</li>
+                            <li>Faça upload da planilha preenchida</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="d-grid mb-3">
+                        <a href="{% url 'manejo_template_download' %}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-download me-1"></i> Baixar Modelo de Planilha
+                        </a>
+                    </div>
+                    
+                    <hr class="my-3">
+                    
+                    <form id="importForm" method="post" action="{% url 'importar_manejos' %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="importFile" class="form-label">Selecione a planilha preenchida:</label>
+                            <input type="file" class="form-control form-control-sm" id="importFile" name="import_file" accept=".xlsx,.xls,.csv" required>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="skipHeader" name="skip_header" checked>
+                            <label class="form-check-label" for="skipHeader">
+                                Ignorar cabeçalho da planilha
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="importButton">
+                        <span id="importarTexto">Importar</span>
+                        <span id="importarSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-let deleteUrl = '';
-
-// Função de fallback para tabelas básicas
-function setupBasicTable(tableId) {
-    var table = $('#' + tableId);
-    
-    // Adicionamos classes básicas de estilo
-    table.addClass('table table-bordered table-striped table-hover');
-    
-    // Configuramos largura da tabela
-    table.css('width', '100%');
-    
-    // Adicionamos um campo de filtro simples
-    var tableContainer = table.parent();
-    var filterDiv = $('<div class="mb-3"><label>Pesquisar: <input type="text" class="form-control" id="' + tableId + '_filter"></label></div>');
-    tableContainer.prepend(filterDiv);
-    
-    // Implementamos a funcionalidade de pesquisa básica
-    $('#' + tableId + '_filter').on('keyup', function() {
-        var value = $(this).val().toLowerCase();
-        $('#' + tableId + ' tbody tr').filter(function() {
-            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
-        });
-    });
-    
-    // Adicionamos ordenação básica nos cabeçalhos
-    $('#' + tableId + ' th').css('cursor', 'pointer').click(function() {
-        var table = $(this).parents('table').eq(0);
-        var rows = table.find('tr:gt(0)').toArray().sort(comparer($(this).index()));
-        this.asc = !this.asc;
-        if (!this.asc) {
-            rows = rows.reverse();
-        }
-        for (var i = 0; i < rows.length; i++) {
-            table.append(rows[i]);
-        }
-    });
-    
-    // Função auxiliar para ordenação
-    function comparer(index) {
-        return function(a, b) {
-            var valA = getCellValue(a, index), valB = getCellValue(b, index);
-            return $.isNumeric(valA) && $.isNumeric(valB) ? valA - valB : valA.localeCompare(valB);
-        };
-    }
-    
-    // Função auxiliar para obter valor da célula
-    function getCellValue(row, index) {
-        return $(row).children('td').eq(index).text();
-    }
-    
-    console.log("Tabela básica configurada para " + tableId);
-}
-
-$(document).ready(function() {
-    var tableId = 'manejoTable';
-    var useDataTables = true;
-    
-    try {
-        // Tentamos remover qualquer inicialização anterior
-        if ($.fn.dataTable.isDataTable('#' + tableId)) {
-            $('#' + tableId).DataTable().destroy();
-        }
+    $(document).ready(function() {
+        // Variável para armazenar a página atual
+        let currentPage = 1;
+        {% if manejos.number %}
+        currentPage = {{ manejos.number }};
+        {% endif %}
         
-        // Se DataTables estiver disponível, tentamos inicializar
-        if ($.fn.DataTable && useDataTables) {
-            console.log("Tentando inicializar DataTables para " + tableId);
+        // Variáveis para armazenar URL de exclusão e tipo de registro
+        let deleteUrl = '';
+        let deleteType = '';
+        
+        // Função para mostrar notificação temporária
+        function showNotification(message, type = 'success') {
+            const notification = $('#notification');
+            notification.text(message);
+            notification.removeClass('bg-success bg-danger bg-warning bg-info');
             
+            // Definir cor com base no tipo
+            switch(type) {
+                case 'success':
+                    notification.addClass('bg-success');
+                    break;
+                case 'error':
+                    notification.addClass('bg-danger');
+                    break;
+                case 'warning':
+                    notification.addClass('bg-warning');
+                    break;
+                case 'info':
+                    notification.addClass('bg-info');
+                    break;
+            }
+            
+            // Mostrar notificação
+            notification.addClass('show');
+            
+            // Esconder após 3 segundos
             setTimeout(function() {
-                try {
-                    // Inicialização ultra-simplificada
-                    $('#' + tableId).DataTable({
-                        "paging": true,
-                        "searching": true,
-                        "ordering": true,
-                        "info": true,
-                        "order": [[0, 'desc']]
-                    });
-                    console.log("DataTable inicializado com sucesso para " + tableId);
-                } catch (e) {
-                    console.error("Erro ao inicializar DataTable:", e);
-                    // Fallback para tabela básica
-                    $('#' + tableId + '_wrapper').remove();
-                    $('#' + tableId).removeClass('dataTable').show();
-                    setupBasicTable(tableId);
+                notification.removeClass('show');
+            }, 3000);
+        }
+        
+        // Função para carregar manejos via AJAX
+        function loadManejos() {
+            const tableContainer = $('#manejoTableContainer');
+            const loadingSpinner = $('<div class="text-center my-4"><div class="spinner-border" role="status"><span class="visually-hidden">Carregando...</span></div></div>');
+            
+            // Mostrar spinner enquanto carrega
+            tableContainer.html(loadingSpinner);
+            
+            // Obter parâmetros de filtro
+            const dias = $('#dias').val();
+            const busca = $('#busca').val();
+            const page = currentPage || 1;
+            
+            // Fazer requisição AJAX
+            $.ajax({
+                url: "{% url 'manejos_json' %}",
+                type: "GET",
+                data: {
+                    dias: dias,
+                    busca: busca,
+                    page: page
+                },
+                success: function(data) {
+                    // Atualizar a tabela com os novos dados
+                    tableContainer.html(data.html);
+                    
+                    // Atualizar contador
+                    $('#contadorRegistros').text(`Total: ${data.total_manejos} manejos, ${data.total_pesagens} pesagens`);
+                    
+                    // Atualizar URL para refletir os filtros sem recarregar a página
+                    const newUrl = `?dias=${dias}${busca ? '&busca=' + busca : ''}${page > 1 ? '&page=' + page : ''}`;
+                    history.pushState({}, '', newUrl);
+                    
+                    // Reativar os event listeners para os botões
+                    initializeEventListeners();
+                },
+                error: function(xhr, status, error) {
+                    // Usar notificação temporária em vez de alert
+                    showNotification('Erro ao carregar dados. Por favor, tente novamente.', 'error');
+                    
+                    // Exibir mensagem na tabela
+                    tableContainer.html('<div class="alert alert-danger">Não foi possível carregar os dados. Tente refinar sua busca ou limpar os filtros.</div>');
+                    
+                    // Limpar contador
+                    $('#contadorRegistros').text('');
+                    
+                    console.error("Erro AJAX:", status, error);
                 }
-            }, 1000);
-        } else {
-            // Se DataTable não estiver disponível, utilizamos a versão básica
-            console.log("DataTable não disponível, utilizando tabela básica para " + tableId);
-            setupBasicTable(tableId);
+            });
         }
-    } catch (e) {
-        console.error("Erro geral na configuração da tabela:", e);
-        // Garantimos que a tabela continue utilizável
-        setupBasicTable(tableId);
-    }
-});
-
-// Inicializa tooltips
-$(document).ready(function() {
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl)
-    });
-    
-    // Inicializa os modais
-    window.modalPesagem = new bootstrap.Modal(document.getElementById('editarPesagemModal'));
-    window.modalManejo = new bootstrap.Modal(document.getElementById('editarManejoModal'));
-    window.deleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-    
-    // Atribuir event listeners para ações
-    $('[data-action="edit-pesagem"]').click(function() {
-        editarPesagem($(this).data('id'));
-    });
-    
-    $('[data-action="edit-manejo"]').click(function() {
-        editarManejo($(this).data('id'));
-    });
-    
-    $('[data-action="delete"]').click(function() {
-        confirmarExclusao($(this).data('url'), $(this).data('type'));
-    });
-});
-
-async function editarPesagem(id) {
-    try {
-        const response = await fetch(`/pesagens/${id}/update/`);
-        const data = await response.json();
         
-        if (data.success) {
-            document.getElementById('pesagem_id').value = id;
-            document.getElementById('edit_data_pesagem').value = data.pesagem.data;
-            document.getElementById('edit_animal_pesagem').value = data.pesagem.animal;
-            document.getElementById('edit_peso').value = data.pesagem.peso;
+        // Inicializar event listeners para botões e links
+        function initializeEventListeners() {
+            // Event listener para botões de paginação
+            $('.pagination .page-link').on('click', function(e) {
+                e.preventDefault();
+                const page = $(this).data('page');
+                if (page) {
+                    currentPage = page;
+                    loadManejos();
+                }
+            });
             
-            modalPesagem.show();
-        } else {
-            alert(data.message || 'Erro ao carregar dados da pesagem');
-        }
-    } catch (error) {
-        console.error('Erro:', error);
-        alert('Erro ao carregar dados da pesagem');
-    }
-}
-
-async function salvarPesagem() {
-    const id = document.getElementById('pesagem_id').value;
-    const formData = new FormData();
-    formData.append('data', document.getElementById('edit_data_pesagem').value);
-    formData.append('animal', document.getElementById('edit_animal_pesagem').value);
-    formData.append('peso', document.getElementById('edit_peso').value);
-    
-    try {
-        const response = await fetch(`/pesagens/${id}/update/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: formData
-        });
-        
-        const result = await response.json();
-        if (result.success) {
-            modalPesagem.hide();
-            window.location.reload();
-        } else {
-            alert(result.message || 'Erro ao salvar pesagem');
-        }
-    } catch (error) {
-        console.error('Erro:', error);
-        alert('Erro ao salvar pesagem');
-    }
-}
-
-async function editarManejo(id) {
-    try {
-        const response = await fetch(`/manejos/${id}/update/`);
-        const data = await response.json();
-        
-        if (data.success) {
-            document.getElementById('manejo_id').value = id;
-            document.getElementById('edit_data_manejo').value = data.manejo.data;
-            document.getElementById('edit_animal_manejo').value = data.manejo.animal;
-            document.getElementById('edit_tipo_manejo').value = data.manejo.tipo_manejo;
-            document.getElementById('edit_insumo').value = data.manejo.insumo;
-            document.getElementById('edit_dias_proximo').value = data.manejo.dias_proximo;
-            document.getElementById('edit_observacao').value = data.manejo.observacao;
+            // Event listeners para ações nos botões da tabela
+            $('[data-action="edit-pesagem"]').click(function() {
+                editarPesagem($(this).data('id'));
+            });
             
-            modalManejo.show();
-        } else {
-            alert(data.message || 'Erro ao carregar dados do manejo');
+            $('[data-action="edit-manejo"]').click(function() {
+                editarManejo($(this).data('id'));
+            });
+            
+            $('[data-action="delete"]').click(function() {
+                confirmarExclusao($(this).data('url'), $(this).data('type'));
+            });
         }
-    } catch (error) {
-        console.error('Erro:', error);
-        alert('Erro ao carregar dados do manejo');
-    }
-}
 
-async function salvarManejo() {
-    const id = document.getElementById('manejo_id').value;
-    const formData = new FormData();
-    formData.append('data', document.getElementById('edit_data_manejo').value);
-    formData.append('animal', document.getElementById('edit_animal_manejo').value);
-    formData.append('tipo_manejo', document.getElementById('edit_tipo_manejo').value);
-    formData.append('insumo', document.getElementById('edit_insumo').value);
-    formData.append('dias_proximo', document.getElementById('edit_dias_proximo').value);
-    formData.append('observacao', document.getElementById('edit_observacao').value);
-    
-    try {
-        const response = await fetch(`/manejos/${id}/update/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: formData
+        // Manipulador para mudanças nos filtros
+        $('#filtroForm').on('submit', function(e) {
+            e.preventDefault();
+            currentPage = 1; // Resetar para primeira página ao filtrar
+            loadManejos();
         });
         
-        const result = await response.json();
-        if (result.success) {
-            modalManejo.hide();
-            window.location.reload();
-        } else {
-            alert(result.message || 'Erro ao salvar manejo');
-        }
-    } catch (error) {
-        console.error('Erro:', error);
-        alert('Erro ao salvar manejo');
-    }
-}
-
-function confirmarExclusao(url, tipo) {
-    deleteUrl = url;
-    deleteType = tipo;
-    deleteModal.show();
-}
-
-async function excluirRegistro() {
-    try {
-        const response = await fetch(deleteUrl, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: 'csrfmiddlewaretoken=' + document.querySelector('[name=csrfmiddlewaretoken]').value
+        // Manipulador para o botão de limpar filtros
+        $('#limparFiltros').on('click', function() {
+            $('#dias').val(30);
+            $('#busca').val('');
+            currentPage = 1;
+            loadManejos();
         });
         
-        const result = await response.json();
-        if (result.success) {
-            deleteModal.hide();
-            window.location.reload();
-        } else {
-            alert(result.message || `Erro ao excluir ${deleteType}`);
-        }
-    } catch (error) {
-        console.error('Erro:', error);
-        alert(`Erro ao excluir ${deleteType}`);
-    }
-}
+        // Inicializar event listeners na carga inicial
+        initializeEventListeners();
+        
+        // Carregar manejos inicialmente
+        loadManejos();
+        
+        // Função para editar pesagem
+        window.editarPesagem = function(id) {
+            $.ajax({
+                url: `/pesagem/${id}/json/`,
+                type: 'GET',
+                success: function(data) {
+                    $('#pesagem_id').val(data.id);
+                    $('#edit_data_pesagem').val(data.data);
+                    $('#edit_animal_pesagem').val(data.animal_brinco);
+                    $('#edit_peso').val(data.peso);
+                    $('#editarPesagemModal').modal('show');
+                },
+                error: function() {
+                    showNotification('Erro ao carregar dados da pesagem', 'error');
+                }
+            });
+        };
+        
+        // Função para salvar pesagem editada
+        window.salvarPesagem = function() {
+            const id = $('#pesagem_id').val();
+            const data = {
+                data: $('#edit_data_pesagem').val(),
+                animal_brinco: $('#edit_animal_pesagem').val(),
+                peso: $('#edit_peso').val()
+            };
+            
+            $.ajax({
+                url: `/pesagem/${id}/update/`,
+                type: 'POST',
+                data: data,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                success: function(response) {
+                    $('#editarPesagemModal').modal('hide');
+                    showNotification('Pesagem atualizada com sucesso', 'success');
+                    loadManejos();
+                },
+                error: function(xhr) {
+                    let errorMessage = 'Erro ao atualizar pesagem';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    }
+                    showNotification(errorMessage, 'error');
+                }
+            });
+        };
+        
+        // Função para editar manejo
+        window.editarManejo = function(id) {
+            $.ajax({
+                url: `/manejo/${id}/json/`,
+                type: 'GET',
+                success: function(data) {
+                    $('#manejo_id').val(data.id);
+                    $('#edit_data_manejo').val(data.data);
+                    $('#edit_animal_manejo').val(data.animal_brinco);
+                    $('#edit_tipo_manejo').val(data.tipo_manejo);
+                    $('#edit_insumo').val(data.insumo);
+                    $('#edit_dias_proximo').val(data.dias_proximo);
+                    $('#edit_observacao').val(data.observacao);
+                    $('#editarManejoModal').modal('show');
+                },
+                error: function() {
+                    showNotification('Erro ao carregar dados do manejo', 'error');
+                }
+            });
+        };
+        
+        // Função para salvar manejo editado
+        window.salvarManejo = function() {
+            const id = $('#manejo_id').val();
+            const data = {
+                data: $('#edit_data_manejo').val(),
+                animal_brinco: $('#edit_animal_manejo').val(),
+                tipo_manejo: $('#edit_tipo_manejo').val(),
+                insumo: $('#edit_insumo').val(),
+                dias_proximo: $('#edit_dias_proximo').val(),
+                observacao: $('#edit_observacao').val()
+            };
+            
+            $.ajax({
+                url: `/manejo/${id}/update/`,
+                type: 'POST',
+                data: data,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                success: function(response) {
+                    $('#editarManejoModal').modal('hide');
+                    showNotification('Manejo atualizado com sucesso', 'success');
+                    loadManejos();
+                },
+                error: function(xhr) {
+                    let errorMessage = 'Erro ao atualizar manejo';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    }
+                    showNotification(errorMessage, 'error');
+                }
+            });
+        };
+        
+        // Função para confirmar exclusão
+        window.confirmarExclusao = function(url, type) {
+            deleteUrl = url;
+            deleteType = type;
+            $('#confirmDeleteModal').modal('show');
+        };
+        
+        // Função para excluir registro
+        window.excluirRegistro = function() {
+            $.ajax({
+                url: deleteUrl,
+                type: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                success: function(response) {
+                    $('#confirmDeleteModal').modal('hide');
+                    showNotification(`${deleteType} excluído com sucesso`, 'success');
+                    loadManejos();
+                },
+                error: function(xhr) {
+                    let errorMessage = `Erro ao excluir ${deleteType}`;
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    }
+                    showNotification(errorMessage, 'error');
+                }
+            });
+        };
+        
+        // Manipulador para o botão de importação
+        $('#importButton').on('click', function() {
+            const button = $(this);
+            const originalText = button.html();
+            const spinner = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Importando...';
+            
+            // Desabilitar botão e mostrar spinner
+            button.html(spinner).prop('disabled', true);
+            
+            // Enviar formulário via AJAX
+            $.ajax({
+                url: "{% url 'importar_manejos' %}",
+                type: "POST",
+                data: new FormData($('#importForm')[0]),
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    // Mostrar mensagem de sucesso
+                    showNotification(response.message, 'success');
+                    
+                    // Recarregar a tabela de manejos
+                    loadManejos();
+                    
+                    // Fechar o modal
+                    $('#importModal').modal('hide');
+                    
+                    // Resetar o formulário
+                    $('#importForm')[0].reset();
+                },
+                error: function(xhr) {
+                    let errorMessage = 'Erro ao importar manejos.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    }
+                    showNotification(errorMessage, 'error');
+                },
+                complete: function() {
+                    // Restaurar botão
+                    button.html(originalText).prop('disabled', false);
+                }
+            });
+        });
+    });
 </script>
 {% endblock %}

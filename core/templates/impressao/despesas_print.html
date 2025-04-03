@@ -1,4 +1,5 @@
 {% load custom_filters %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -18,15 +19,35 @@
             line-height: 1.4;
             color: #333;
             background: white;
-            padding: 20mm;
+            padding: 0;
         }
 
         /* Cabeçalho */
         header {
-            text-align: center;
             margin-bottom: 20px;
             padding-bottom: 10px;
             border-bottom: 2px solid #333;
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-container {
+            width: 100px;
+            height: 100px;
+            margin-right: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .header-info {
+            flex: 1;
         }
 
         header h1 {
@@ -45,19 +66,6 @@
             font-size: 16px;
             margin: 20px 0;
             font-weight: bold;
-        }
-
-        /* Seções */
-        .secao {
-            margin: 15px 0;
-            page-break-inside: avoid;
-        }
-
-        .secao h2 {
-            font-size: 14px;
-            background: #f5f5f5;
-            padding: 5px;
-            margin-bottom: 10px;
         }
 
         /* Filtros aplicados */
@@ -99,34 +107,30 @@
 
         /* Status */
         .status {
-            padding: 2px 6px;
+            padding: 2px 5px;
             border-radius: 3px;
             font-size: 11px;
-            font-weight: bold;
+            display: inline-block;
         }
 
-        .status-pago { background: #d4edda; color: #155724; }
-        .status-pendente { background: #fff3cd; color: #856404; }
-        .status-vencido { background: #f8d7da; color: #721c24; }
-        .status-vence-hoje { background: #cce5ff; color: #004085; }
-        .status-cancelado { background: #e2e3e5; color: #383d41; }
+        .status-pago {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-pendente {
+            background: #fff3cd;
+            color: #856404;
+        }
 
         /* Totais */
         .totais {
             margin-top: 20px;
-            border-top: 2px solid #333;
-            padding-top: 10px;
-            text-align: right;
-        }
-
-        .total-item {
-            margin: 5px 0;
-            font-size: 12px;
-        }
-
-        .total-label {
             font-weight: bold;
-            margin-right: 10px;
+        }
+
+        .totais p {
+            margin: 5px 0;
         }
 
         /* Rodapé */
@@ -134,38 +138,49 @@
             margin-top: 30px;
             padding-top: 10px;
             border-top: 1px solid #ddd;
-            font-size: 10px;
-            text-align: center;
-            color: #666;
+            font-size: 12px;
         }
 
-        /* Botão de Impressão */
+        .footer-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        .footer-left, .footer-right {
+            flex: 1;
+        }
+
+        /* Botão de impressão */
         .print-button {
             position: fixed;
-            top: 20px;
+            bottom: 20px;
             right: 20px;
-            padding: 10px 20px;
-            background-color: #007bff;
+            padding: 10px 15px;
+            background: #007bff;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 14px;
-            z-index: 1000;
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
         .print-button:hover {
-            background-color: #0056b3;
+            background: #0069d9;
         }
 
-        .print-button.hidden {
-            display: none !important;
+        .hidden {
+            display: none;
         }
 
         @media print {
+            body {
+                padding: 0;
+            }
             .print-button {
-                display: none !important;
+                display: none;
             }
         }
     </style>
@@ -173,10 +188,21 @@
 <body>
     <!-- Cabeçalho -->
     <header>
-        <h1>{{ cabecalho.empresa }}</h1>
-        <p>CNPJ: {{ cabecalho.cnpj }}</p>
-        <p>{{ cabecalho.endereco }}</p>
-        <p>{{ cabecalho.cidade }} - {{ cabecalho.estado }}</p>
+        <div class="logo-container">
+            {% if fazenda_logo %}
+                <img src="{{ fazenda_logo }}" alt="Logo da Fazenda">
+            {% else %}
+                <div style="width: 100px; height: 100px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; border: 1px solid #ddd;">
+                    <span style="font-size: 10px; color: #999;">Sem logo</span>
+                </div>
+            {% endif %}
+        </div>
+        <div class="header-info">
+            <h1>{{ cabecalho.empresa }}</h1>
+            <p>{{ cabecalho.endereco }}</p>
+            {% if cabecalho.cidade and cabecalho.estado %}<p>{{ cabecalho.cidade }}/{{ cabecalho.estado }}</p>{% endif %}
+            {% if cabecalho.cnpj %}<p>CNPJ: {{ cabecalho.cnpj }}</p>{% endif %}
+        </div>
     </header>
 
     <!-- Título do Relatório -->
@@ -220,35 +246,45 @@
         <table>
             <thead>
                 <tr>
-                    <th>Data Emissão</th>
-                    <th>Data Vencimento</th>
+                    <th>Descrição</th>
+                    <th>Categoria</th>
                     <th>Fornecedor</th>
                     <th>NF</th>
-                    <th>Valor</th>
+                    <th>Data Emissão</th>
+                    <th>Data Vencimento</th>
+                    <th>Valor (R$)</th>
                     <th>Status</th>
+                    <th>Data Pagamento</th>
+                    <th>Forma Pagamento</th>
+                    <th>Observação</th>
                 </tr>
             </thead>
             <tbody>
                 {% for despesa in despesas %}
                 <tr>
+                    <td>
+                        {% for item in despesa.itens.all %}
+                        <div>{{ item.categoria.nome }}{% if not forloop.last %}, {% endif %}</div>
+                        {% endfor %}
+                    </td>
+                    <td>
+                        {% for item in despesa.itens.all %}
+                        <div>{{ item.categoria.nome }} - {{ item.subcategoria.nome }}{% if not forloop.last %}<br>{% endif %}</div>
+                        {% endfor %}
+                    </td>
+                    <td>{{ despesa.contato.nome }}</td>
+                    <td>{{ despesa.numero_nf|default:"-" }}</td>
                     <td>{{ despesa.data_emissao|date:"d/m/Y" }}</td>
                     <td>{{ despesa.data_vencimento|date:"d/m/Y" }}</td>
-                    <td>{{ despesa.contato.nome }}</td>
-                    <td>{{ despesa.numero_nf|default:"S/N" }}</td>
                     <td style="text-align: right;">R$ {{ valores_totais|get_item:despesa.id|floatformat:2 }}</td>
                     <td>
-                        {% if despesa.status == 'PAGO' %}
-                            <span class="status status-pago">Pago</span>
-                        {% elif despesa.status == 'PENDENTE' %}
-                            <span class="status status-pendente">Pendente</span>
-                        {% elif despesa.status == 'VENCIDO' %}
-                            <span class="status status-vencido">Atrasado</span>
-                        {% elif despesa.status == 'VENCE_HOJE' %}
-                            <span class="status status-vence-hoje">Vence Hoje</span>
-                        {% elif despesa.status == 'CANCELADO' %}
-                            <span class="status status-cancelado">Cancelado</span>
-                        {% endif %}
+                        <span class="status {% if despesa.status == 'PAGO' %}status-pago{% else %}status-pendente{% endif %}">
+                            {% if despesa.status == 'PAGO' %}Pago{% elif despesa.status == 'PENDENTE' %}Pendente{% elif despesa.status == 'VENCIDO' %}Vencido{% elif despesa.status == 'VENCE_HOJE' %}Vence Hoje{% elif despesa.status == 'CANCELADO' %}Cancelado{% else %}{{ despesa.status }}{% endif %}
+                        </span>
                     </td>
+                    <td>{{ despesa.data_pagamento|date:"d/m/Y"|default:"-" }}</td>
+                    <td>{% if despesa.forma_pagamento == 'AV' %}À Vista{% elif despesa.forma_pagamento == 'PR' %}Parcelado{% else %}{{ despesa.forma_pagamento }}{% endif %}</td>
+                    <td>{{ despesa.observacao|default:"-"|truncatechars:30 }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -257,26 +293,24 @@
 
     <!-- Totais -->
     <div class="totais">
-        <div class="total-item">
-            <span class="total-label">Total Geral:</span>
-            R$ {{ total_geral|floatformat:2 }}
-        </div>
-        <div class="total-item">
-            <span class="total-label">Total Pago:</span>
-            R$ {{ total_pago|floatformat:2 }}
-        </div>
-        <div class="total-item">
-            <span class="total-label">Total Pendente:</span>
-            R$ {{ total_pendente|floatformat:2 }}
-        </div>
+        <p>Total Geral: R$ {{ total_geral|floatformat:2 }}</p>
+        <p>Total Pago: R$ {{ total_pago|floatformat:2 }}</p>
+        <p>Total Pendente: R$ {{ total_pendente|floatformat:2 }}</p>
     </div>
 
     <!-- Rodapé -->
     <footer>
-        <p>{{ cabecalho.empresa }} - CNPJ: {{ cabecalho.cnpj }}</p>
-        <p>{{ cabecalho.endereco }} - {{ cabecalho.cidade }}/{{ cabecalho.estado }}</p>
-        <p>Sistema de Gestão Pecuária</p>
-        <p>Emitido em: {% now "d/m/Y H:i" %}</p>
+        <p>Relatório gerado em <span id="data-hora-local">Carregando...</span></p>
+        <div class="footer-info">
+            <div class="footer-left">
+                <p>PecuaristaPRO</p>
+                <p>Versão {{ versao_sistema|default:"1.0.0" }}</p>
+            </div>
+            <div class="footer-right">
+                <p>Desenvolvido por LWL Solutions Ltda</p>
+                <p>www.pecuaristapro.com</p>
+            </div>
+        </div>
     </footer>
 
     <!-- Botão de Impressão -->
@@ -300,6 +334,23 @@
                 };
             }, 100);
         }
+
+        // Atualiza a data e hora local
+        function atualizaDataHora() {
+            const dataHoraLocal = document.getElementById('data-hora-local');
+            const dataAtual = new Date();
+            const dia = String(dataAtual.getDate()).padStart(2, '0');
+            const mes = String(dataAtual.getMonth() + 1).padStart(2, '0');
+            const ano = dataAtual.getFullYear();
+            const hora = String(dataAtual.getHours()).padStart(2, '0');
+            const minutos = String(dataAtual.getMinutes()).padStart(2, '0');
+            const segundos = String(dataAtual.getSeconds()).padStart(2, '0');
+            dataHoraLocal.textContent = `${dia}/${mes}/${ano} ${hora}:${minutos}:${segundos}`;
+        }
+
+        // Atualiza a data e hora local a cada segundo
+        setInterval(atualizaDataHora, 1000);
+        atualizaDataHora();
     </script>
 </body>
 </html>

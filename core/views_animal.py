@@ -181,3 +181,4 @@ def animal_list(request):
     }
     
     return render(request, 'animais/animal_list.html', context)
+    #

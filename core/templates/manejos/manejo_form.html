@@ -135,6 +135,35 @@
     .notification.show {
         opacity: 1;
     }
+    
+    /* Estilos para os botões de Bluetooth */
+    .bluetooth-btn {
+        font-size: 0.9rem;
+        padding: 0.3rem 0.6rem;
+        margin-left: 0.3rem;
+        background-color: #0d6efd;
+        color: white;
+        border: none;
+        border-radius: 4px;
+    }
+    
+    .bluetooth-btn.connected {
+        background-color: #198754;
+    }
+    
+    .bluetooth-btn.error {
+        background-color: #dc3545;
+    }
+    
+    .bluetooth-status {
+        font-size: 0.8rem;
+        margin-top: 0.2rem;
+        color: #6c757d;
+    }
+    
+    .input-group-append {
+        display: flex;
+    }
 </style>
 
 <!-- Div para notificações temporárias -->
@@ -166,13 +195,21 @@
                             <input type="date" class="form-control" id="data" name="data" required value="{% now 'Y-m-d' %}">
                         </div>
 
-                        <!-- Brinco -->
+                        <!-- Brinco com botão de conexão Bluetooth -->
                         <div class="mb-2">
                             <label for="brinco" class="form-label">
                                 <i class="fas fa-tag me-2"></i>Brinco
                             </label>
-                            <input type="text" class="form-control" id="brinco" name="brinco" 
-                                   placeholder="Digite o brinco" required>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="brinco" name="brinco" 
+                                       placeholder="Digite o brinco" required>
+                                <div class="input-group-append">
+                                    <button type="button" id="conectarBastao" class="bluetooth-btn" title="Conectar bastão">
+                                        <i class="fas fa-bluetooth-b"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="bastaoStatus" class="bluetooth-status"></div>
                         </div>
 
                         <!-- Informações do Animal -->
@@ -224,10 +261,18 @@
                                     </div>
                                 </div>
                                 
-                                <!-- Peso -->
+                                <!-- Peso com botão de conexão Bluetooth -->
                                 <div class="mb-2">
                                     <label for="peso" class="form-label">Peso (kg)</label>
-                                    <input type="number" class="form-control" id="peso" name="peso" step="0.01" disabled>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="peso" name="peso" step="0.01" disabled>
+                                        <div class="input-group-append">
+                                            <button type="button" id="conectarBalanca" class="bluetooth-btn" title="Conectar balança">
+                                                <i class="fas fa-bluetooth-b"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="balancaStatus" class="bluetooth-status"></div>
                                 </div>
                                 <div id="novoGMDInfo" class="alert alert-info mt-2" style="display: none;">
                                     <p class="info-text mb-0">
@@ -917,6 +962,225 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => console.error('Erro ao carregar pastos:', error));
     }
 
+    // Funções para conexão Bluetooth
+    
+    // Função para conectar ao bastão de leitura de brinco
+    async function conectarBastao() {
+        try {
+            const bastaoStatusDiv = document.getElementById('bastaoStatus');
+            bastaoStatusDiv.textContent = "Procurando dispositivos...";
+            
+            // Solicitar dispositivo Bluetooth com serviço genérico de UART
+            const bastaoDevice = await navigator.bluetooth.requestDevice({
+                // Aceitar qualquer dispositivo que anuncie um serviço genérico de UART
+                filters: [
+                    { services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] } // Serviço UART Nordic
+                ],
+                optionalServices: ['battery_service']
+            });
+            
+            bastaoStatusDiv.textContent = "Conectando ao bastão...";
+            const conectarBastaoBtn = document.getElementById('conectarBastao');
+            conectarBastaoBtn.classList.add('connected');
+            
+            // Adicionar listener para desconexão
+            bastaoDevice.addEventListener('gattserverdisconnected', onBastaoDisconnected);
+            
+            // Conectar ao GATT server
+            const server = await bastaoDevice.gatt.connect();
+            
+            // Obter serviço UART
+            const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+            
+            // Obter características para RX (receber dados do bastão)
+            const bastaoCharacteristic = await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+            
+            // Iniciar notificações
+            await bastaoCharacteristic.startNotifications();
+            const bastaoNotificationsStarted = true;
+            
+            // Adicionar listener para receber dados
+            bastaoCharacteristic.addEventListener('characteristicvaluechanged', handleBastaoValueChanged);
+            
+            bastaoStatusDiv.textContent = "Conectado a " + bastaoDevice.name;
+            mostrarNotificacao("Bastão conectado com sucesso!");
+            
+        } catch (error) {
+            console.error('Erro ao conectar ao bastão:', error);
+            const bastaoStatusDiv = document.getElementById('bastaoStatus');
+            bastaoStatusDiv.textContent = "Erro: " + error.message;
+            const conectarBastaoBtn = document.getElementById('conectarBastao');
+            conectarBastaoBtn.classList.remove('connected');
+            conectarBastaoBtn.classList.add('error');
+            
+            setTimeout(() => {
+                conectarBastaoBtn.classList.remove('error');
+            }, 2000);
+        }
+    }
+    
+    // Função para tratar desconexão do bastão
+    function onBastaoDisconnected() {
+        const bastaoNotificationsStarted = false;
+        const bastaoCharacteristic = null;
+        const bastaoStatusDiv = document.getElementById('bastaoStatus');
+        bastaoStatusDiv.textContent = "Desconectado";
+        const conectarBastaoBtn = document.getElementById('conectarBastao');
+        conectarBastaoBtn.classList.remove('connected');
+        mostrarNotificacao("Bastão desconectado");
+    }
+    
+    // Função para processar dados recebidos do bastão
+    function handleBastaoValueChanged(event) {
+        const value = event.target.value;
+        const decoder = new TextDecoder('utf-8');
+        const brincoLido = decoder.decode(value).trim();
+        
+        console.log('Brinco lido:', brincoLido);
+        
+        if (brincoLido) {
+            // Preencher o campo de brinco
+            brincoInput.value = brincoLido;
+            
+            // Disparar evento de busca de animal
+            buscarAnimal(brincoLido);
+            
+            // Reproduzir beep de confirmação
+            beep();
+            
+            // Focar no próximo campo se automação estiver ativa
+            if (automationActive) {
+                pesoInput.focus();
+            }
+        }
+    }
+    
+    // Função para conectar à balança
+    async function conectarBalanca() {
+        try {
+            const balancaStatusDiv = document.getElementById('balancaStatus');
+            balancaStatusDiv.textContent = "Procurando balança...";
+            
+            // Solicitar dispositivo Bluetooth com nome específico da balança
+            const balancaDevice = await navigator.bluetooth.requestDevice({
+                filters: [
+                    { name: 'BTBOV3000' }
+                ],
+                optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] // Serviço UART Nordic
+            });
+            
+            balancaStatusDiv.textContent = "Conectando à balança...";
+            const conectarBalancaBtn = document.getElementById('conectarBalanca');
+            conectarBalancaBtn.classList.add('connected');
+            
+            // Adicionar listener para desconexão
+            balancaDevice.addEventListener('gattserverdisconnected', onBalancaDisconnected);
+            
+            // Conectar ao GATT server
+            const server = await balancaDevice.gatt.connect();
+            
+            // Obter serviço UART
+            const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+            
+            // Obter características para RX (receber dados da balança)
+            const balancaCharacteristic = await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+            
+            // Iniciar notificações
+            await balancaCharacteristic.startNotifications();
+            const balancaNotificationsStarted = true;
+            
+            // Adicionar listener para receber dados
+            balancaCharacteristic.addEventListener('characteristicvaluechanged', handleBalancaValueChanged);
+            
+            balancaStatusDiv.textContent = "Conectado a " + balancaDevice.name;
+            mostrarNotificacao("Balança conectada com sucesso!");
+            
+            // Habilitar campo de peso
+            pesoInput.disabled = false;
+            
+        } catch (error) {
+            console.error('Erro ao conectar à balança:', error);
+            const balancaStatusDiv = document.getElementById('balancaStatus');
+            balancaStatusDiv.textContent = "Erro: " + error.message;
+            const conectarBalancaBtn = document.getElementById('conectarBalanca');
+            conectarBalancaBtn.classList.remove('connected');
+            conectarBalancaBtn.classList.add('error');
+            
+            setTimeout(() => {
+                conectarBalancaBtn.classList.remove('error');
+            }, 2000);
+        }
+    }
+    
+    // Função para tratar desconexão da balança
+    function onBalancaDisconnected() {
+        const balancaNotificationsStarted = false;
+        const balancaCharacteristic = null;
+        const balancaStatusDiv = document.getElementById('balancaStatus');
+        balancaStatusDiv.textContent = "Desconectado";
+        const conectarBalancaBtn = document.getElementById('conectarBalanca');
+        conectarBalancaBtn.classList.remove('connected');
+        mostrarNotificacao("Balança desconectada");
+        
+        // Desabilitar campo de peso
+        pesoInput.disabled = true;
+    }
+    
+    // Função para processar dados recebidos da balança
+    function handleBalancaValueChanged(event) {
+        const value = event.target.value;
+        const decoder = new TextDecoder('utf-8');
+        const frameRecebido = decoder.decode(value).trim();
+        
+        console.log('Frame recebido da balança:', frameRecebido);
+        
+        // Verificar se é um frame de peso válido (formato: "PESO      0 N")
+        if (frameRecebido.startsWith('PESO')) {
+            const ultimoFrame = frameRecebido;
+            
+            // Extrair o peso e o status
+            const pesoStr = frameRecebido.substring(4, 11).trim();
+            const statusBalanca = frameRecebido.charAt(frameRecebido.length - 1);
+            
+            // Converter para número
+            const pesoAtual = parseFloat(pesoStr);
+            
+            // Atualizar status da balança
+            let statusText = "";
+            switch(statusBalanca) {
+                case 'A': statusText = "Aguarde"; break;
+                case 'N': statusText = "Aguardando animal"; break;
+                case 'P': statusText = "Pronto para congelar"; break;
+                case 'C': statusText = "Peso congelado"; break;
+                case 'R': statusText = "Peso registrado"; break;
+                default: statusText = "Status desconhecido"; break;
+            }
+            
+            const balancaStatusDiv = document.getElementById('balancaStatus');
+            balancaStatusDiv.textContent = `Status: ${statusText} (${pesoAtual} kg)`;
+            
+            // Se o status for 'C' (congelado) ou 'R' (registrado), atualizar o campo de peso
+            if (statusBalanca === 'C' || statusBalanca === 'R') {
+                pesoInput.value = pesoAtual;
+                
+                // Calcular GMD
+                calcularNovoGMD();
+                
+                // Se estiver no modo automação e o status for 'R', iniciar o processo de salvamento
+                if (automationActive && statusBalanca === 'R') {
+                    beep();
+                    autoPesoTriggered = true;
+                    animateSaveButton();
+                    
+                    // Habilitar os checkboxes se necessário
+                    fazerManejoCheckbox.disabled = false;
+                    fazerApartacaoCheckbox.disabled = false;
+                    submitButton.disabled = false;
+                }
+            }
+        }
+    }
+
     // Event Listeners
     toggleAutomation.addEventListener('change', function() {
         automationActive = this.checked;
@@ -1019,6 +1283,12 @@ document.addEventListener('DOMContentLoaded', function() {
             registrarManejo(new FormData(this));
         }
     });
+
+    // Event listeners para botões Bluetooth
+    const conectarBastaoBtn = document.getElementById('conectarBastao');
+    const conectarBalancaBtn = document.getElementById('conectarBalanca');
+    conectarBastaoBtn.addEventListener('click', conectarBastao);
+    conectarBalancaBtn.addEventListener('click', conectarBalanca);
 
     // Inicializar campos
     pesoInput.disabled = true;

@@ -1,9 +1,11 @@
 {% load custom_filters %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <title>Relatório do Animal - {{ animal.brinco_visual }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
         /* Reset básico */
         * {
@@ -18,15 +20,35 @@
             line-height: 1.4;
             color: #333;
             background: white;
-            padding: 20mm;
+            padding: 0;
         }
 
         /* Cabeçalho */
         header {
-            text-align: center;
             margin-bottom: 20px;
             padding-bottom: 10px;
             border-bottom: 2px solid #333;
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-container {
+            width: 100px;
+            height: 100px;
+            margin-right: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .header-info {
+            flex: 1;
         }
 
         header h1 {
@@ -104,11 +126,17 @@
             padding-top: 10px;
             border-top: 1px solid #ddd;
             font-size: 10px;
-            text-align: center;
+            color: #666;
         }
 
-        footer p {
-            margin: 2px 0;
+        .footer-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+        }
+
+        .footer-left, .footer-right {
+            font-size: 10px;
         }
 
         /* Botão de Impressão */
@@ -145,10 +173,20 @@
 <body>
     <!-- Cabeçalho -->
     <header>
-        <h1>{{ cabecalho.empresa }}</h1>
-        <p>CNPJ: {{ cabecalho.cnpj }}</p>
-        <p>{{ cabecalho.endereco }} - {{ cabecalho.cidade_uf }}</p>
-        <p>Tel: {{ cabecalho.telefone }} - Email: {{ cabecalho.email }}</p>
+        <div class="logo-container">
+            {% if fazenda_logo %}
+                <img src="{{ fazenda_logo }}" alt="Logo da Fazenda">
+            {% else %}
+                <div style="width: 100px; height: 100px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; border: 1px solid #ddd;">
+                    <span style="font-size: 10px; color: #999;">Sem logo</span>
+                </div>
+            {% endif %}
+        </div>
+        <div class="header-info">
+            <h1>{{ cabecalho.empresa }}</h1>
+            <p>{{ cabecalho.endereco }}</p>
+            <p>Data de Emissão: <span id="data-hora-cabecalho">Carregando...</span></p>
+        </div>
     </header>
 
     <!-- Título do Relatório -->
@@ -661,17 +699,50 @@
 
     <!-- Rodapé -->
     <footer>
-        <p>Responsável Técnico: {{ rodape.responsavel_tecnico }} - {{ rodape.crmv }}</p>
-        <p>{{ rodape.sistema }}</p>
-        <p>Emitido em: {% now "d/m/Y H:i" %}</p>
+        <p>Relatório gerado em <span id="data-hora-local">Carregando...</span></p>
+        <div class="footer-info">
+            <div class="footer-left">
+                <p>PecuaristaPRO</p>
+                <p>Versão {{ versao_sistema|default:"1.0.0" }}</p>
+            </div>
+            <div class="footer-right">
+                <p>Desenvolvido por LWL Solutions Ltda</p>
+                <p>www.pecuaristapro.com</p>
+            </div>
+        </div>
     </footer>
 
     <!-- Botão de Impressão -->
     <button onclick="handlePrint()" class="print-button">
         <i class="bi bi-printer"></i> Imprimir
     </button>
+    
+    <!-- Botão de Configurações de Impressão -->
+    <button onclick="window.print()" class="print-button" style="right: 120px;">
+        <i class="bi bi-gear"></i> Configurações
+    </button>
 
     <script>
+        // Função para formatar a data no formato brasileiro
+        function formatarDataHora(data) {
+            const dia = data.getDate().toString().padStart(2, '0');
+            const mes = (data.getMonth() + 1).toString().padStart(2, '0');
+            const ano = data.getFullYear();
+            const hora = data.getHours().toString().padStart(2, '0');
+            const minuto = data.getMinutes().toString().padStart(2, '0');
+            
+            return `${dia}/${mes}/${ano} às ${hora}:${minuto}`;
+        }
+
+        // Atualiza os elementos com a data e hora local do navegador
+        document.addEventListener('DOMContentLoaded', function() {
+            const dataHoraLocal = new Date();
+            const dataFormatada = formatarDataHora(dataHoraLocal);
+            
+            document.getElementById('data-hora-cabecalho').textContent = dataFormatada;
+            document.getElementById('data-hora-local').textContent = dataFormatada;
+        });
+
         // Função para lidar com a impressão
         function handlePrint() {
             // Esconde o botão

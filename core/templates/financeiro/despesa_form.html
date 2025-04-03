@@ -288,16 +288,16 @@ $(document).ready(function() {
         itensContainer.appendChild(newItem);
     });
 
-    function setupItemEventListeners(item) {
-        const categoriaSelect = item.querySelector('.categoria-select');
-        const subcategoriaSelect = item.querySelector('.subcategoria-select');
-        const destinoSelect = item.querySelector('.destino-select');
-        const insumoField = item.querySelector('.insumo-field');
-        const insumoSelect = item.querySelector('.insumo-select');
-        const insumoInput = item.querySelector('.insumo-input');
-        const toggleInsumoBtn = item.querySelector('.toggle-insumo-input');
-        const unidadeMedidaField = item.querySelector('.unidade-medida-field');
-        const unidadeMedidaSelect = item.querySelector('.unidade-medida-select');
+    function setupItemEventListeners(itemRow) {
+        const categoriaSelect = itemRow.querySelector('.categoria-select');
+        const subcategoriaSelect = itemRow.querySelector('.subcategoria-select');
+        const destinoSelect = itemRow.querySelector('.destino-select');
+        const insumoField = itemRow.querySelector('.insumo-field');
+        const insumoSelect = itemRow.querySelector('.insumo-select');
+        const insumoInput = itemRow.querySelector('.insumo-input');
+        const toggleInsumoBtn = itemRow.querySelector('.toggle-insumo-input');
+        const unidadeMedidaField = itemRow.querySelector('.unidade-medida-field');
+        const unidadeMedidaSelect = itemRow.querySelector('.unidade-medida-select');
         
         // Setup insumo toggle
         toggleInsumoBtn.addEventListener('click', function() {
@@ -336,111 +336,45 @@ $(document).ready(function() {
             const selectedOption = this.options[this.selectedIndex];
             const categoriaText = selectedOption.text;
             
-            // Determina a alocação com base no texto da categoria ou no atributo data-alocacao
-            let alocacao = selectedOption.dataset.alocacao;
-            
-            // Para categorias globais, infere a alocação pelo nome
-            if (!alocacao) {
-                if (categoriaText.includes('Estoque') || categoriaText.includes('Insumo')) {
-                    alocacao = 'estoque';
-                    console.log('Alocação inferida como estoque pelo nome da categoria:', categoriaText);
-                }
-            }
-            
             console.log('Categoria selecionada:', categoriaText);
-            console.log('Alocação:', alocacao);
-            console.log('É categoria de estoque?', isCategoriaEstoque(this));
             
-            // Mostra/esconde campo de insumo baseado na alocação
-            if (insumoField) {
-                const isEstoque = isCategoriaEstoque(this);
-                console.log('Campo de insumo deve ser exibido?', isEstoque);
-                insumoField.style.display = isEstoque ? 'block' : 'none';
-                
-                if (!isEstoque) {
-                    // Se não for estoque, limpa e desabilita os campos de insumo
-                    insumoSelect.value = '';
-                    insumoInput.value = '';
-                    unidadeMedidaSelect.value = '';
-                    unidadeMedidaField.style.display = 'none';
-                    unidadeMedidaSelect.removeAttribute('required');
-                } else {
-                    // Se for estoque, carrega os insumos
-                    fetch('{% url "get_insumos" %}')
-                        .then(response => response.json())
-                        .then(data => {
-                            insumoSelect.innerHTML = '<option value="">Selecione um insumo existente ou digite um novo...</option>';
-                            data.forEach(insumo => {
-                                insumoSelect.innerHTML += `<option value="${insumo.id}">${insumo.nome}</option>`;
-                            });
-                            insumoSelect.disabled = false;
-                            
-                            // Mostra o campo de unidade de medida apenas se for um novo insumo
-                            if (insumoInput.style.display !== 'none') {
-                                unidadeMedidaField.style.display = 'block';
-                                unidadeMedidaSelect.setAttribute('required', 'required');
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Erro ao carregar insumos:', error);
-                            insumoSelect.innerHTML = '<option value="">Erro ao carregar insumos</option>';
-                            insumoSelect.disabled = true;
-                        });
-                }
-            }
+            // Usa a função toggleInsumoFields para mostrar/ocultar campos de insumo
+            toggleInsumoFields(this, itemRow);
             
             // Limpa e desabilita os selects
             subcategoriaSelect.innerHTML = '<option value="">Carregando...</option>';
-            destinoSelect.innerHTML = '<option value="">Carregando...</option>';
             subcategoriaSelect.disabled = true;
-            destinoSelect.disabled = true;
             
             // Carrega subcategorias
             if (categoriaId) {
                 fetch(`/api/financeiro/categorias/${categoriaId}/subcategorias/`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Erro ao carregar subcategorias');
-                        }
-                        return response.json();
-                    })
+                    .then(response => response.json())
                     .then(data => {
-                        if (Array.isArray(data)) {
-                            subcategoriaSelect.innerHTML = '<option value="">Selecione...</option>';
-                            data.forEach(sub => {
-                                subcategoriaSelect.innerHTML += `<option value="${sub.id}">${sub.nome}</option>`;
-                            });
-                            subcategoriaSelect.disabled = false;
-                        } else {
-                            throw new Error('Formato de dados inválido');
-                        }
+                        subcategoriaSelect.innerHTML = '<option value="">Selecione uma subcategoria</option>';
+                        data.forEach(subcategoria => {
+                            subcategoriaSelect.innerHTML += `<option value="${subcategoria.id}">${subcategoria.nome}</option>`;
+                        });
+                        subcategoriaSelect.disabled = false;
                     })
                     .catch(error => {
                         console.error('Erro ao carregar subcategorias:', error);
                         subcategoriaSelect.innerHTML = '<option value="">Erro ao carregar subcategorias</option>';
-                        subcategoriaSelect.disabled = true;
                     });
-                
-                // Carrega destinos baseado no tipo de alocação
-                if (alocacao) {
-                    carregarDestinos(alocacao, destinoSelect);
-                } else {
-                    destinoSelect.innerHTML = '<option value="">Selecione a categoria primeiro...</option>';
-                    destinoSelect.disabled = true;
-                }
+            } else {
+                subcategoriaSelect.innerHTML = '<option value="">Selecione uma categoria primeiro</option>';
             }
         });
 
         // Atualiza valor total quando quantidade ou valor unitário mudam
         function atualizarValorTotal() {
-            const quantidade = parseFloat(item.querySelector('.quantidade-input').value) || 0;
-            const valorUnitario = parseFloat(item.querySelector('.valor-unitario-input').value) || 0;
-            item.querySelector('.valor-total-input').value = (quantidade * valorUnitario).toFixed(2);
+            const quantidade = parseFloat(itemRow.querySelector('.quantidade-input').value) || 0;
+            const valorUnitario = parseFloat(itemRow.querySelector('.valor-unitario-input').value) || 0;
+            itemRow.querySelector('.valor-total-input').value = (quantidade * valorUnitario).toFixed(2);
             atualizarParcelas();
         }
 
-        item.querySelector('.quantidade-input').addEventListener('input', atualizarValorTotal);
-        item.querySelector('.valor-unitario-input').addEventListener('input', atualizarValorTotal);
+        itemRow.querySelector('.quantidade-input').addEventListener('input', atualizarValorTotal);
+        itemRow.querySelector('.valor-unitario-input').addEventListener('input', atualizarValorTotal);
     }
 
     // Configura os event listeners para o primeiro item
@@ -448,61 +382,79 @@ $(document).ready(function() {
 
     // Função para verificar se uma categoria é do tipo estoque
     function isCategoriaEstoque(categoriaSelect) {
-        if (!categoriaSelect || categoriaSelect.selectedIndex <= 0) return false;
-        
+        // Verifica pelo atributo data-alocacao
         const selectedOption = categoriaSelect.options[categoriaSelect.selectedIndex];
-        if (!selectedOption) return false;
-        
-        // Verificar diretamente pelo texto da categoria para categorias globais
-        const categoriaText = selectedOption.text.toLowerCase();
-        const keywords = ['estoque', 'insumo', 'ração', 'medicamento', 'vacina', 'suplemento'];
-        for (const keyword of keywords) {
-            if (categoriaText.includes(keyword.toLowerCase())) {
-                console.log('Categoria identificada como estoque pelo nome:', selectedOption.text);
-                return true;
-            }
+        if (selectedOption.dataset.alocacao === 'estoque') {
+            return true;
         }
         
-        // Para categorias do usuário, verificar pelo atributo data-alocacao
-        const alocacao = selectedOption.dataset.alocacao;
-        console.log('Verificando categoria:', selectedOption.text, 'Alocação:', alocacao);
-        
-        return alocacao === 'estoque';
+        // Para categorias globais, verifica pelo nome
+        const categoriaText = selectedOption.text.toLowerCase();
+        const keywords = ['estoque', 'insumo', 'ração', 'medicamento', 'vacina', 'suplemento'];
+        return keywords.some(keyword => categoriaText.includes(keyword.toLowerCase()));
     }
 
     // Função para carregar os destinos com base no tipo de alocação
-    function carregarDestinos(tipoAlocacao, destinoSelect) {
-        // Converte para minúsculas para garantir consistência
-        tipoAlocacao = tipoAlocacao.toLowerCase();
+    function loadDestinos(itemRow, alocacao) {
+        const destinoSelect = itemRow.querySelector('.destino-select');
+        const destinoLabel = itemRow.querySelector('.destino-label');
         
-        console.log('Carregando destinos para alocação:', tipoAlocacao);
+        console.log('Carregando destinos para alocação:', alocacao);
         
-        // Limpa o select de destino
-        destinoSelect.innerHTML = '<option value="">Selecione...</option>';
+        destinoSelect.innerHTML = '<option value="">Carregando...</option>';
+        destinoSelect.disabled = true;
         
-        // Carrega os destinos apropriados com base no tipo de alocação
-        fetch(`/api/financeiro/destinos/?tipo_alocacao=${tipoAlocacao}`)
-            .then(response => response.json())
-            .then(data => {
-                data.forEach(destino => {
-                    const option = document.createElement('option');
-                    option.value = destino.id;
-                    option.textContent = destino.nome;
-                    destinoSelect.appendChild(option);
+        let url = '';
+        let labelText = '';
+        
+        // Usa a API get_destinos que já existe no sistema
+        url = '/api/financeiro/destinos/?tipo_alocacao=' + (alocacao || '');
+        
+        switch(alocacao) {
+            case 'fazenda':
+                labelText = 'Fazenda Destino';
+                destinoSelect.setAttribute('required', 'required');
+                break;
+            case 'lote':
+                labelText = 'Lote Destino';
+                break;
+            case 'maquina':
+                labelText = 'Máquina Destino';
+                break;
+            case 'benfeitoria':
+                labelText = 'Benfeitoria Destino';
+                break;
+            case 'pastagem':
+                labelText = 'Pastagem Destino';
+                break;
+            case 'estoque':
+                labelText = 'Fazenda Destino';
+                destinoSelect.setAttribute('required', 'required');
+                break;
+            default:
+                destinoSelect.innerHTML = '<option value="">Sem destino necessário</option>';
+                destinoSelect.disabled = true;
+                destinoLabel.textContent = 'Destino';
+                return;
+        }
+        
+        if (url) {
+            destinoLabel.textContent = labelText;
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    destinoSelect.innerHTML = '<option value="">Selecione...</option>';
+                    data.forEach(item => {
+                        destinoSelect.innerHTML += `<option value="${item.id}">${item.nome}</option>`;
+                    });
+                    destinoSelect.disabled = false;
+                })
+                .catch(error => {
+                    console.error(`Erro ao carregar destinos para ${alocacao}:`, error);
+                    destinoSelect.innerHTML = '<option value="">Erro ao carregar destinos</option>';
                 });
-                destinoSelect.disabled = false;
-                
-                // Para categorias de estoque, o destino (fazenda) é obrigatório
-                // pois é necessário para criar a entrada no estoque
-                const itemRow = destinoSelect.closest('.item-row');
-                const categoriaSelect = itemRow.querySelector('.categoria-select');
-                if (isCategoriaEstoque(categoriaSelect)) {
-                    destinoSelect.setAttribute('required', 'required');
-                } else {
-                    destinoSelect.removeAttribute('required');
-                }
-            })
-            .catch(error => console.error('Erro ao carregar destinos:', error));
+        }
     }
 
     // Event listener para submit do formulário
@@ -511,8 +463,8 @@ $(document).ready(function() {
 
         // Coleta dados dos itens
         const itens = [];
-        document.querySelectorAll('.item-row').forEach(item => {
-            const categoriaSelect = item.querySelector('.categoria-select');
+        document.querySelectorAll('.item-row').forEach(itemRow => {
+            const categoriaSelect = itemRow.querySelector('.categoria-select');
             const selectedOption = categoriaSelect.options[categoriaSelect.selectedIndex];
             const categoriaText = selectedOption.text;
             
@@ -521,7 +473,9 @@ $(document).ready(function() {
             
             // Para categorias globais, infere a alocação pelo nome
             if (!alocacao) {
-                if (categoriaText.includes('Estoque') || categoriaText.includes('Insumo')) {
+                if (categoriaText.includes('Estoque') || categoriaText.includes('Insumo') || 
+                    categoriaText.includes('Ração') || categoriaText.includes('Medicamento') || 
+                    categoriaText.includes('Vacina') || categoriaText.includes('Suplemento')) {
                     alocacao = 'estoque';
                     console.log('Alocação inferida como estoque pelo nome da categoria:', categoriaText);
                 }
@@ -529,34 +483,48 @@ $(document).ready(function() {
             
             console.log('Processando item com categoria:', categoriaText);
             console.log('Alocação:', alocacao);
-            console.log('É categoria de estoque?', isCategoriaEstoque(categoriaSelect));
+            
+            // Verifica se é categoria de estoque (pela alocação ou pelo nome)
+            const isEstoque = alocacao === 'estoque' || 
+                              (categoriaText.toLowerCase().includes('estoque') || 
+                               categoriaText.toLowerCase().includes('insumo') ||
+                               categoriaText.toLowerCase().includes('ração') ||
+                               categoriaText.toLowerCase().includes('medicamento') ||
+                               categoriaText.toLowerCase().includes('vacina') ||
+                               categoriaText.toLowerCase().includes('suplemento'));
+            
+            console.log('É categoria de estoque?', isEstoque);
             
             let insumoData = null;
-            if (isCategoriaEstoque(categoriaSelect)) {
+            if (isEstoque) {
                 console.log('Categoria identificada como estoque');
-                const insumoSelect = item.querySelector('.insumo-select');
-                const insumoInput = item.querySelector('.insumo-input');
+                const insumoSelect = itemRow.querySelector('.insumo-select');
+                const insumoInput = itemRow.querySelector('.insumo-input');
+                const unidadeMedidaSelect = itemRow.querySelector('.unidade-medida-select');
                 
-                if (insumoInput.style.display !== 'none') {
+                if (insumoInput.style.display !== 'none' && insumoInput.value) {
                     // Modo de novo insumo
                     insumoData = {
                         id: null,
                         nome: insumoInput.value,
-                        unidade_medida_id: item.querySelector('.unidade-medida-select').value
+                        unidade_medida_id: unidadeMedidaSelect.value
                     };
                     console.log('Novo insumo:', insumoData);
-                } else {
+                } else if (insumoSelect.value) {
                     // Modo de insumo existente
                     insumoData = {
                         id: insumoSelect.value,
                         nome: insumoSelect.options[insumoSelect.selectedIndex].text
                     };
                     console.log('Insumo existente:', insumoData);
+                } else {
+                    // Nenhum insumo selecionado ou criado
+                    alert('Para categorias de estoque, é necessário selecionar ou criar um insumo.');
+                    return;
                 }
                 
                 // Para categorias de estoque, o destino (fazenda) é obrigatório
-                // pois é necessário para criar a entrada no estoque
-                const destino = item.querySelector('.destino-select').value;
+                const destino = itemRow.querySelector('.destino-select').value;
                 if (!destino) {
                     alert('Para categorias de estoque, o destino é obrigatório.');
                     return;
@@ -566,11 +534,11 @@ $(document).ready(function() {
             // Coleta os dados do item
             const itemData = {
                 categoria_id: categoriaSelect.value,
-                subcategoria_id: item.querySelector('.subcategoria-select').value,
-                quantidade: parseFloat(item.querySelector('.quantidade-input').value),
-                valor_unitario: parseFloat(item.querySelector('.valor-unitario-input').value),
-                valor_total: parseFloat(item.querySelector('.valor-total-input').value),
-                destino_id: item.querySelector('.destino-select').value,
+                subcategoria_id: itemRow.querySelector('.subcategoria-select').value,
+                quantidade: parseFloat(itemRow.querySelector('.quantidade-input').value),
+                valor_unitario: parseFloat(itemRow.querySelector('.valor-unitario-input').value),
+                valor_total: parseFloat(itemRow.querySelector('.valor-total-input').value),
+                destino_id: itemRow.querySelector('.destino-select').value,
                 alocacao: alocacao  // Adiciona o tipo de alocação inferido
             };
             
@@ -582,6 +550,12 @@ $(document).ready(function() {
             console.log('Dados do item a serem enviados:', itemData);
             itens.push(itemData);
         });
+        
+        // Verifica se há pelo menos um item
+        if (itens.length === 0) {
+            alert('É necessário adicionar pelo menos um item à despesa.');
+            return;
+        }
         
         // Adiciona os dados dos itens ao hidden input
         document.getElementById('itensData').value = JSON.stringify(itens);
@@ -675,6 +649,67 @@ $(document).ready(function() {
 
     // Inicializar visibilidade
     secaoParcelas.style.display = formaPagamento.value === 'PR' ? 'block' : 'none';
+
+    // Função para mostrar/ocultar campos de insumo com base na categoria selecionada
+    function toggleInsumoFields(categoriaSelect, itemRow) {
+        const insumoContainer = itemRow.querySelector('.insumo-container');
+        const insumoField = itemRow.querySelector('.insumo-field');
+        const insumoSelect = itemRow.querySelector('.insumo-select');
+        const insumoInput = itemRow.querySelector('.insumo-input');
+        const unidadeMedidaField = itemRow.querySelector('.unidade-medida-field');
+        const unidadeMedidaSelect = itemRow.querySelector('.unidade-medida-select');
+        
+        if (isCategoriaEstoque(categoriaSelect)) {
+            console.log('Exibindo campos de insumo para categoria de estoque');
+            insumoContainer.style.display = 'block';
+            
+            // Carrega os insumos
+            fetch('{% url "get_insumos" %}')
+                .then(response => response.json())
+                .then(data => {
+                    insumoSelect.innerHTML = '<option value="">Selecione um insumo existente ou digite um novo...</option>';
+                    data.forEach(insumo => {
+                        insumoSelect.innerHTML += `<option value="${insumo.id}">${insumo.nome}</option>`;
+                    });
+                    insumoSelect.disabled = false;
+                    
+                    // Mostra o campo de unidade de medida apenas se for um novo insumo
+                    if (insumoInput.style.display !== 'none') {
+                        unidadeMedidaField.style.display = 'block';
+                        unidadeMedidaSelect.setAttribute('required', 'required');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar insumos:', error);
+                    insumoSelect.innerHTML = '<option value="">Erro ao carregar insumos</option>';
+                    insumoSelect.disabled = true;
+                });
+            
+            // Garante que o destino seja uma fazenda para categorias de estoque
+            const destinoSelect = itemRow.querySelector('.destino-select');
+            const destinoLabel = itemRow.querySelector('.destino-label');
+            
+            // Carrega as fazendas como destino
+            loadDestinos(itemRow, 'fazenda');
+            destinoLabel.textContent = 'Fazenda Destino';
+            destinoSelect.setAttribute('required', 'required');
+        } else {
+            console.log('Ocultando campos de insumo para categoria não-estoque');
+            insumoContainer.style.display = 'none';
+            
+            // Limpa e desabilita os campos de insumo
+            insumoSelect.value = '';
+            insumoInput.value = '';
+            unidadeMedidaSelect.value = '';
+            unidadeMedidaField.style.display = 'none';
+            unidadeMedidaSelect.removeAttribute('required');
+            
+            // Carrega os destinos normais com base na alocação
+            const selectedOption = categoriaSelect.options[categoriaSelect.selectedIndex];
+            const alocacao = selectedOption.dataset.alocacao;
+            loadDestinos(itemRow, alocacao);
+        }
+    }
 });
 </script>
 {% endblock %}

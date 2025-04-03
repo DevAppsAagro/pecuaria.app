@@ -112,7 +112,7 @@ def imprimir_animal(request, pk):
         lucro = valor_saida - valor_entrada - custos_total if valor_saida else 0
     else:
         peso_final = ultima_pesagem.peso if ultima_pesagem else peso_atual
-        arrobas_final = peso_final / Decimal('30') if peso_final else 0
+        arrobas_final = peso_final / Decimal('30') if peso_atual else 0
 
     # Buscar históricos
     pesagens = Pesagem.objects.filter(animal=animal).order_by('-data')
@@ -169,21 +169,23 @@ def imprimir_animal(request, pk):
             estacao_origem = manejo_origem.estacao_monta
     
     # Informações do cabeçalho
+    # Obter a fazenda selecionada pelo usuário
+    fazenda_atual = request.session.get('fazenda_atual')
+    fazenda = None
+    if fazenda_atual:
+        fazenda = Fazenda.objects.filter(id=fazenda_atual).first()
+    
     cabecalho = {
-        'empresa': 'FAZENDA MODELO LTDA',
-        'cnpj': '12.345.678/0001-90',
-        'endereco': 'Rodovia BR 101, Km 123',
-        'cidade_uf': 'Cidade Alta - MT',
-        'telefone': '(11) 1234-5678',
-        'email': 'contato@fazendamodelo.com.br'
+        'empresa': fazenda.nome if fazenda else request.user.first_name,
+        'endereco': fazenda.endereco if fazenda and fazenda.endereco else "",
+        'cidade': fazenda.cidade if fazenda else "",
+        'estado': fazenda.estado if fazenda else "",
+        'cnpj': fazenda.cnpj if fazenda and hasattr(fazenda, 'cnpj') else "",
+        'logo_url': fazenda.logo_url if fazenda and fazenda.logo_url else None
     }
     
-    # Informações do rodapé
-    rodape = {
-        'responsavel_tecnico': 'Dr. João Silva',
-        'crmv': 'CRMV-MT 12345',
-        'sistema': 'Sistema de Gestão Pecuária v1.0'
-    }
+    # Preparar a URL do logo da fazenda, se existir
+    fazenda_logo = fazenda.logo_url if fazenda and hasattr(fazenda, 'logo_url') and fazenda.logo_url else None
     
     # Obter data e hora local (UTC-3)
     from datetime import datetime
@@ -224,8 +226,13 @@ def imprimir_animal(request, pk):
         'bezerros_organizados': bezerros_organizados,
         'estacao_origem': estacao_origem,
         'cabecalho': cabecalho,
-        'rodape': rodape,
+        'rodape': {
+            'responsavel_tecnico': 'Dr. João Silva',
+            'crmv': 'CRMV-MT 12345',
+            'sistema': 'Sistema de Gestão Pecuária v1.0'
+        },
         'data_hora_local': data_hora_local,
+        'fazenda_logo': fazenda_logo,
     }
     
     return render(request, 'impressao/animal_detail_print.html', context)
@@ -446,23 +453,6 @@ def imprimir_pesagens(request):
     }
     
     # Informações do cabeçalho
-    cabecalho = {
-        'empresa': 'FAZENDA MODELO LTDA',
-        'cnpj': '12.345.678/0001-90',
-        'endereco': 'Rodovia BR 101, Km 123'
-    }
-    
-    # Obter data e hora local (UTC-3)
-    from datetime import datetime
-    import pytz
-    
-    # Definir o fuso horário do Brasil (UTC-3)
-    tz_brasil = pytz.timezone('America/Sao_Paulo')
-    
-    # Obter a data e hora atual no fuso horário do Brasil
-    data_hora_local = datetime.now(tz_brasil)
-    
-    # Obtém o lote selecionado se houver
     lote_selecionado = None
     if lote_id:
         lote_selecionado = Lote.objects.filter(id=lote_id).first()
@@ -470,11 +460,10 @@ def imprimir_pesagens(request):
             # Atualiza o cabeçalho com os dados da fazenda
             cabecalho = {
                 'empresa': lote_selecionado.fazenda.nome,
-                'cnpj': lote_selecionado.fazenda.inscricao_estadual or '',
                 'endereco': f"{lote_selecionado.fazenda.cidade}/{lote_selecionado.fazenda.estado}"
             }
     
-    # Obtém o animal selecionado se houver
+    # Obter o animal selecionado se houver
     animal_selecionado = None
     if animal_id:
         animal_selecionado = Animal.objects.filter(id=animal_id).first()
@@ -482,7 +471,6 @@ def imprimir_pesagens(request):
             # Atualiza o cabeçalho com os dados da fazenda do animal
             cabecalho = {
                 'empresa': animal_selecionado.fazenda_atual.nome,
-                'cnpj': animal_selecionado.fazenda_atual.inscricao_estadual or '',
                 'endereco': f"{animal_selecionado.fazenda_atual.cidade}/{animal_selecionado.fazenda_atual.estado}"
             }
     
@@ -497,7 +485,7 @@ def imprimir_pesagens(request):
     
     fazendas_diferentes = len(fazendas_ids) > 1
     
-    # Obtém a logo da fazenda, se disponível
+    # Obter a logo da fazenda, se disponível
     fazenda_logo = None
     if lote_selecionado and lote_selecionado.fazenda and lote_selecionado.fazenda.logo_url:
         fazenda_logo = lote_selecionado.fazenda.logo_url
@@ -523,11 +511,14 @@ def imprimir_pesagens(request):
         },
         'lote_selecionado': lote_selecionado,
         'animal_selecionado': animal_selecionado,
-        'cabecalho': cabecalho,
+        'cabecalho': {
+            'empresa': fazenda.nome if fazenda else request.user.first_name,
+            'endereco': f"{fazenda.cidade} - {fazenda.estado}" if fazenda else ""
+        },
         'fazenda_logo': fazenda_logo,
         'fazendas_diferentes': fazendas_diferentes,
         'versao_sistema': '1.0.0',  # Versão do sistema
-        'data_hora_local': data_hora_local,
+        'data_hora_local': datetime.now(pytz.timezone('America/Sao_Paulo')),
     }
     
     return render(request, 'impressao/pesagens_print.html', context)
@@ -617,13 +608,23 @@ def despesas_print(request):
     }
     
     # Dados do cabeçalho
+    # Obter a fazenda selecionada pelo usuário
+    fazenda_atual = request.session.get('fazenda_atual')
+    fazenda = None
+    if fazenda_atual:
+        fazenda = Fazenda.objects.filter(id=fazenda_atual).first()
+    
     cabecalho = {
-        'empresa': request.user.first_name,
-        'cnpj': request.user.profile.cnpj if hasattr(request.user, 'profile') else '',
-        'endereco': request.user.profile.endereco if hasattr(request.user, 'profile') else '',
-        'cidade': request.user.profile.cidade if hasattr(request.user, 'profile') else '',
-        'estado': request.user.profile.estado if hasattr(request.user, 'profile') else ''
+        'empresa': fazenda.nome if fazenda else request.user.first_name,
+        'endereco': fazenda.endereco if fazenda and fazenda.endereco else "",
+        'cidade': fazenda.cidade if fazenda else "",
+        'estado': fazenda.estado if fazenda else "",
+        'cnpj': fazenda.cnpj if fazenda and hasattr(fazenda, 'cnpj') else "",
+        'logo_url': fazenda.logo_url if fazenda and fazenda.logo_url else None
     }
+    
+    # Preparar a URL do logo da fazenda, se existir
+    fazenda_logo = fazenda.logo_url if fazenda and hasattr(fazenda, 'logo_url') and fazenda.logo_url else None
     
     # Obter data e hora local (UTC-3)
     from datetime import datetime
@@ -635,7 +636,8 @@ def despesas_print(request):
     # Obter a data e hora atual no fuso horário do Brasil
     data_hora_local = datetime.now(tz_brasil)
     
-    return render(request, 'impressao/despesas_print.html', {
+    # Contexto
+    context = {
         'despesas': despesas,
         'valores_totais': valores_totais,
         'filtros': filtros,
@@ -643,9 +645,13 @@ def despesas_print(request):
         'total_geral': total_geral,
         'total_pago': total_pago,
         'total_pendente': total_pendente,
+        'fazenda_logo': fazenda_logo,
+        'versao_sistema': '1.0.0',
         'now': timezone.now(),
         'data_hora_local': data_hora_local,
-    })
+    }
+    
+    return render(request, 'impressao/despesas_print.html', context)
 
 @login_required
 def imprimir_compras(request):
@@ -903,9 +909,19 @@ def imprimir_dre(request):
             fazenda_logo = fazenda.logo_url
     
     # Montar dados do cabeçalho
+    # Obter a fazenda selecionada pelo usuário
+    fazenda_atual = request.session.get('fazenda_atual')
+    fazenda = None
+    if fazenda_atual:
+        fazenda = Fazenda.objects.filter(id=fazenda_atual).first()
+    
     cabecalho = {
-        'empresa': fazenda.nome if fazenda else 'Todas as Fazendas',
-        'endereco': f"{fazenda.cidade}/{fazenda.estado}" if fazenda else '-',
+        'empresa': fazenda.nome if fazenda else request.user.first_name,
+        'endereco': fazenda.endereco if fazenda and fazenda.endereco else "",
+        'cidade': fazenda.cidade if fazenda else "",
+        'estado': fazenda.estado if fazenda else "",
+        'cnpj': fazenda.cnpj if fazenda and hasattr(fazenda, 'cnpj') else "",
+        'logo_url': fazenda.logo_url if fazenda and fazenda.logo_url else None
     }
     
     # Dados dos filtros para exibição
@@ -1016,9 +1032,19 @@ def imprimir_fluxo_caixa(request):
             mensagem_erro = f"Erro ao processar dados: {e}"
     
     # Montar dados do cabeçalho
+    # Obter a fazenda selecionada pelo usuário
+    fazenda_atual = request.session.get('fazenda_atual')
+    fazenda = None
+    if fazenda_atual:
+        fazenda = Fazenda.objects.filter(id=fazenda_atual).first()
+    
     cabecalho = {
-        'empresa': fazenda.nome if fazenda else 'Todas as Fazendas',
-        'endereco': f"{fazenda.cidade}/{fazenda.estado}" if fazenda else '-',
+        'empresa': fazenda.nome if fazenda else request.user.first_name,
+        'endereco': fazenda.endereco if fazenda and fazenda.endereco else "",
+        'cidade': fazenda.cidade if fazenda else "",
+        'estado': fazenda.estado if fazenda else "",
+        'cnpj': fazenda.cnpj if fazenda and hasattr(fazenda, 'cnpj') else "",
+        'logo_url': fazenda.logo_url if fazenda and fazenda.logo_url else None
     }
     
     # Dados dos filtros para exibição

@@ -1,0 +1,260 @@
+{% extends 'base_print.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Fluxo de Caixa - Impressão{% endblock %}
+
+{% block head %}
+<style>
+    body {
+        font-size: 12px;
+    }
+    .table-cash-flow th, .table-cash-flow td {
+        text-align: center;
+        padding: 0.25rem 0.5rem;
+        font-size: 90%;
+    }
+    .table-cash-flow .text-left {
+        text-align: left;
+    }
+    .table-cash-flow .positive {
+        color: #28a745;
+        font-weight: bold;
+    }
+    .table-cash-flow .negative {
+        color: #dc3545;
+        font-weight: bold;
+    }
+    .table-cash-flow .category-header {
+        background-color: #f8f9fa;
+        font-weight: bold;
+    }
+    .table-cash-flow .subcategory {
+        padding-left: 1.5rem;
+    }
+    .table-cash-flow .result-row {
+        background-color: #e9ecef;
+        font-weight: bold;
+    }
+    .table-cash-flow .final-row {
+        background-color: #dee2e6;
+        font-weight: bold;
+    }
+    
+    .report-header {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .report-header h1 {
+        font-size: 20px;
+        margin-bottom: 5px;
+    }
+    .report-header p {
+        font-size: 14px;
+        margin-bottom: 5px;
+    }
+    
+    .summary-card {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 8px;
+        margin-bottom: 10px;
+        background-color: #f8f9fa;
+    }
+    .summary-card h5 {
+        font-size: 14px;
+        margin-bottom: 5px;
+    }
+    .summary-card p {
+        font-size: 14px;
+        margin-bottom: 0;
+    }
+    
+    @media print {
+        .table-cash-flow {
+            font-size: 10px;
+        }
+        .table-cash-flow th, .table-cash-flow td {
+            padding: 2px 4px;
+        }
+        .positive {
+            color: #28a745 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .negative {
+            color: #dc3545 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .category-header, .result-row, .final-row {
+            background-color: #f8f9fa !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-2">
+    <div class="report-header">
+        <h1>Fluxo de Caixa</h1>
+        <p>Período: {{ dados_fluxo.data_inicial|date:"d/m/Y" }} a {{ dados_fluxo.data_final|date:"d/m/Y" }}</p>
+        {% if fazenda_selecionada %}
+            <p>Fazenda: {{ fazenda_selecionada.nome }}</p>
+        {% else %}
+            <p>Todas as Fazendas</p>
+        {% endif %}
+        <p>Data de Emissão: {% now "d/m/Y H:i" %}</p>
+    </div>
+
+    <!-- Resumo -->
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <div class="summary-card">
+                <h5>Total de Entradas</h5>
+                <p>R$ {{ dados_fluxo.total_entradas|floatformat:2 }}</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="summary-card">
+                <h5>Total de Saídas</h5>
+                <p>R$ {{ dados_fluxo.total_saidas|floatformat:2 }}</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="summary-card">
+                <h5>Fluxo Líquido</h5>
+                <p class="{% if dados_fluxo.fluxo_liquido > 0 %}positive{% elif dados_fluxo.fluxo_liquido < 0 %}negative{% endif %}">
+                    R$ {{ dados_fluxo.fluxo_liquido|floatformat:2 }}
+                </p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="summary-card">
+                <h5>Saldo Acumulado</h5>
+                <p class="{% if dados_fluxo.saldo_acumulado > 0 %}positive{% elif dados_fluxo.saldo_acumulado < 0 %}negative{% endif %}">
+                    R$ {{ dados_fluxo.saldo_acumulado|floatformat:2 }}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Fluxo de Caixa Mensal -->
+    <div class="table-responsive">
+        <table class="table table-sm table-bordered table-cash-flow">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-left">Descrição</th>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <th>{{ mes_nome }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Saldo Inicial -->
+                <tr>
+                    <td class="text-left">Saldo Inicial</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td class="{% if dados_fluxo.saldo_inicial_por_mes|get_dict_item:mes_nome > 0 %}positive{% elif dados_fluxo.saldo_inicial_por_mes|get_dict_item:mes_nome < 0 %}negative{% endif %}">
+                            R$ {{ dados_fluxo.saldo_inicial_por_mes|get_dict_item:mes_nome|floatformat:2 }}
+                        </td>
+                    {% endfor %}
+                </tr>
+                
+                <!-- Entradas -->
+                <tr class="category-header">
+                    <td class="text-left">ENTRADAS</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td>R$ {{ dados_fluxo.dados_por_categoria.entradas_total|get_dict_item:mes_nome|floatformat:2 }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="text-left subcategory">Vendas</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td>R$ {{ dados_fluxo.dados_por_categoria.entradas_vendas|get_dict_item:mes_nome|floatformat:2 }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="text-left subcategory">Abates</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td>R$ {{ dados_fluxo.dados_por_categoria.entradas_abates|get_dict_item:mes_nome|floatformat:2 }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="text-left subcategory">Outras Entradas</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td>R$ {{ dados_fluxo.dados_por_categoria.entradas_outras|get_dict_item:mes_nome|floatformat:2 }}</td>
+                    {% endfor %}
+                </tr>
+                
+                <!-- Saídas -->
+                <tr class="category-header">
+                    <td class="text-left">SAÍDAS</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td>R$ {{ dados_fluxo.dados_por_categoria.saidas_total|get_dict_item:mes_nome|floatformat:2 }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="text-left subcategory">Custos Fixos</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td>R$ {{ dados_fluxo.dados_por_categoria.saidas_custos_fixos|get_dict_item:mes_nome|floatformat:2 }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="text-left subcategory">Custos Variáveis</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td>R$ {{ dados_fluxo.dados_por_categoria.saidas_custos_variaveis|get_dict_item:mes_nome|floatformat:2 }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="text-left subcategory">Investimentos</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td>R$ {{ dados_fluxo.dados_por_categoria.saidas_investimentos|get_dict_item:mes_nome|floatformat:2 }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="text-left subcategory">Compras de Animais</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td>R$ {{ dados_fluxo.dados_por_categoria.saidas_compras_animais|get_dict_item:mes_nome|floatformat:2 }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="text-left subcategory">Outras Saídas</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td>R$ {{ dados_fluxo.dados_por_categoria.saidas_outras|get_dict_item:mes_nome|floatformat:2 }}</td>
+                    {% endfor %}
+                </tr>
+                
+                <!-- Saldo Mensal -->
+                <tr class="result-row">
+                    <td class="text-left">SALDO MENSAL</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td class="{% if dados_fluxo.saldo_mensal|get_dict_item:mes_nome > 0 %}positive{% elif dados_fluxo.saldo_mensal|get_dict_item:mes_nome < 0 %}negative{% endif %}">
+                            R$ {{ dados_fluxo.saldo_mensal|get_dict_item:mes_nome|floatformat:2 }}
+                        </td>
+                    {% endfor %}
+                </tr>
+                
+                <!-- Saldo Acumulado -->
+                <tr class="final-row">
+                    <td class="text-left">SALDO ACUMULADO</td>
+                    {% for mes_nome in dados_fluxo.lista_meses %}
+                        <td class="{% if dados_fluxo.saldo_acumulado_por_mes|get_dict_item:mes_nome > 0 %}positive{% elif dados_fluxo.saldo_acumulado_por_mes|get_dict_item:mes_nome < 0 %}negative{% endif %}">
+                            R$ {{ dados_fluxo.saldo_acumulado_por_mes|get_dict_item:mes_nome|floatformat:2 }}
+                        </td>
+                    {% endfor %}
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // Imprimir automaticamente ao carregar a página
+    window.onload = function() {
+        window.print();
+    };
+</script>
+{% endblock %}

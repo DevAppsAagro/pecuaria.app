@@ -1,0 +1,388 @@
+{% extends 'base.html' %}
+{% block title %}Fluxo de Caixa{% endblock %}
+
+{% block head %}
+    <!-- Adicionar referência ao jQuery primeiro (se ainda não estiver incluído) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Adicionar referência ao Toastr CSS e JS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    
+    <script>
+        // Configuração do toastr para mensagens temporárias
+        $(document).ready(function() {
+            toastr.options = {
+                "closeButton": true,
+                "positionClass": "toast-bottom-right",
+                "preventDuplicates": true,
+                "showDuration": "300",
+                "hideDuration": "1000",
+                "timeOut": "3000",
+                "extendedTimeOut": "1000"
+            };
+            
+            // Esconder o spinner inicialmente
+            $("#spinner-overlay").hide();
+        });
+    </script>
+    
+    <style>
+        /* Estilos específicos para o relatório de Fluxo de Caixa - Interface compacta */
+        .table-sm td, .table-sm th {
+            padding: 0.15rem 0.3rem;
+            font-size: 0.8rem;
+        }
+        
+        .table-sm .table-header th {
+            background-color: #f8f9fa;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .table-sm .subtotal {
+            font-weight: bold;
+            background-color: #f0f0f0;
+        }
+        
+        .table-sm .total {
+            font-weight: bold;
+            background-color: #e9ecef;
+        }
+        
+        .table-sm .saldo-final {
+            font-weight: bold;
+            font-size: 0.9rem;
+            background-color: #e9ecef;
+        }
+        
+        .table-sm .saldo-positivo {
+            color: #198754;
+        }
+        
+        .table-sm .saldo-negativo {
+            color: #dc3545;
+        }
+        
+        .table-sm .categoria {
+            font-weight: bold;
+        }
+        
+        .table-sm .subcategoria {
+            padding-left: 1rem;
+        }
+        
+        /* Estilos para o spinner de carregamento */
+        #spinner-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .spinner-container {
+            text-align: center;
+        }
+        
+        .spinner-text {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        
+        .small {
+            font-size: 80%;
+        }
+        .toggle-icon {
+            cursor: pointer;
+            margin-right: 5px;
+            font-size: 0.7rem;
+        }
+        .detalhes-categoria {
+            display: none;
+        }
+        .text-success {
+            color: #28a745 !important;
+        }
+        .text-danger {
+            color: #dc3545 !important;
+        }
+        .bg-light-success {
+            background-color: rgba(40, 167, 69, 0.1);
+        }
+        .bg-light-danger {
+            background-color: rgba(220, 53, 69, 0.1);
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+        .sticky-col {
+            position: sticky;
+            left: 0;
+            background-color: #fff;
+            z-index: 1;
+        }
+        .table-bordered th, .table-bordered td {
+            border: 1px solid #dee2e6;
+        }
+        /* Reduzir tamanho da fonte no relatório */
+        #report-content .table {
+            font-size: 0.75rem;
+        }
+        #report-content .fw-bold {
+            font-weight: 600 !important;
+        }
+        #report-content .card-title {
+            font-size: 0.95rem;
+        }
+        /* Ajustes para melhor visualização */
+        #report-content .table-sm td, 
+        #report-content .table-sm th {
+            padding: 0.12rem 0.25rem;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="container-fluid">
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="mb-0">Fluxo de Caixa</h4>
+                    {% if dados_fluxo %}
+                    <a href="{% url 'imprimir_fluxo_caixa' %}?mes_ano={{ filtros.mes_ano }}&fazenda={{ filtros.fazenda }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-print"></i> Imprimir
+                    </a>
+                    {% endif %}
+                </div>
+                
+                <!-- Filtros -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-light py-2">
+                        <h6 class="card-title mb-0"><i class="fas fa-filter me-2"></i>Filtros</h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <form id="form-filtros" method="get" class="row g-3">
+                            <div class="col-md-5">
+                                <label for="mes_ano" class="form-label small mb-1">Mês Inicial</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                                    <input type="month" class="form-control" id="mes_ano" name="mes_ano" value="{{ filtros.mes_ano }}" required>
+                                </div>
+                                <small class="text-muted">Selecione o mês inicial para projeção de 12 meses</small>
+                            </div>
+                            <div class="col-md-5">
+                                <label for="fazenda" class="form-label small mb-1">Fazenda</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-map-marker-alt"></i></span>
+                                    <select class="form-select" id="fazenda" name="fazenda">
+                                        <option value="">Todas as Fazendas</option>
+                                        {% for fazenda in fazendas %}
+                                        <option value="{{ fazenda.id }}" {% if fazenda_selecionada.id == fazenda.id %}selected{% endif %}>{{ fazenda.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <small class="text-muted">Filtre por uma fazenda específica ou veja todas</small>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">&nbsp;</label>
+                                <button type="submit" class="btn btn-primary w-100 d-block" onclick="document.getElementById('spinner-overlay').style.display='block';">
+                                    <i class="fas fa-search me-1"></i> Gerar Relatório
+                                </button>
+                                <small class="text-muted">&nbsp;</small>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                {% if dados_fluxo %}
+                <!-- Relatório de Fluxo de Caixa -->
+                <div id="report-content" class="card shadow">
+                    <div class="card-header bg-light py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">Fluxo de Caixa - Projeção 12 meses</h5>
+                            <div>
+                                <span class="badge bg-primary">Início: {{ filtros.mes_ano }}</span>
+                                {% if fazenda_selecionada %}
+                                <span class="badge bg-secondary">{{ fazenda_selecionada.nome }}</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Todas as Fazendas</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-body p-3">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="sticky-col">Descrição</th>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <th class="text-center">{{ mes.nome }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Saldo Inicial -->
+                                    <tr class="table-primary">
+                                        <td class="fw-bold sticky-col">1. SALDO INICIAL</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end fw-bold">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'saldo_inicial'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Entradas -->
+                                    <tr class="table-success">
+                                        <td class="fw-bold sticky-col">2. ENTRADAS DE CAIXA</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end fw-bold">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'entradas_total'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Entradas Operacionais -->
+                                    <tr>
+                                        <td class="ps-3 sticky-col">2.1 Entradas Operacionais</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'entradas_op'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Vendas de Animais -->
+                                    <tr>
+                                        <td class="ps-4 sticky-col">Vendas de Animais</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'entradas_vendas'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Abates -->
+                                    <tr>
+                                        <td class="ps-4 sticky-col">Abates</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'entradas_abates'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Entradas Não Operacionais -->
+                                    <tr>
+                                        <td class="ps-3 sticky-col">2.2 Entradas Não Operacionais</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'entradas_nao_operacionais'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Saídas -->
+                                    <tr class="table-danger">
+                                        <td class="fw-bold sticky-col">3. SAÍDAS DE CAIXA</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                            {% with dados_mes=dados_fluxo.dados_mensais|get_dict_item:mes.nome %}
+                                                <td class="text-end fw-bold">R$ {{ dados_mes.saidas_total|floatformat:2 }}</td>
+                                            {% endwith %}
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Saídas Operacionais -->
+                                    <tr>
+                                        <td class="ps-3 sticky-col">3.1 Saídas Operacionais</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'saidas_op'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Custos Fixos -->
+                                    <tr>
+                                        <td class="ps-4 sticky-col">Custos Fixos</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'saidas_custos_fixos'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Custos Variáveis -->
+                                    <tr>
+                                        <td class="ps-4 sticky-col">Custos Variáveis</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'saidas_custos_variaveis'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Investimentos -->
+                                    <tr>
+                                        <td class="ps-3 sticky-col">3.2 Investimentos</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'saidas_investimentos'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Compra de Animais -->
+                                    <tr>
+                                        <td class="ps-4 sticky-col">Compra de Animais</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'saidas_compra_animais'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Outros Investimentos -->
+                                    <tr>
+                                        <td class="ps-4 sticky-col">Outros Investimentos</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'saidas_outros_investimentos'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Saídas Não Operacionais -->
+                                    <tr>
+                                        <td class="ps-3 sticky-col">3.3 Saídas Não Operacionais</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'saidas_nao_operacionais'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Fluxo Líquido -->
+                                    <tr class="table-info">
+                                        <td class="fw-bold sticky-col">4. FLUXO LÍQUIDO (2-3)</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end fw-bold {% if dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'fluxo_liquido' >= 0 %}text-success{% else %}text-danger{% endif %}">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'fluxo_liquido'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    
+                                    <!-- Saldo Acumulado -->
+                                    <tr class="table-primary">
+                                        <td class="fw-bold sticky-col">5. SALDO ACUMULADO (1+4)</td>
+                                        {% for mes in dados_fluxo.meses %}
+                                        <td class="text-end fw-bold {% if dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'saldo_acumulado' >= 0 %}text-success{% else %}text-danger{% endif %}">R$ {{ dados_fluxo.dados_mensais|get_dict_item:mes.nome|get_dict_item:'saldo_acumulado'|floatformat:2 }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <!-- Mensagem quando não houver filtros aplicados -->
+                <div class="card mb-2">
+                    <div class="card-body p-3 text-center">
+                        <p class="mb-0">Selecione o mês inicial e a fazenda (opcional) para visualizar o relatório de fluxo de caixa.</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Spinner de carregamento -->
+    <div id="spinner-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.8); z-index: 9999;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <div style="margin-top: 10px; font-weight: bold; color: #0d6efd;">Gerando relatório...</div>
+        </div>
+    </div>
+{% endblock %}

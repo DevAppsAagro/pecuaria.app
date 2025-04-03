@@ -545,17 +545,14 @@ def atualizar_dre_dados(usuario, data_inicial, data_final, fazenda_id=None):
     # Filtramos os animais comprados depois por fazenda, se necessário
     total_compra_animais = 0
     for compra in compras:
-        compra_total = 0
         # Se temos um filtro de fazenda, verificamos se os animais estão nessa fazenda
         if fazenda_id:
             for animal_compra in compra.animais.all():
-                if animal_compra.animal.fazenda_atual_id == fazenda_id:
-                    compra_total += float(animal_compra.valor_total or 0)
+                if animal_compra.animal.fazenda_atual_id == int(fazenda_id):
+                    total_compra_animais += float(animal_compra.valor_total or 0)
         else:
-            # Sem filtro de fazenda, somamos todos
-            compra_total = compra.animais.aggregate(total=Sum('valor_total'))['total'] or 0
-            
-        total_compra_animais += float(compra_total)
+            # Sem filtro de fazenda, somamos todos os valores dos animais
+            total_compra_animais += float(compra.valor_total or 0)
     
     # Percentual de compra de animais em relação às receitas
     percentual_compra_animais = (float(total_compra_animais) / receitas_totais_float) * 100 if receitas_totais_float > 0 else 0

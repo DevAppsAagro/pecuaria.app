@@ -183,7 +183,11 @@ def logout_view(request):
 
 @login_required
 def dashboard_view(request):
-    return render(request, 'em_desenvolvimento.html', {'titulo': 'Dashboard'})
+    """
+    Redireciona para o dashboard simples
+    """
+    # Redirecionamento para o dashboard simples
+    return redirect('dashboard_simples')
 
 @login_required
 def em_desenvolvimento(request):

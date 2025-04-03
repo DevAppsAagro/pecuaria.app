@@ -1,0 +1,9 @@
+Substitua a função dashboard_view (linhas 184-189) por:
+
+@login_required
+def dashboard_view(request):
+    """
+    Redireciona para o dashboard simples
+    """
+    # Redirecionamento para o dashboard simples
+    return redirect('dashboard_simples')
