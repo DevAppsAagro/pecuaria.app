@@ -1036,6 +1036,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let balancaNotificationsStarted = false;
     let bastaoReadInterval = null;
     let balancaReadInterval = null;
+    let ultimoBrincoLido = ''; // Armazenar o último brinco lido para evitar duplicatas
+    let ultimaLeituraBrinco = 0; // Timestamp da última leitura válida
     
     // Variáveis para controle do estado da balança
     let pesoAtual = 0;
@@ -1278,7 +1280,34 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('Brinco lido:', brincoLido);
         
-        if (brincoLido) {
+        // Verificar se o brinco é válido (não vazio e não contém apenas caracteres nulos)
+        const brincoValido = brincoLido && 
+                            !/^[\x00\s]*$/.test(brincoLido) && // Não contém apenas nulos ou espaços
+                            brincoLido.length > 1 && // Tem pelo menos 2 caracteres
+                            brincoLido.length < 30; // Não é muito longo (provavelmente erro)
+        
+        // Verificar se já passou tempo suficiente desde a última leitura (500ms)
+        const agora = Date.now();
+        const tempoSuficiente = (agora - ultimaLeituraBrinco) > 500;
+        
+        // Verificar se é diferente do último brinco lido
+        const brincoNovo = brincoLido !== ultimoBrincoLido;
+        
+        console.log('Dados recebidos do bastão:', {
+            bruto: brincoLido,
+            valido: brincoValido,
+            novo: brincoNovo,
+            tempoSuficiente: tempoSuficiente
+        });
+        
+        // Só processa se for um brinco válido, novo e tiver passado tempo suficiente
+        if (brincoValido && (brincoNovo || tempoSuficiente)) {
+            console.log('Brinco válido lido:', brincoLido);
+            
+            // Atualizar variáveis de controle
+            ultimoBrincoLido = brincoLido;
+            ultimaLeituraBrinco = agora;
+            
             // Preencher o campo de brinco
             brincoInput.value = brincoLido;
             
@@ -1294,7 +1323,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
-    
+
     // Função para conectar à balança
     async function conectarBalanca() {
         try {
