@@ -1066,7 +1066,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     'device_information',
                     // Serviços genéricos
                     '00001800-0000-1000-8000-00805f9b34fb',
-                    '00001801-0000-1000-8000-00805f9b34fb'
+                    '00001801-0000-1000-8000-00805f9b34fb',
+                    // Serviço HID (Human Interface Device) - comum em leitores
+                    '00001812-0000-1000-8000-00805f9b34fb',
+                    // Serviços adicionais que podem estar presentes em leitores
+                    '0000ffe0-0000-1000-8000-00805f9b34fb',
+                    '0000ffe1-0000-1000-8000-00805f9b34fb',
+                    '0000fff0-0000-1000-8000-00805f9b34fb',
+                    '0000180f-0000-1000-8000-00805f9b34fb'  // Battery Service
                 ]
             });
             
@@ -1094,6 +1101,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 '00001101-0000-1000-8000-00805f9b34fb',
                 // Serviço UART padrão
                 '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+                // Serviços comuns em leitores
+                '0000ffe0-0000-1000-8000-00805f9b34fb',
+                '0000fff0-0000-1000-8000-00805f9b34fb',
+                // Serviço HID
+                '00001812-0000-1000-8000-00805f9b34fb',
                 // Outros serviços comuns
                 '0000180a-0000-1000-8000-00805f9b34fb',
                 'device_information'
@@ -1125,15 +1137,18 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Obter todas as características disponíveis
             const characteristics = await service.getCharacteristics();
-            console.log('Características disponíveis:', characteristics.map(c => ({
-                uuid: c.uuid,
-                properties: {
-                    read: c.properties.read,
-                    write: c.properties.write,
-                    notify: c.properties.notify,
-                    indicate: c.properties.indicate
-                }
-            })));
+            console.log('Características disponíveis:', characteristics.map(c => c.uuid));
+            
+            // Exibir propriedades de cada característica para depuração
+            for (const char of characteristics) {
+                console.log(`Propriedades da característica ${char.uuid}:`, {
+                    read: char.properties.read,
+                    write: char.properties.write,
+                    notify: char.properties.notify,
+                    indicate: char.properties.indicate,
+                    writeWithoutResponse: char.properties.writeWithoutResponse
+                });
+            }
             
             if (characteristics.length === 0) {
                 throw new Error('Nenhuma característica disponível no serviço');
@@ -1144,7 +1159,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Característica RX UART padrão
                 '6e400003-b5a3-f393-e0a9-e50e24dcca9e',
                 // Característica SPP
-                '00001101-0000-1000-8000-00805f9b34fb'
+                '00001101-0000-1000-8000-00805f9b34fb',
+                // Características comuns em leitores
+                '0000ffe1-0000-1000-8000-00805f9b34fb',
+                '0000fff1-0000-1000-8000-00805f9b34fb',
+                // Características de informação do dispositivo que podem conter dados úteis
+                '00002a23-0000-1000-8000-00805f9b34fb', // System ID
+                '00002a24-0000-1000-8000-00805f9b34fb', // Model Number
+                '00002a25-0000-1000-8000-00805f9b34fb', // Serial Number
+                '00002a26-0000-1000-8000-00805f9b34fb', // Firmware Revision
+                '00002a27-0000-1000-8000-00805f9b34fb', // Hardware Revision
+                '00002a28-0000-1000-8000-00805f9b34fb', // Software Revision
+                '00002a29-0000-1000-8000-00805f9b34fb'  // Manufacturer Name
             ];
             
             // Tentar encontrar uma característica que suporte notificações primeiro
@@ -1208,7 +1234,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 bastaoNotificationsStarted = false;
                 console.log('Modo de leitura periódica ativado');
                 
-                // Configurar leitura periódica a cada 1 segundo
+                // Configurar leitura periódica a cada 500ms (mais frequente para capturar leituras)
                 if (bastaoReadInterval) {
                     clearInterval(bastaoReadInterval);
                 }
@@ -1226,13 +1252,25 @@ document.addEventListener('DOMContentLoaded', function() {
                             onBastaoDisconnected();
                         }
                     }
-                }, 1000);
+                }, 500); // Reduzido para 500ms para maior responsividade
             } else {
                 throw new Error('A característica não suporta notificações nem leitura');
             }
             
+            // Tentar fazer uma leitura inicial para ver se o dispositivo responde
+            if (bastaoCharacteristic.properties.read) {
+                try {
+                    console.log('Tentando leitura inicial...');
+                    const value = await bastaoCharacteristic.readValue();
+                    console.log('Leitura inicial bem-sucedida:', Array.from(new Uint8Array(value.buffer)));
+                    handleBastaoValueChanged({ target: { value } });
+                } catch (error) {
+                    console.error('Erro na leitura inicial:', error);
+                }
+            }
+            
             bastaoStatusDiv.textContent = "Conectado a " + bastaoDevice.name;
-            mostrarNotificacao("Bastão conectado com sucesso!");
+            mostrarNotificacao("Bastão conectado com sucesso!", "success");
             
         } catch (error) {
             console.error('Erro ao conectar ao bastão:', error);
@@ -1250,7 +1288,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             setTimeout(() => {
                 conectarBastaoBtn.classList.remove('error');
-            }, 2000);
+            }, 3000);
+            
+            mostrarNotificacao("Erro ao conectar ao bastão: " + error.message, "error");
         }
     }
     
@@ -1275,10 +1315,58 @@ document.addEventListener('DOMContentLoaded', function() {
     // Função para processar dados recebidos do bastão
     function handleBastaoValueChanged(event) {
         const value = event.target.value;
-        const decoder = new TextDecoder('utf-8');
-        const brincoLido = decoder.decode(value).trim();
         
-        console.log('Brinco lido:', brincoLido);
+        // Exibir os dados brutos recebidos para depuração
+        console.log('Dados brutos recebidos do bastão:', Array.from(new Uint8Array(value.buffer)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+        
+        // Tentar diferentes decodificações
+        const decoder = new TextDecoder('utf-8');
+        let brincoLido = decoder.decode(value).trim();
+        
+        // Se o brinco estiver vazio ou contiver apenas caracteres nulos, tente outras abordagens
+        if (!brincoLido || /^[\x00\s]*$/.test(brincoLido)) {
+            // Tentar extrair caracteres ASCII válidos
+            const bytes = new Uint8Array(value.buffer);
+            const asciiChars = [];
+            
+            for (let i = 0; i < bytes.length; i++) {
+                // Considerar apenas caracteres ASCII imprimíveis (32-126)
+                if (bytes[i] >= 32 && bytes[i] <= 126) {
+                    asciiChars.push(String.fromCharCode(bytes[i]));
+                }
+            }
+            
+            if (asciiChars.length > 0) {
+                brincoLido = asciiChars.join('');
+                console.log('Brinco extraído de caracteres ASCII:', brincoLido);
+            }
+            
+            // Se ainda estiver vazio, tente interpretar como número
+            if (!brincoLido || /^[\x00\s]*$/.test(brincoLido)) {
+                // Tentar interpretar como número (big-endian e little-endian)
+                if (bytes.length >= 4) {
+                    const view = new DataView(value.buffer);
+                    const numBE = view.getUint32(0, false); // Big Endian
+                    const numLE = view.getUint32(0, true);  // Little Endian
+                    
+                    console.log('Possíveis interpretações numéricas:', {
+                        bigEndian: numBE,
+                        littleEndian: numLE
+                    });
+                    
+                    // Usar o número se for razoável (não zero e não muito grande)
+                    if (numBE > 0 && numBE < 1000000000) {
+                        brincoLido = numBE.toString();
+                        console.log('Usando interpretação numérica (BE):', brincoLido);
+                    } else if (numLE > 0 && numLE < 1000000000) {
+                        brincoLido = numLE.toString();
+                        console.log('Usando interpretação numérica (LE):', brincoLido);
+                    }
+                }
+            }
+        }
+        
+        console.log('Brinco lido após processamento:', brincoLido);
         
         // Verificar se o brinco é válido (não vazio e não contém apenas caracteres nulos)
         const brincoValido = brincoLido && 
@@ -1321,6 +1409,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (automationActive) {
                 pesoInput.focus();
             }
+            
+            // Mostrar notificação
+            mostrarNotificacao("Brinco lido: " + brincoLido, "success");
         }
     }
 
