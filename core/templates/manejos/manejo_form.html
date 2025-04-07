@@ -743,6 +743,13 @@ function mostrarNotificacao(mensagem, tipo = 'info', duracao = 3000) {
 // Variáveis adicionais para controle de erros
 let consecutiveErrors = 0;
 let lastErrorTime = 0;
+
+// Função para processar a fila de operações GATT
+async function processGattQueue() {
+    if (gattOperationQueue.length === 0) {
+        gattOperationInProgress = false;
+        return;
+    }
     
     gattOperationInProgress = true;
     const nextOperation = gattOperationQueue.shift();
@@ -1199,7 +1206,6 @@ async function conectarBalanca() {
                         balancaCharacteristic = notifyChar;
                         console.log('Usando característica com notificação:', notifyChar.uuid);
                         foundCharacteristic = true;
-                        break;
                     }
                 }
                 
@@ -1210,7 +1216,6 @@ async function conectarBalanca() {
                         balancaCharacteristic = readChar;
                         console.log('Usando característica com leitura:', readChar.uuid);
                         foundCharacteristic = true;
-                        break;
                     }
                 }
             } catch (error) {
