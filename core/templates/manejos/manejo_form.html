@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <style>
@@ -701,17 +702,9 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'core/manejos/bluetooth_code_clean.js' %}"></script>
 <script>
-// Variáveis globais para o Bluetooth
-// Bastão
-var bastaoDevice = null;
-var bastaoCharacteristic = null;
-var bastaoNotificationsStarted = false;
-var bastaoReadInterval = null;
-var ultimoBrincoLido = '';
-var ultimaLeituraBrinco = 0;
-
-// Balança
+// Variáveis adicionais para a balança
 var balancaDevice = null;
 var balancaCharacteristic = null;
 var balancaNotificationsStarted = false;
@@ -719,8 +712,9 @@ var balancaReadInterval = null;
 var ultimoPesoLido = 0;
 var ultimaLeituraBalanca = 0;
 
-// Controle de erros
-var errorCount = 0;
+// Variáveis de controle de erros específicos
+var bastaoErrorCount = 0;
+var balancaErrorCount = 0;
 
 // Função para mostrar notificações temporárias
 function mostrarNotificacao(mensagem, tipo = 'info', duracao = 3000) {
@@ -746,38 +740,9 @@ function mostrarNotificacao(mensagem, tipo = 'info', duracao = 3000) {
     }, duracao);
 }
 
-// Fila para operações GATT
-let gattOperationQueue = [];
-let gattOperationInProgress = false;
-let bastaoErrorCount = 0;
-let balancaErrorCount = 0;
+// Variáveis adicionais para controle de erros
 let consecutiveErrors = 0;
 let lastErrorTime = 0;
-const MAX_CONSECUTIVE_GATT_ERRORS = 5;
-
-async function executeGattOperation(operation) {
-    return new Promise((resolve, reject) => {
-        gattOperationQueue.push({
-            operation: operation,
-            resolve: resolve,
-            reject: reject,
-            retryCount: 0,
-            maxRetries: 5,
-            initialBackoff: 150,
-            currentBackoff: 150
-        });
-        if (!gattOperationInProgress) {
-            processGattQueue();
-        }
-    });
-}
-
-// Função para processar a fila de operações GATT
-async function processGattQueue() {
-    if (gattOperationQueue.length === 0) {
-        gattOperationInProgress = false;
-        return;
-    }
     
     gattOperationInProgress = true;
     const nextOperation = gattOperationQueue.shift();
@@ -987,10 +952,27 @@ async function conectarBastao() {
                     } catch (error) {
                         console.error('Erro na leitura periódica do bastão:', error);
                         bastaoErrorCount++;
-                        if (bastaoErrorCount > 5) {
+                        
+                        // Tratamento específico para NotSupportedError
+                        if (error.name === 'NotSupportedError' || (error.message && error.message.includes('GATT operation failed for unknown reason'))) {
+                            console.log('NotSupportedError detectado, aguardando antes da próxima tentativa...');
+                            // Não interromper a leitura, apenas aguardar mais tempo
+                            await new Promise(resolve => setTimeout(resolve, 1000 + (bastaoErrorCount * 200)));
+                        } else if (bastaoErrorCount > MAX_CONSECUTIVE_GATT_ERRORS) {
                             console.log('Muitos erros consecutivos, interrompendo leitura periódica');
                             clearInterval(bastaoReadInterval);
                             bastaoReadInterval = null;
+                            
+                            // Tentar reconectar após um tempo
+                            setTimeout(() => {
+                                if (!bastaoDevice || !bastaoDevice.gatt.connected) {
+                                    console.log('Tentando reconectar ao bastão...');
+                                    conectarBastao().catch(e => console.error('Falha ao reconectar:', e));
+                                } else {
+                                    // Reiniciar leitura periódica
+                                    configurarLeituraPeriodica();
+                                }
+                            }, 5000); // Aguardar 5 segundos antes de tentar reconectar
                         }
                     }
                 }, 1500); // Aumentado para 1.5 segundos
@@ -1280,10 +1262,49 @@ async function conectarBalanca() {
                     } catch (error) {
                         console.error('Erro na leitura periódica da balança:', error);
                         balancaErrorCount++;
-                        if (balancaErrorCount > MAX_CONSECUTIVE_GATT_ERRORS) {
-                            console.log('Muitos erros consecutivos, interrompendo leitura periódica');
+                        
+                        // Tratamento específico para NotSupportedError
+                        if (error.name === 'NotSupportedError' || (error.message && error.message.includes('GATT operation failed for unknown reason'))) {
+                            console.log('NotSupportedError detectado na balança, aguardando antes da próxima tentativa...');
+                            // Não interromper a leitura, apenas aguardar mais tempo
+                            await new Promise(resolve => setTimeout(resolve, 1000 + (balancaErrorCount * 200)));
+                        } else if (balancaErrorCount > MAX_CONSECUTIVE_GATT_ERRORS) {
+                            console.log('Muitos erros consecutivos na balança, interrompendo leitura periódica');
                             clearInterval(balancaReadInterval);
                             balancaReadInterval = null;
+                            
+                            // Tentar reconectar após um tempo
+                            setTimeout(() => {
+                                if (!balancaDevice || !balancaDevice.gatt.connected) {
+                                    console.log('Tentando reconectar à balança...');
+                                    conectarBalanca().catch(e => console.error('Falha ao reconectar balança:', e));
+                                } else {
+                                    // Reiniciar leitura periódica
+                                    balancaReadInterval = setInterval(async () => {
+                                        if (!balancaCharacteristic || !balancaDevice || !balancaDevice.gatt.connected) {
+                                            console.log('Balança desconectada ou característica não disponível, interrompendo leitura');
+                                            clearInterval(balancaReadInterval);
+                                            balancaReadInterval = null;
+                                            return;
+                                        }
+                                        
+                                        try {
+                                            await executeGattOperation(() => balancaCharacteristic.readValue());
+                                            const value = balancaCharacteristic.value;
+                                            handleBalancaValueChanged({ target: { value } });
+                                            balancaErrorCount = 0; // Resetar contador de erros após leitura bem-sucedida
+                                        } catch (error) {
+                                            console.error('Erro na leitura periódica da balança:', error);
+                                            balancaErrorCount++;
+                                            if (balancaErrorCount > MAX_CONSECUTIVE_GATT_ERRORS) {
+                                                console.log('Muitos erros consecutivos, interrompendo leitura periódica');
+                                                clearInterval(balancaReadInterval);
+                                                balancaReadInterval = null;
+                                            }
+                                        }
+                                    }, 1000);
+                                }
+                            }, 5000); // Aguardar 5 segundos antes de tentar reconectar
                         }
                     }
                 }, 1000); // Intervalo de 1 segundo para a balança
@@ -1484,5 +1505,47 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Função para verificar e reconectar dispositivos
+async function verificarConexoes() {
+    // Verificar bastão
+    if (bastaoDevice && !bastaoDevice.gatt.connected) {
+        console.log('Bastão desconectado, tentando reconectar...');
+        try {
+            // Limpar intervalos existentes
+            if (bastaoReadInterval) {
+                clearInterval(bastaoReadInterval);
+                bastaoReadInterval = null;
+            }
+            bastaoErrorCount = 0; // Resetar contador de erros
+            await conectarBastao();
+            mostrarNotificacao("Bastão reconectado automaticamente", "success");
+        } catch (error) {
+            console.error('Falha ao reconectar bastão:', error);
+            mostrarNotificacao("Falha ao reconectar bastão", "error");
+        }
+    }
+    
+    // Verificar balança
+    if (balancaDevice && !balancaDevice.gatt.connected) {
+        console.log('Balança desconectada, tentando reconectar...');
+        try {
+            // Limpar intervalos existentes
+            if (balancaReadInterval) {
+                clearInterval(balancaReadInterval);
+                balancaReadInterval = null;
+            }
+            balancaErrorCount = 0; // Resetar contador de erros
+            await conectarBalanca();
+            mostrarNotificacao("Balança reconectada automaticamente", "success");
+        } catch (error) {
+            console.error('Falha ao reconectar balança:', error);
+            mostrarNotificacao("Falha ao reconectar balança", "error");
+        }
+    }
+}
+
+// Configurar verificação periódica de conexão
+setInterval(verificarConexoes, 30000); // Verificar a cada 30 segundos
 </script>
 {% endblock %}
