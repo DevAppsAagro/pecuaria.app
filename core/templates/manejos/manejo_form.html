@@ -203,6 +203,183 @@
     .notificacao.error {
         border-left-color: #dc3545;
     }
+    
+    /* Estilos para o modo de campo */
+    .field-mode {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .field-mode .form-group {
+        margin-bottom: 5px;
+    }
+    
+    .field-mode label {
+        font-weight: bold;
+        margin-bottom: 2px;
+    }
+    
+    .field-mode input, .field-mode select {
+        padding: 8px;
+        font-size: 16px;
+    }
+    
+    /* Estilos para os botões de conexão Bluetooth */
+    .bt-connect-btn {
+        padding: 8px 15px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+    
+    .bt-connect-btn.connected {
+        background-color: #28a745;
+    }
+    
+    .bt-connect-btn.error {
+        background-color: #dc3545;
+    }
+    
+    .bt-status {
+        padding: 8px;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+    
+    /* Estilos para status da balança */
+    .bt-status.status-aguarde {
+        background-color: #fff3cd;
+        border-color: #ffeeba;
+        color: #856404;
+    }
+    
+    .bt-status.status-pronto {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+    }
+    
+    .bt-status.status-congelado {
+        background-color: #cce5ff;
+        border-color: #b8daff;
+        color: #004085;
+    }
+    
+    .bt-status.status-registrado {
+        background-color: #d1ecf1;
+        border-color: #bee5eb;
+        color: #0c5460;
+    }
+    
+    .bt-status.peso-capturado {
+        animation: highlight-peso 2s;
+    }
+    
+    @keyframes highlight-peso {
+        0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+    }
+    
+    /* Estilos para notificações */
+    .notificacao {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 10px 15px;
+        background-color: #007bff;
+        color: white;
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        z-index: 1000;
+        opacity: 0;
+        transform: translateY(-20px);
+        transition: opacity 0.3s, transform 0.3s;
+    }
+    
+    .notificacao.visivel {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    
+    .notificacao.success {
+        background-color: #28a745;
+    }
+    
+    .notificacao.error {
+        background-color: #dc3545;
+    }
+    
+    .notificacao.warning {
+        background-color: #ffc107;
+        color: #212529;
+    }
+    
+    /* Estilos para o botão de salvar */
+    .save-button-container {
+        margin-top: 20px;
+        text-align: center;
+    }
+    
+    .save-button {
+        padding: 10px 20px;
+        background-color: #28a745;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 16px;
+        cursor: pointer;
+    }
+    
+    .save-button:disabled {
+        background-color: #6c757d;
+        cursor: not-allowed;
+    }
+    
+    .save-button.pulse {
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.05);
+            background-color: #218838;
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+    
+    /* Estilos para o modo de automação */
+    .automation-toggle {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    
+    .automation-toggle input {
+        margin-right: 8px;
+    }
+    
+    .automation-active {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border: 1px solid #28a745;
+        border-radius: 4px;
+    }
 </style>
 
 <!-- Div para notificações temporárias -->
@@ -1317,42 +1494,129 @@ document.addEventListener('DOMContentLoaded', function() {
                     clearInterval(bastaoReadInterval);
                 }
                 
+                // Contador de erros consecutivos para controle de reconexão
+                let errorCount = 0;
+                const MAX_ERRORS = 5;
+                
                 bastaoReadInterval = setInterval(async () => {
                     try {
-                        const value = await executeGattOperation(async () => {
-                            return await bastaoCharacteristic.readValue();
-                        });
-                        handleBastaoValueChanged({ target: { value } });
-                    } catch (error) {
-                        console.error('Erro ao ler valor do bastão:', error);
-                        
-                        // Registrar detalhes do erro para depuração
-                        console.log('Tipo de erro:', error.name);
-                        console.log('Mensagem de erro:', error.message);
-                        
-                        // Tratamento específico para diferentes tipos de erros
-                        if (error.message.includes('GATT operation already in progress')) {
-                            // Este erro é esperado e será tratado pela fila de operações
-                            console.warn('Erro de operação GATT em andamento, será tratado pela fila');
-                        } else if (error.message.includes('GATT operation failed')) {
-                            // Erro de operação GATT genérico
-                            console.warn('Erro de operação GATT, tentando continuar...');
-                        } else if (error.name === 'NetworkError') {
-                            // Erro de rede pode indicar problemas de conexão
-                            console.warn('Erro de rede detectado, verificando conexão...');
-                            // Verificar se o dispositivo ainda está conectado
-                            if (bastaoDevice && bastaoDevice.gatt && !bastaoDevice.gatt.connected) {
-                                console.warn('Dispositivo desconectado, tentando reconectar...');
-                                // Tentar reconectar na próxima iteração
-                                setTimeout(() => {
-                                    if (bastaoDevice) {
-                                        bastaoDevice.gatt.connect()
-                                            .then(() => console.log('Reconectado com sucesso'))
-                                            .catch(err => console.error('Falha na reconexão:', err));
-                                    }
-                                }, 1000);
+                        // Verificar se o dispositivo ainda está conectado antes de tentar ler
+                        if (!bastaoDevice || !bastaoDevice.gatt || !bastaoDevice.gatt.connected) {
+                            console.warn('Dispositivo desconectado, tentando reconectar...');
+                            try {
+                                if (bastaoDevice) {
+                                    await bastaoDevice.gatt.connect();
+                                    console.log('Reconectado com sucesso');
+                                    // Resetar contador de erros após reconexão bem-sucedida
+                                    errorCount = 0;
+                                }
+                            } catch (reconnectError) {
+                                console.error('Falha na reconexão:', reconnectError);
+                                return; // Sair e tentar novamente no próximo intervalo
                             }
                         }
+                        
+                        // Tentar ler o valor com tratamento especial para "GATT operation failed"
+                        try {
+                            const value = await executeGattOperation(async () => {
+                                return await bastaoCharacteristic.readValue();
+                            });
+                            
+                            // Leitura bem-sucedida, resetar contador de erros
+                            errorCount = 0;
+                            handleBastaoValueChanged({ target: { value } });
+                        } catch (readError) {
+                            // Tratamento especial para "GATT operation failed"
+                            if (readError.message.includes('GATT operation failed')) {
+                                console.warn('Erro de operação GATT, tentando método alternativo...');
+                                
+                                // Tentar método alternativo: escrever um comando e depois ler
+                                try {
+                                    // Se a característica suporta escrita, enviar comando de leitura
+                                    if (bastaoCharacteristic.properties.write || 
+                                        bastaoCharacteristic.properties.writeWithoutResponse) {
+                                        
+                                        // Comando genérico para solicitar dados (0x01)
+                                        const cmd = new Uint8Array([0x01]);
+                                        
+                                        // Escrever comando
+                                        if (bastaoCharacteristic.properties.write) {
+                                            await executeGattOperation(async () => {
+                                                return await bastaoCharacteristic.writeValue(cmd);
+                                            });
+                                        } else {
+                                            await executeGattOperation(async () => {
+                                                return await bastaoCharacteristic.writeValueWithoutResponse(cmd);
+                                            });
+                                        }
+                                        
+                                        // Pequeno delay antes de ler
+                                        await new Promise(resolve => setTimeout(resolve, 200));
+                                        
+                                        // Tentar ler novamente
+                                        const value = await executeGattOperation(async () => {
+                                            return await bastaoCharacteristic.readValue();
+                                        });
+                                        
+                                        errorCount = 0;
+                                        handleBastaoValueChanged({ target: { value } });
+                                    } else {
+                                        throw new Error('Característica não suporta escrita');
+                                    }
+                                } catch (altError) {
+                                    // Se o método alternativo também falhar, incrementar contador de erros
+                                    errorCount++;
+                                    console.error('Método alternativo falhou:', altError);
+                                    
+                                    // Se excedeu o limite de erros, tentar reconectar completamente
+                                    if (errorCount >= MAX_ERRORS) {
+                                        console.warn(`Excedido limite de ${MAX_ERRORS} erros consecutivos, reconectando...`);
+                                        try {
+                                            // Desconectar e reconectar completamente
+                                            if (bastaoDevice && bastaoDevice.gatt) {
+                                                if (bastaoDevice.gatt.connected) {
+                                                    await bastaoDevice.gatt.disconnect();
+                                                }
+                                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                                await conectarBastao(); // Reconectar usando a função completa
+                                                errorCount = 0;
+                                            }
+                                        } catch (reconnectError) {
+                                            console.error('Falha na reconexão completa:', reconnectError);
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Outros erros
+                                console.error('Erro ao ler valor do bastão:', readError);
+                                console.log('Tipo de erro:', readError.name);
+                                console.log('Mensagem de erro:', readError.message);
+                                
+                                errorCount++;
+                                
+                                // Tratamento específico para diferentes tipos de erros
+                                if (readError.message.includes('GATT operation already in progress')) {
+                                    console.warn('Erro de operação GATT em andamento, será tratado pela fila');
+                                } else if (readError.name === 'NetworkError') {
+                                    console.warn('Erro de rede detectado');
+                                }
+                                
+                                // Se excedeu o limite de erros, tentar reconectar
+                                if (errorCount >= MAX_ERRORS) {
+                                    console.warn(`Excedido limite de ${MAX_ERRORS} erros consecutivos, reconectando...`);
+                                    try {
+                                        await conectarBastao(); // Reconectar usando a função completa
+                                        errorCount = 0;
+                                    } catch (reconnectError) {
+                                        console.error('Falha na reconexão completa:', reconnectError);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        // Erro geral no bloco principal
+                        console.error('Erro geral na leitura do bastão:', error);
+                        errorCount++;
                     }
                 }, 1000); // Mantido em 1000ms para evitar sobrecarga de operações GATT
             } else {
@@ -1361,37 +1625,112 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Tentar fazer uma leitura inicial para ver se o dispositivo responde
             // Mas com um pequeno delay para evitar colisão com outras operações GATT
+            // Atrasar a leitura inicial para dar tempo ao dispositivo de se estabilizar
             setTimeout(async () => {
                 if (bastaoCharacteristic.properties.read) {
                     try {
                         console.log('Tentando leitura inicial...');
-                        const value = await executeGattOperation(async () => {
-                            return await bastaoCharacteristic.readValue();
-                        });
-                        console.log('Leitura inicial bem-sucedida:', Array.from(new Uint8Array(value.buffer)));
-                        handleBastaoValueChanged({ target: { value } });
-                    } catch (error) {
-                        console.error('Erro na leitura inicial:', error);
-                        // Não desistir na primeira tentativa
-                        console.log('Tentando leitura inicial novamente após um delay maior...');
                         
-                        // Segunda tentativa após um delay maior
-                        setTimeout(async () => {
+                        // Verificar se o dispositivo ainda está conectado
+                        if (!bastaoDevice || !bastaoDevice.gatt || !bastaoDevice.gatt.connected) {
+                            console.warn('Dispositivo desconectado antes da leitura inicial, tentando reconectar...');
                             try {
-                                const value = await executeGattOperation(async () => {
-                                    return await bastaoCharacteristic.readValue();
-                                });
-                                console.log('Segunda tentativa de leitura bem-sucedida:', 
-                                    Array.from(new Uint8Array(value.buffer)));
-                                handleBastaoValueChanged({ target: { value } });
-                            } catch (secondError) {
-                                console.error('Erro na segunda tentativa de leitura:', secondError);
-                                // Registrar o erro mas continuar com o polling normal
+                                if (bastaoDevice) {
+                                    await bastaoDevice.gatt.connect();
+                                    console.log('Reconectado com sucesso antes da leitura inicial');
+                                }
+                            } catch (reconnectError) {
+                                console.error('Falha na reconexão antes da leitura inicial:', reconnectError);
+                                return; // Sair e deixar o intervalo regular tentar depois
                             }
-                        }, 1000); // Delay maior para a segunda tentativa
+                        }
+                        
+                        // Tentar diferentes abordagens para a leitura inicial
+                        try {
+                            // 1. Primeiro, tentar leitura normal
+                            const value = await executeGattOperation(async () => {
+                                return await bastaoCharacteristic.readValue();
+                            });
+                            console.log('Leitura inicial bem-sucedida:', Array.from(new Uint8Array(value.buffer)));
+                            handleBastaoValueChanged({ target: { value } });
+                        } catch (readError) {
+                            console.error('Erro na primeira tentativa de leitura inicial:', readError);
+                            
+                            // 2. Se falhar, tentar com um comando de escrita primeiro (se suportado)
+                            if (bastaoCharacteristic.properties.write || 
+                                bastaoCharacteristic.properties.writeWithoutResponse) {
+                                
+                                try {
+                                    console.log('Tentando método alternativo com escrita...');
+                                    
+                                    // Comando genérico para solicitar dados (0x01)
+                                    const cmd = new Uint8Array([0x01]);
+                                    
+                                    // Escrever comando
+                                    if (bastaoCharacteristic.properties.write) {
+                                        await executeGattOperation(async () => {
+                                            return await bastaoCharacteristic.writeValue(cmd);
+                                        });
+                                    } else {
+                                        await executeGattOperation(async () => {
+                                            return await bastaoCharacteristic.writeValueWithoutResponse(cmd);
+                                        });
+                                    }
+                                    
+                                    // Pequeno delay antes de ler
+                                    await new Promise(resolve => setTimeout(resolve, 300));
+                                    
+                                    // Tentar ler novamente
+                                    const value = await executeGattOperation(async () => {
+                                        return await bastaoCharacteristic.readValue();
+                                    });
+                                    
+                                    console.log('Leitura inicial após escrita bem-sucedida:', 
+                                        Array.from(new Uint8Array(value.buffer)));
+                                    handleBastaoValueChanged({ target: { value } });
+                                } catch (writeReadError) {
+                                    console.error('Erro no método alternativo com escrita:', writeReadError);
+                                    
+                                    // 3. Última tentativa: apenas aguardar mais tempo e tentar novamente
+                                    setTimeout(async () => {
+                                        try {
+                                            console.log('Fazendo última tentativa de leitura inicial após delay maior...');
+                                            const value = await executeGattOperation(async () => {
+                                                return await bastaoCharacteristic.readValue();
+                                            });
+                                            console.log('Terceira tentativa de leitura bem-sucedida:', 
+                                                Array.from(new Uint8Array(value.buffer)));
+                                            handleBastaoValueChanged({ target: { value } });
+                                        } catch (thirdError) {
+                                            console.error('Todas as tentativas de leitura inicial falharam:', thirdError);
+                                            // Deixar o intervalo regular tentar depois
+                                        }
+                                    }, 1500); // Delay ainda maior para a terceira tentativa
+                                }
+                            } else {
+                                // Se não suporta escrita, apenas tentar novamente com delay maior
+                                setTimeout(async () => {
+                                    try {
+                                        console.log('Segunda tentativa de leitura inicial após delay maior...');
+                                        const value = await executeGattOperation(async () => {
+                                            return await bastaoCharacteristic.readValue();
+                                        });
+                                        console.log('Segunda tentativa de leitura bem-sucedida:', 
+                                            Array.from(new Uint8Array(value.buffer)));
+                                        handleBastaoValueChanged({ target: { value } });
+                                    } catch (secondError) {
+                                        console.error('Segunda tentativa de leitura falhou:', secondError);
+                                        // Deixar o intervalo regular tentar depois
+                                    }
+                                }, 1200); // Delay maior para a segunda tentativa
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Erro geral na leitura inicial:', error);
+                        // Deixar o intervalo regular tentar depois
                     }
                 }
-            }, 800); // Aumentado para 800ms para dar mais tempo ao dispositivo
+            }, 1000); // Aumentado para 1000ms para dar mais tempo ao dispositivo
             
             bastaoStatusDiv.textContent = "Conectado a " + bastaoDevice.name;
             mostrarNotificacao("Bastão conectado com sucesso!", "success");
@@ -1637,20 +1976,32 @@ document.addEventListener('DOMContentLoaded', function() {
         pesoInput.disabled = true;
     }
     
-    // Função para processar dados recebidos da balança
+    // Função para processar dados recebidos da balança conforme documentação do fabricante
     function handleBalancaValueChanged(event) {
         const value = event.target.value;
         const decoder = new TextDecoder('utf-8');
         const frameRecebido = decoder.decode(value).trim();
         
+        // Exibir dados brutos para depuração
+        console.log('Dados brutos da balança:', Array.from(new Uint8Array(value.buffer)));
         console.log('Frame recebido da balança:', frameRecebido);
+        
+        // Atualizar o último frame recebido
+        ultimoFrame = frameRecebido;
         
         // Verificar se é um frame de peso válido (formato: "PESO      0 N")
         if (frameRecebido.startsWith('PESO')) {
-            const ultimoFrame = frameRecebido;
+            // Extrair o peso e o status conforme documentação do fabricante
+            // Formato: "PESO      0 N" onde N é o status
+            // Status: A - aguarde (aguarde)
+            //         N - nenhum (aguardando animal)
+            //         P - pronto (autoriza congela peso)
+            //         C - congelado (autoriza registrar o peso)
+            //         R - registrado (registrado)
             
-            // Extrair o peso e o status
+            // Extrair o peso (7 bytes após a palavra PESO)
             const pesoStr = frameRecebido.substring(4, 11).trim();
+            // O status é o último caractere
             const statusBalanca = frameRecebido.charAt(frameRecebido.length - 1);
             
             // Converter para número
@@ -1670,9 +2021,27 @@ document.addEventListener('DOMContentLoaded', function() {
             const balancaStatusDiv = document.getElementById('balancaStatus');
             balancaStatusDiv.textContent = `Status: ${statusText} (${pesoAtual} kg)`;
             
+            // Atualizar a interface com base no status
+            balancaStatusDiv.classList.remove('status-aguarde', 'status-pronto', 'status-congelado', 'status-registrado');
+            if (statusBalanca === 'A') {
+                balancaStatusDiv.classList.add('status-aguarde');
+            } else if (statusBalanca === 'P') {
+                balancaStatusDiv.classList.add('status-pronto');
+            } else if (statusBalanca === 'C') {
+                balancaStatusDiv.classList.add('status-congelado');
+            } else if (statusBalanca === 'R') {
+                balancaStatusDiv.classList.add('status-registrado');
+            }
+            
             // Se o status for 'C' (congelado) ou 'R' (registrado), atualizar o campo de peso
             if (statusBalanca === 'C' || statusBalanca === 'R') {
                 pesoInput.value = pesoAtual;
+                
+                // Destacar visualmente que o peso foi capturado
+                balancaStatusDiv.classList.add('peso-capturado');
+                setTimeout(() => {
+                    balancaStatusDiv.classList.remove('peso-capturado');
+                }, 2000);
                 
                 // Calcular GMD
                 calcularNovoGMD();
