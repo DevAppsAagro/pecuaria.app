@@ -721,7 +721,6 @@ var ultimaLeituraBalanca = 0;
 
 // Controle de erros
 var errorCount = 0;
-var MAX_CONSECUTIVE_GATT_ERRORS = 5;
 
 // Função para mostrar notificações temporárias
 function mostrarNotificacao(mensagem, tipo = 'info', duracao = 3000) {
@@ -747,11 +746,15 @@ function mostrarNotificacao(mensagem, tipo = 'info', duracao = 3000) {
     }, duracao);
 }
 
-// Fila de operações GATT
-var gattOperationQueue = [];
-var gattOperationInProgress = false;
+// Fila para operações GATT
+let gattOperationQueue = [];
+let gattOperationInProgress = false;
+let bastaoErrorCount = 0;
+let balancaErrorCount = 0;
+let consecutiveErrors = 0;
+let lastErrorTime = 0;
+const MAX_CONSECUTIVE_GATT_ERRORS = 5;
 
-// Função para executar operações GATT com fila e retry
 async function executeGattOperation(operation) {
     return new Promise((resolve, reject) => {
         gattOperationQueue.push({
@@ -760,8 +763,8 @@ async function executeGattOperation(operation) {
             reject: reject,
             retryCount: 0,
             maxRetries: 5,
-            initialBackoff: 100,
-            currentBackoff: 100
+            initialBackoff: 150,
+            currentBackoff: 150
         });
         if (!gattOperationInProgress) {
             processGattQueue();
@@ -779,13 +782,43 @@ async function processGattQueue() {
     gattOperationInProgress = true;
     const nextOperation = gattOperationQueue.shift();
     
+    // Verificar se houve muitos erros consecutivos e pausar brevemente
+    const now = Date.now();
+    if (consecutiveErrors > 10 && now - lastErrorTime < 5000) {
+        console.log('Muitos erros consecutivos, pausando a fila por 2 segundos...');
+        setTimeout(() => {
+            consecutiveErrors = 0;
+            gattOperationQueue.unshift(nextOperation);
+            processGattQueue();
+        }, 2000);
+        return;
+    }
+    
     try {
         const result = await nextOperation.operation();
         nextOperation.resolve(result);
-        errorCount = 0; // Resetar contador de erros em caso de sucesso
+        consecutiveErrors = 0; // Resetar contador de erros em caso de sucesso
     } catch (error) {
         console.error('Erro na operação GATT:', error);
-        errorCount++;
+        lastErrorTime = Date.now();
+        consecutiveErrors++;
+        
+        // Tratar erros específicos
+        if (error.name === 'NetworkError' && error.message.includes('GATT operation already in progress')) {
+            // Para este erro específico, esperar mais tempo
+            const delay = Math.min(500 * (nextOperation.retryCount + 1), 3000); // Máximo de 3 segundos
+            console.log(`Erro GATT operation already in progress. Aguardando ${delay}ms...`);
+            
+            // Incrementar contador de tentativas e backoff
+            nextOperation.retryCount++;
+            
+            // Colocar de volta na fila
+            setTimeout(() => {
+                gattOperationQueue.unshift(nextOperation);
+                processGattQueue();
+            }, delay);
+            return;
+        }
         
         // Verificar se deve tentar novamente
         if (nextOperation.retryCount < nextOperation.maxRetries) {
@@ -922,32 +955,46 @@ async function conectarBastao() {
             bastaoNotificationsStarted = true;
         } else if (bastaoCharacteristic.properties.read) {
             console.log('Configurando leitura periódica para o bastão...');
-            // Ler imediatamente
+            
+            // Adiciona um atraso antes da primeira leitura
             setTimeout(async () => {
+                // Tenta ler o valor inicial
                 try {
-                    const value = await executeGattOperation(() => bastaoCharacteristic.readValue());
-                    handleBastaoValueChanged({ target: { value } });
+                    await executeGattOperation(() => bastaoCharacteristic.readValue());
+                    const initialValue = bastaoCharacteristic.value;
+                    handleBastaoValueChanged({ target: { value: initialValue } });
+                    bastaoErrorCount = 0; // Resetar contador de erros
                 } catch (error) {
                     console.error('Erro na leitura inicial do bastão:', error);
+                    bastaoErrorCount++;
                 }
-            }, 500);
-            
-            // Configurar leitura periódica
-            bastaoReadInterval = setInterval(async () => {
-                try {
-                    const value = await executeGattOperation(() => bastaoCharacteristic.readValue());
-                    handleBastaoValueChanged({ target: { value } });
-                } catch (error) {
-                    console.error('Erro na leitura periódica do bastão:', error);
-                    errorCount++;
-                    
-                    if (errorCount > MAX_CONSECUTIVE_GATT_ERRORS) {
+
+                // Configura leitura periódica com um intervalo maior
+                console.log('Configurando leitura periódica para o bastão...');
+                bastaoReadInterval = setInterval(async () => {
+                    if (!bastaoCharacteristic) {
+                        console.log('Característica do bastão não disponível, interrompendo leitura');
                         clearInterval(bastaoReadInterval);
                         bastaoReadInterval = null;
-                        console.error('Muitos erros consecutivos, interrompendo leitura periódica');
+                        return;
                     }
-                }
-            }, 1000); // Intervalo de 1 segundo para o bastão
+                    
+                    try {
+                        await executeGattOperation(() => bastaoCharacteristic.readValue());
+                        const value = bastaoCharacteristic.value;
+                        handleBastaoValueChanged({ target: { value } });
+                        bastaoErrorCount = 0; // Resetar contador de erros após leitura bem-sucedida
+                    } catch (error) {
+                        console.error('Erro na leitura periódica do bastão:', error);
+                        bastaoErrorCount++;
+                        if (bastaoErrorCount > 5) {
+                            console.log('Muitos erros consecutivos, interrompendo leitura periódica');
+                            clearInterval(bastaoReadInterval);
+                            bastaoReadInterval = null;
+                        }
+                    }
+                }, 1500); // Aumentado para 1.5 segundos
+            }, 500); // Atraso de 500ms antes da primeira leitura
         } else {
             throw new Error('A característica não suporta notificações nem leitura');
         }
@@ -1101,6 +1148,7 @@ async function conectarBalanca() {
         if (balancaDevice && balancaDevice.gatt.connected) {
             console.log('Balança já está conectada');
             balancaStatusDiv.textContent = "Conectado a " + balancaDevice.name;
+            document.getElementById('peso').disabled = false;
             return;
         }
         
@@ -1122,115 +1170,138 @@ async function conectarBalanca() {
             ]
         });
         
-        console.log('Conectando à balança:', balancaDevice.name);
-        balancaStatusDiv.textContent = "Conectando a " + balancaDevice.name + "...";
+        // Adicionar listener para desconexão
+        balancaDevice.addEventListener('gattserverdisconnected', onBalancaDisconnected);
         
-        // Conectar ao dispositivo GATT
+        // Conectar ao GATT server
+        console.log('Conectando ao GATT server da balança...');
         const server = await executeGattOperation(() => balancaDevice.gatt.connect());
-        console.log('Conectado ao servidor GATT');
         
         // Descobrir serviços
+        console.log('Descobrindo serviços...');
         const services = await executeGattOperation(() => server.getPrimaryServices());
-        console.log('Serviços descobertos:', services.length);
+        console.log('Serviços descobertos:', services.map(s => s.uuid));
         
-        // Procurar por características em todos os serviços
-        let characteristicFound = false;
+        // Procurar por características em cada serviço
+        let foundCharacteristic = false;
         
         for (const service of services) {
-            console.log('Verificando serviço:', service.uuid);
-            
             try {
+                console.log('Descobrindo características para serviço:', service.uuid);
                 const characteristics = await executeGattOperation(() => service.getCharacteristics());
-                console.log(`Serviço ${service.uuid}: ${characteristics.length} características`);
+                console.log('Características descobertas:', characteristics.map(c => c.uuid));
                 
-                for (const characteristic of characteristics) {
-                    console.log('Característica:', characteristic.uuid, 
-                                'Propriedades:', 
-                                'Read:', characteristic.properties.read,
-                                'Notify:', characteristic.properties.notify,
-                                'Write:', characteristic.properties.write);
-                    
-                    // Verificar se é uma característica que pode conter dados de peso
-                    if (characteristic.properties.read || characteristic.properties.notify) {
-                        balancaCharacteristic = characteristic;
-                        characteristicFound = true;
-                        console.log('Característica para leitura de peso encontrada:', characteristic.uuid);
-                        
-                        // Habilitar notificações se disponível
-                        if (characteristic.properties.notify) {
-                            await executeGattOperation(() => characteristic.startNotifications());
-                            balancaNotificationsStarted = true;
-                            console.log('Notificações iniciadas para a balança');
-                            
-                            characteristic.addEventListener('characteristicvaluechanged', handleBalancaValueChanged);
-                        } else if (characteristic.properties.read) {
-                            // Se não suportar notificações, configurar leitura periódica
-                            console.log('Configurando leitura periódica para a balança');
-                            
-                            // Primeira leitura após um pequeno delay
-                            setTimeout(async () => {
-                                try {
-                                    const value = await executeGattOperation(() => characteristic.readValue());
-                                    handleBalancaValueChanged({ target: { value } });
-                                } catch (error) {
-                                    console.error('Erro na leitura inicial da balança:', error);
-                                }
-                            }, 500);
-                            
-                            // Configurar leitura periódica a cada 500ms
-                            balancaReadInterval = setInterval(async () => {
-                                try {
-                                    if (balancaDevice && balancaDevice.gatt.connected && balancaCharacteristic) {
-                                        const value = await executeGattOperation(() => balancaCharacteristic.readValue());
-                                        handleBalancaValueChanged({ target: { value } });
-                                    } else {
-                                        console.log('Balança desconectada, parando leitura periódica');
-                                        clearInterval(balancaReadInterval);
-                                        balancaReadInterval = null;
-                                    }
-                                } catch (error) {
-                                    console.error('Erro na leitura periódica da balança:', error);
-                                    errorCount++;
-                                    if (errorCount > MAX_CONSECUTIVE_GATT_ERRORS) {
-                                        console.log('Máximo de erros consecutivos atingido, parando leitura periódica');
-                                        clearInterval(balancaReadInterval);
-                                        balancaReadInterval = null;
-                                        errorCount = 0;
-                                    }
-                                }
-                            }, 500); // Intervalo menor para a balança (500ms)
-                        }
-                        
-                        break; // Sair do loop de características
+                // Procurar por características conhecidas
+                const targetCharUUIDs = [
+                    '6e400003-b5a3-f393-e0a9-e50e24dcca9e', // UART RX
+                    '0000ffe1-0000-1000-8000-00805f9b34fb', // FFE1
+                    '0000fff1-0000-1000-8000-00805f9b34fb'  // FFF1
+                ];
+                
+                for (const uuid of targetCharUUIDs) {
+                    const char = characteristics.find(c => c.uuid === uuid);
+                    if (char) {
+                        balancaCharacteristic = char;
+                        console.log('Encontrada característica alvo:', uuid);
+                        foundCharacteristic = true;
+                        break;
                     }
                 }
                 
-                if (characteristicFound) {
-                    break; // Sair do loop de serviços
+                if (foundCharacteristic) break;
+                
+                // Se não encontrou características conhecidas, procurar por qualquer uma que suporte notificações
+                if (!balancaCharacteristic) {
+                    const notifyChar = characteristics.find(c => c.properties.notify || c.properties.indicate);
+                    if (notifyChar) {
+                        balancaCharacteristic = notifyChar;
+                        console.log('Usando característica com notificação:', notifyChar.uuid);
+                        foundCharacteristic = true;
+                        break;
+                    }
+                }
+                
+                // Se ainda não encontrou, procurar por qualquer uma que suporte leitura
+                if (!balancaCharacteristic) {
+                    const readChar = characteristics.find(c => c.properties.read);
+                    if (readChar) {
+                        balancaCharacteristic = readChar;
+                        console.log('Usando característica com leitura:', readChar.uuid);
+                        foundCharacteristic = true;
+                        break;
+                    }
                 }
             } catch (error) {
-                console.error(`Erro ao acessar características do serviço ${service.uuid}:`, error);
+                console.warn('Erro ao descobrir características para serviço', service.uuid, error);
             }
         }
         
-        if (!characteristicFound) {
+        if (!balancaCharacteristic) {
             throw new Error('Não foi possível encontrar uma característica compatível na balança');
         }
         
-        // Configurar desconexão
-        balancaDevice.addEventListener('gattserverdisconnected', onBalancaDisconnected);
+        // Iniciar notificações ou leitura periódica
+        if (balancaCharacteristic.properties.notify || balancaCharacteristic.properties.indicate) {
+            console.log('Iniciando notificações para a balança...');
+            await executeGattOperation(() => balancaCharacteristic.startNotifications());
+            balancaCharacteristic.addEventListener('characteristicvaluechanged', handleBalancaValueChanged);
+            balancaNotificationsStarted = true;
+        } else if (balancaCharacteristic.properties.read) {
+            console.log('Configurando leitura periódica para a balança...');
+            
+            // Adiciona um atraso antes da primeira leitura
+            setTimeout(async () => {
+                // Tenta ler o valor inicial
+                try {
+                    await executeGattOperation(() => balancaCharacteristic.readValue());
+                    const initialValue = balancaCharacteristic.value;
+                    handleBalancaValueChanged({ target: { value: initialValue } });
+                    balancaErrorCount = 0; // Resetar contador de erros
+                } catch (error) {
+                    console.error('Erro na leitura inicial da balança:', error);
+                    balancaErrorCount++;
+                }
+
+                // Configura leitura periódica com um intervalo maior
+                console.log('Configurando leitura periódica para a balança...');
+                balancaReadInterval = setInterval(async () => {
+                    if (!balancaCharacteristic || !balancaDevice || !balancaDevice.gatt.connected) {
+                        console.log('Balança desconectada ou característica não disponível, interrompendo leitura');
+                        clearInterval(balancaReadInterval);
+                        balancaReadInterval = null;
+                        return;
+                    }
+                    
+                    try {
+                        await executeGattOperation(() => balancaCharacteristic.readValue());
+                        const value = balancaCharacteristic.value;
+                        handleBalancaValueChanged({ target: { value } });
+                        balancaErrorCount = 0; // Resetar contador de erros após leitura bem-sucedida
+                    } catch (error) {
+                        console.error('Erro na leitura periódica da balança:', error);
+                        balancaErrorCount++;
+                        if (balancaErrorCount > MAX_CONSECUTIVE_GATT_ERRORS) {
+                            console.log('Muitos erros consecutivos, interrompendo leitura periódica');
+                            clearInterval(balancaReadInterval);
+                            balancaReadInterval = null;
+                        }
+                    }
+                }, 1000); // Intervalo de 1 segundo para a balança
+            }, 500); // Atraso de 500ms antes da primeira leitura
+        } else {
+            throw new Error('A característica não suporta notificações nem leitura');
+        }
         
-        // Atualizar status
         balancaStatusDiv.textContent = "Conectado a " + balancaDevice.name;
         document.getElementById('peso').disabled = false;
         mostrarNotificacao("Balança conectada com sucesso!", "success");
         
-        return balancaCharacteristic;
     } catch (error) {
         console.error('Erro ao conectar à balança:', error);
         const balancaStatusDiv = document.getElementById('balancaStatus');
         balancaStatusDiv.textContent = "Erro: " + error.message;
         document.getElementById('peso').disabled = true;
+        mostrarNotificacao("Erro ao conectar à balança: " + error.message, "error");
         throw error;
     }
 }
@@ -1239,61 +1310,95 @@ async function conectarBalanca() {
 function handleBalancaValueChanged(event) {
     try {
         const value = event.target.value;
-        const decoder = new TextDecoder('utf-8');
+        const bytes = new Uint8Array(value.buffer);
+        
+        // Exibir dados brutos para depuração
+        console.log('Dados brutos recebidos da balança:', Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' '));
+        
+        // Variável para armazenar o peso processado
         let pesoStr = '';
         
-        // Tentar diferentes formatos de dados
-        if (value.byteLength > 0) {
-            // Mostrar dados brutos para debug
-            let hexString = '';
-            const dataView = new DataView(value.buffer);
-            for (let i = 0; i < value.byteLength; i++) {
-                const byte = dataView.getUint8(i);
-                hexString += ('00' + byte.toString(16)).slice(-2) + ' ';
-            }
-            console.log('Dados brutos da balança (hex):', hexString.trim());
-            
-            // Tentar decodificar como texto
-            pesoStr = decoder.decode(value).trim();
-            console.log('Dados da balança (texto):', pesoStr);
-            
-            // Limpar dados e extrair apenas números
-            pesoStr = pesoStr.replace(/[^0-9.,]/g, '');
-            
-            // Se estiver vazio, tentar interpretar como número
-            if (!pesoStr && value.byteLength >= 4) {
-                // Tentar interpretar como float (little-endian e big-endian)
-                const floatLE = dataView.getFloat32(0, true); // little-endian
-                const floatBE = dataView.getFloat32(0, false); // big-endian
-                
-                // Escolher o valor mais provável (não negativo e menor que 10000)
-                if (floatLE >= 0 && floatLE < 10000) {
-                    pesoStr = floatLE.toFixed(2);
-                } else if (floatBE >= 0 && floatBE < 10000) {
-                    pesoStr = floatBE.toFixed(2);
-                }
-                
-                console.log('Dados interpretados como float:', 'LE:', floatLE, 'BE:', floatBE);
-            }
-            
-            // Se ainda estiver vazio, tentar interpretar como inteiro
-            if (!pesoStr && value.byteLength >= 2) {
-                // Tentar interpretar como int16 (little-endian e big-endian)
-                const int16LE = dataView.getInt16(0, true); // little-endian
-                const int16BE = dataView.getInt16(0, false); // big-endian
-                
-                // Escolher o valor mais provável (não negativo e menor que 10000)
-                if (int16LE >= 0 && int16LE < 10000) {
-                    pesoStr = int16LE.toString();
-                } else if (int16BE >= 0 && int16BE < 10000) {
-                    pesoStr = int16BE.toString();
-                }
-                
-                console.log('Dados interpretados como int16:', 'LE:', int16LE, 'BE:', int16BE);
+        // Abordagem 1: Tentar decodificar como texto UTF-8
+        const decoder = new TextDecoder('utf-8');
+        let textoDecodificado = decoder.decode(value).trim();
+        console.log('Dados da balança (texto):', textoDecodificado);
+        
+        // Extrair apenas números, ponto e vírgula do texto
+        if (textoDecodificado) {
+            pesoStr = textoDecodificado.replace(/[^0-9.,]/g, '');
+            if (pesoStr) {
+                console.log('Peso extraído do texto:', pesoStr);
             }
         }
         
-        // Validar e processar o peso
+        // Abordagem 2: Se o texto não contiver números válidos, tentar extrair caracteres ASCII
+        if (!pesoStr || /^[\x00\s]*$/.test(pesoStr)) {
+            const asciiChars = [];
+            
+            for (let i = 0; i < bytes.length; i++) {
+                // Considerar apenas caracteres ASCII imprimiíveis (32-126) e números (48-57)
+                if ((bytes[i] >= 48 && bytes[i] <= 57) || bytes[i] === 46 || bytes[i] === 44) { // 0-9, ., ,
+                    asciiChars.push(String.fromCharCode(bytes[i]));
+                }
+            }
+            
+            if (asciiChars.length > 0) {
+                pesoStr = asciiChars.join('');
+                console.log('Peso extraído de caracteres ASCII:', pesoStr);
+            }
+        }
+        
+        // Abordagem 3: Tentar interpretar como número (float)
+        if (!pesoStr && bytes.length >= 4) {
+            const dataView = new DataView(value.buffer);
+            
+            // Tentar interpretar como float (little-endian e big-endian)
+            const floatLE = dataView.getFloat32(0, true); // little-endian
+            const floatBE = dataView.getFloat32(0, false); // big-endian
+            
+            console.log('Dados interpretados como float:', 'LE:', floatLE, 'BE:', floatBE);
+            
+            // Escolher o valor mais provável (não negativo e menor que 10000)
+            if (floatLE >= 0 && floatLE < 10000 && !isNaN(floatLE)) {
+                pesoStr = floatLE.toFixed(2);
+                console.log('Usando valor float LE:', pesoStr);
+            } else if (floatBE >= 0 && floatBE < 10000 && !isNaN(floatBE)) {
+                pesoStr = floatBE.toFixed(2);
+                console.log('Usando valor float BE:', pesoStr);
+            }
+        }
+        
+        // Abordagem 4: Tentar interpretar como número (int16)
+        if (!pesoStr && bytes.length >= 2) {
+            const dataView = new DataView(value.buffer);
+            
+            // Tentar interpretar como int16 (little-endian e big-endian)
+            const int16LE = dataView.getInt16(0, true); // little-endian
+            const int16BE = dataView.getInt16(0, false); // big-endian
+            
+            console.log('Dados interpretados como int16:', 'LE:', int16LE, 'BE:', int16BE);
+            
+            // Escolher o valor mais provável (não negativo e menor que 10000)
+            if (int16LE >= 0 && int16LE < 10000) {
+                pesoStr = int16LE.toString();
+                console.log('Usando valor int16 LE:', pesoStr);
+            } else if (int16BE >= 0 && int16BE < 10000) {
+                pesoStr = int16BE.toString();
+                console.log('Usando valor int16 BE:', pesoStr);
+            }
+        }
+        
+        // Abordagem 5: Tentar interpretar como número (uint8)
+        if (!pesoStr && bytes.length >= 1) {
+            // Algumas balanças enviam apenas um byte com o peso
+            const uint8Value = bytes[0];
+            if (uint8Value > 0 && uint8Value < 255) {
+                pesoStr = uint8Value.toString();
+                console.log('Usando valor uint8:', pesoStr);
+            }
+        }
+        
+        // Processar e validar o peso encontrado
         if (pesoStr) {
             // Substituir vírgula por ponto para garantir formato numérico
             pesoStr = pesoStr.replace(',', '.');
@@ -1305,7 +1410,7 @@ function handleBalancaValueChanged(event) {
             if (!isNaN(peso) && peso > 0 && peso < 10000) {
                 const agora = Date.now();
                 
-                // Verificar se é uma nova leitura ou se passou tempo suficiente
+                // Verificar se é uma nova leitura ou se passou tempo suficiente desde a última leitura
                 if (peso !== ultimoPesoLido || (agora - ultimaLeituraBalanca) > 2000) {
                     console.log('Peso válido recebido:', peso);
                     
@@ -1319,8 +1424,15 @@ function handleBalancaValueChanged(event) {
                     // Atualizar variáveis de controle
                     ultimoPesoLido = peso;
                     ultimaLeituraBalanca = agora;
+                    
+                    // Mostrar notificação discreta
+                    mostrarNotificacao(`Peso lido: ${peso.toFixed(2)} kg`, "info", 1500);
                 }
+            } else {
+                console.warn('Valor de peso inválido:', peso);
             }
+        } else {
+            console.warn('Não foi possível extrair um valor de peso válido');
         }
     } catch (error) {
         console.error('Erro ao processar dados da balança:', error);
