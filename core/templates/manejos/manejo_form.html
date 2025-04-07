@@ -828,14 +828,8 @@ async function conectarBastao() {
         
         // Solicitar dispositivo Bluetooth
         bastaoDevice = await navigator.bluetooth.requestDevice({
-            // Usar filtros para dispositivos específicos
-            filters: [
-                { namePrefix: 'RFID' },
-                { namePrefix: 'LEITOR' },
-                { namePrefix: 'READER' },
-                { namePrefix: 'HC-' },
-                { namePrefix: 'BT' }
-            ],
+            // Aceitar qualquer dispositivo Bluetooth para garantir a descoberta
+            acceptAllDevices: true,
             // Incluir serviços que não estão bloqueados
             optionalServices: [
                 '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // UART
@@ -1112,14 +1106,8 @@ async function conectarBalanca() {
         
         // Solicitar dispositivo Bluetooth
         balancaDevice = await navigator.bluetooth.requestDevice({
-            // Usar filtros para dispositivos específicos
-            filters: [
-                { namePrefix: 'Balanca' },
-                { namePrefix: 'Scale' },
-                { namePrefix: 'Peso' },
-                { namePrefix: 'Weight' },
-                { namePrefix: 'BT' }
-            ],
+            // Aceitar qualquer dispositivo Bluetooth para garantir a descoberta
+            acceptAllDevices: true,
             // Incluir serviços que não estão bloqueados
             optionalServices: [
                 '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // UART
