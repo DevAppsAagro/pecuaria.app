@@ -655,6 +655,44 @@
                 .slider.round:before {
                     border-radius: 50%;
                 }
+                
+                /* Estilos para as notificações */
+                .notificacao {
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    padding: 12px 20px;
+                    border-radius: 4px;
+                    color: white;
+                    font-weight: 500;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                    z-index: 9999;
+                    opacity: 0;
+                    transform: translateY(20px);
+                    transition: opacity 0.3s, transform 0.3s;
+                    max-width: 300px;
+                }
+                
+                .notificacao.visivel {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+                
+                .notificacao.info {
+                    background-color: #3498db;
+                }
+                
+                .notificacao.success {
+                    background-color: #2ecc71;
+                }
+                
+                .notificacao.warning {
+                    background-color: #f39c12;
+                }
+                
+                .notificacao.error {
+                    background-color: #e74c3c;
+                }
                 </style>
             </div>
         </div>
@@ -664,1704 +702,381 @@
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Elementos do DOM
-    const form = document.getElementById('manejoForm');
-    const brincoInput = document.getElementById('brinco');
-    const pesoInput = document.getElementById('peso');
-    const dataInput = document.getElementById('data');
-    const submitButton = document.getElementById('submitButton');
-    const toggleAutomation = document.getElementById('toggleAutomation');
-    const fazerManejoCheckbox = document.getElementById('fazer_manejo');
-    const manejoSanitarioCampos = document.getElementById('manejo_sanitario_campos');
-    const fazerApartacaoCheckbox = document.getElementById('fazer_apartacao');
-    const apartacaoCampos = document.getElementById('apartacao_campos');
+// Variáveis globais para o Bluetooth
+// Bastão
+var bastaoDevice = null;
+var bastaoCharacteristic = null;
+var bastaoNotificationsStarted = false;
+var bastaoReadInterval = null;
+var ultimoBrincoLido = '';
+var ultimaLeituraBrinco = 0;
+
+// Balança
+var balancaDevice = null;
+var balancaCharacteristic = null;
+var balancaNotificationsStarted = false;
+var balancaReadInterval = null;
+var ultimoPesoLido = 0;
+var ultimaLeituraBalanca = 0;
+
+// Controle de erros
+var errorCount = 0;
+var MAX_CONSECUTIVE_GATT_ERRORS = 5;
+
+// Função para mostrar notificações temporárias
+function mostrarNotificacao(mensagem, tipo = 'info', duracao = 3000) {
+    // Criar elemento de notificação
+    const notificacao = document.createElement('div');
+    notificacao.className = `notificacao ${tipo}`;
+    notificacao.textContent = mensagem;
     
-    // Adicionar elementos que faltam para manejo sanitário
-    const insumoInput = document.getElementById('insumo');
-    const tipoManejoInput = document.getElementById('tipo_manejo');
-    const diasProximoManejoInput = document.getElementById('dias_proximo');
-    const observacaoTextarea = document.getElementById('observacao');
-
-    // Variáveis de controle
-    let automationActive = false;
-    let autoPesoTriggered = false;
-
-    // Inicializar variáveis globais de controle
-    if (typeof window.formSubmitInProgress === 'undefined') {
-        window.formSubmitInProgress = false;
-    }
-    if (typeof window.registroEmAndamento === 'undefined') {
-        window.registroEmAndamento = false;
-    }
-    if (typeof window.saveButtonInterval === 'undefined') {
-        window.saveButtonInterval = null;
-    }
-    if (typeof window.brincoTimeout === 'undefined') {
-        window.brincoTimeout = null;
-    }
-
-    // Função para reproduzir beep
-    function beep() {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        
-        oscillator.type = 'sine';
-        oscillator.frequency.value = 800;
-        gainNode.gain.value = 0.5;
-        
-        oscillator.start();
-        setTimeout(function() {
-            oscillator.stop();
-            ctx.close();
-        }, 150);
-    }
-
-    // Função para animar o botão de salvar
-    function animateSaveButton() {
-        // Se já tiver um envio de formulário em andamento, não prosseguir
-        if (window.formSubmitInProgress) {
-            console.log("Envio de formulário já em andamento, ignorando requisição");
-            return;
-        }
-        
-        window.formSubmitInProgress = true;
-        const buttonText = submitButton.querySelector('.button-text');
-        let progress = 0;
-        const originalText = buttonText.textContent;
-        
-        buttonText.textContent = 'Salvando... 0%';
-        
-        const interval = setInterval(function() {
-            progress += 5;
-            buttonText.textContent = `Salvando... ${progress}%`;
-            
-            if (progress >= 100) {
-                clearInterval(interval);
-                buttonText.textContent = originalText;
-                // Enviar o formulário diretamente 
-                registrarManejo(new FormData(form));
-            }
-        }, 50);
-        
-        // Limpar intervalo caso demore muito (segurança)
-        setTimeout(() => {
-            clearInterval(interval);
-            buttonText.textContent = originalText;
-            window.formSubmitInProgress = false;
-        }, 10000);
-        
-        // Salvar referência global para poder limpar em outros lugares
-        window.saveButtonInterval = interval;
-    }
-
-    // Função para buscar animal
-    async function buscarAnimal(brinco) {
-        try {
-            const response = await fetch(`/api/buscar_animal/${brinco}/`);
-            const data = await response.json();
-            
-            if (data.success) {
-                beep();
-                document.getElementById('animalInfo').style.display = 'block';
-                document.getElementById('animalBrinco').textContent = data.animal.brinco;
-                document.getElementById('animalRaca').textContent = data.animal.raca;
-                document.getElementById('animalCategoria').textContent = data.animal.categoria;
-                document.getElementById('animalLote').textContent = data.animal.lote;
-                document.getElementById('animalPasto').textContent = data.animal.pasto || "Não atribuído";
-                
-                // Atualizar dados de última pesagem
-                if (data.ultima_pesagem) {
-                    document.getElementById('ultimaPesagem').style.display = 'block';
-                    document.getElementById('ultimoPeso').textContent = data.ultima_pesagem.peso;
-                    document.getElementById('ultimaData').textContent = data.ultima_pesagem.data;
-                    
-                    // Log detalhado para depuração
-                    console.log("Dados da última pesagem:", data.ultima_pesagem);
-                    console.log("GMD recebido da API:", data.gmd);
-                    
-                    // Mostrar GMD histórico se disponível
-                    if (data.gmd !== null && data.gmd !== undefined) {
-                        console.log("Mostrando GMD histórico:", data.gmd);
-                        document.getElementById('gmdValor').textContent = data.gmd;
-                        document.getElementById('gmdInfo').style.display = 'block';
-                    } else {
-                        console.log("GMD histórico não disponível");
-                        document.getElementById('gmdInfo').style.display = 'none';
-                    }
-                } else {
-                    console.log("Não há dados de última pesagem disponíveis");
-                    document.getElementById('ultimaPesagem').style.display = 'none';
-                    document.getElementById('gmdInfo').style.display = 'none';
-                }
-                
-                // Habilitar campos
-                pesoInput.disabled = false;
-                fazerManejoCheckbox.disabled = false;
-                fazerApartacaoCheckbox.disabled = false;
-                submitButton.disabled = false;
-                
-                // Verificar os estados atuais das checkboxes para decidir a visibilidade
-                if (fazerManejoCheckbox.checked) {
-                    manejoSanitarioCampos.style.display = 'block';
-                } else {
-                    manejoSanitarioCampos.style.display = 'none';
-                }
-                
-                if (fazerApartacaoCheckbox.checked) {
-                    apartacaoCampos.style.display = 'block';
-                    // Se a fazenda foi carregada, recarregar lotes e pastos
-                    if (document.getElementById('fazenda_id').value) {
-                        carregarLotesPastosMantendoSelecao(
-                            document.getElementById('fazenda_id').value,
-                            document.getElementById('lote_acima').value,
-                            document.getElementById('pasto_acima').value,
-                            document.getElementById('lote_abaixo').value,
-                            document.getElementById('pasto_abaixo').value
-                        );
-                    }
-                } else {
-                    apartacaoCampos.style.display = 'none';
-                }
-                
-                document.getElementById('novoGMDInfo').style.display = 'none';
-                
-                // Adicionar ID do animal ao formulário
-                document.getElementById('animal_id').value = data.animal.id;
-                document.getElementById('lote_id').value = data.animal.lote_id;
-                document.getElementById('pasto_id').value = data.animal.pasto_id;
-                document.getElementById('fazenda_id').value = data.animal.fazenda_id;
-                
-                // Limpar o campo de peso para nova entrada
-                pesoInput.value = "";
-                
-                if (automationActive) {
-                    setTimeout(() => {
-                        pesoInput.focus();
-                        beep();
-                    }, 500);
-                }
-            } else {
-                const notification = document.getElementById('notification');
-                notification.textContent = data.message || 'Animal não encontrado';
-                notification.classList.add('show');
-                setTimeout(() => notification.classList.remove('show'), 3000);
-                document.getElementById('animalInfo').style.display = 'none';
-                document.getElementById('ultimaPesagem').style.display = 'none';
-                document.getElementById('gmdInfo').style.display = 'none';
-                document.getElementById('novoGMDInfo').style.display = 'none';
-                
-                // Desabilitar campos
-                pesoInput.disabled = true;
-                fazerManejoCheckbox.disabled = true;
-                fazerApartacaoCheckbox.disabled = true;
-                submitButton.disabled = true;
-            }
-        } catch (error) {
-            console.error('Erro ao buscar animal:', error);
-            const notification = document.getElementById('notification');
-            notification.textContent = 'Erro ao buscar animal';
-            notification.classList.add('show');
-            setTimeout(() => notification.classList.remove('show'), 3000);
-        }
-    }
+    // Adicionar ao corpo do documento
+    document.body.appendChild(notificacao);
     
-    // Função para calcular o novo GMD baseado no peso atual
-    function calcularNovoGMD() {
-        const novoPeso = parseFloat(pesoInput.value);
-        const ultimoPesoElement = document.getElementById('ultimoPeso');
-        const ultimaDataElement = document.getElementById('ultimaData');
-        
-        // Log para depuração
-        console.log("Calculando novo GMD...");
-        console.log("Novo peso:", novoPeso);
-        
-        if (novoPeso && ultimoPesoElement && ultimaDataElement) {
-            const ultimoPeso = parseFloat(ultimoPesoElement.textContent);
-            const ultimaData = new Date(ultimaDataElement.textContent);
-            const novaData = new Date(dataInput.value);
-            
-            console.log("Último peso:", ultimoPeso);
-            console.log("Última data:", ultimaData);
-            console.log("Nova data:", novaData);
-            
-            if (ultimoPeso && ultimaData && novaData && !isNaN(ultimoPeso) && !isNaN(novoPeso)) {
-                const diffDays = Math.floor((novaData - ultimaData) / (1000 * 60 * 60 * 24));
-                
-                console.log("Diferença em dias:", diffDays);
-                
-                if (diffDays > 0) {
-                    const novoGMD = (novoPeso - ultimoPeso) / diffDays;
-                    console.log("Novo GMD calculado:", novoGMD.toFixed(3));
-                    
-                    document.getElementById('novoGMDValor').textContent = novoGMD.toFixed(3);
-                    document.getElementById('novoGMDInfo').style.display = 'block';
-                    
-                    if (automationActive && !autoPesoTriggered) {
-                        autoPesoTriggered = true;
-                        setTimeout(() => {
-                            beep();
-                            animateSaveButton();
-                        }, 1000);
-                    }
-                } else {
-                    console.log("Diferença em dias <= 0, não mostrando GMD");
-                    document.getElementById('novoGMDInfo').style.display = 'none';
-                }
-            } else {
-                console.log("Dados inválidos para cálculo de GMD");
-                document.getElementById('novoGMDInfo').style.display = 'none';
-            }
-        } else {
-            console.log("Faltam dados para cálculo de GMD");
-            document.getElementById('novoGMDInfo').style.display = 'none';
-        }
-    }
-
-    // Função para carregar lotes por fazenda
-    async function carregarLotesPorFazenda(fazendaId) {
-        try {
-            const response = await fetch(`/api/lotes_por_fazenda/${fazendaId}/`);
-            const data = await response.json();
-            
-            if (data.success) {
-                const loteAcima = document.getElementById('lote_acima');
-                const loteAbaixo = document.getElementById('lote_abaixo');
-                
-                loteAcima.innerHTML = '<option value="">Selecione</option>';
-                loteAbaixo.innerHTML = '<option value="">Selecione</option>';
-                
-                data.lotes.forEach(lote => {
-                    const option = document.createElement('option');
-                    option.value = lote.id;
-                    option.textContent = lote.nome;  // Isso está correto pois a API agora retorna str(lote)
-                    
-                    loteAcima.appendChild(option.cloneNode(true));
-                    loteAbaixo.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Erro ao carregar lotes:', error);
-            const notification = document.getElementById('notification');
-            notification.textContent = 'Erro ao carregar lotes';
-            notification.classList.add('show');
-            setTimeout(() => notification.classList.remove('show'), 3000);
-        }
-    }
-
-    // Função para carregar pastos por fazenda
-    async function carregarPastosPorFazenda(fazendaId) {
-        try {
-            const response = await fetch(`/api/pastos_por_fazenda/${fazendaId}/`);
-            const data = await response.json();
-            
-            if (data.success) {
-                const pastoAcima = document.getElementById('pasto_acima');
-                const pastoAbaixo = document.getElementById('pasto_abaixo');
-                
-                pastoAcima.innerHTML = '<option value="">Selecione</option>';
-                pastoAbaixo.innerHTML = '<option value="">Selecione</option>';
-                
-                data.pastos.forEach(pasto => {
-                    const option = document.createElement('option');
-                    option.value = pasto.id;
-                    option.textContent = pasto.nome;
-                    
-                    pastoAcima.appendChild(option.cloneNode(true));
-                    pastoAbaixo.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Erro ao carregar pastos:', error);
-            const notification = document.getElementById('notification');
-            notification.textContent = 'Erro ao carregar pastos';
-            notification.classList.add('show');
-            setTimeout(() => notification.classList.remove('show'), 3000);
-        }
-    }
-
-    // Função para registrar manejo
-    async function registrarManejo(formData) {
-        try {
-            // Se já tiver um envio em andamento, não prosseguir
-            if (window.registroEmAndamento) {
-                console.log("Registro já em andamento, ignorando requisição duplicada");
-                return;
-            }
-            
-            window.registroEmAndamento = true;
-            
-            const response = await fetch('/api/registrar_manejo/', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
-            
-            // Garantir que o intervalo da animação seja limpo
-            if (window.saveButtonInterval) {
-                clearInterval(window.saveButtonInterval);
-                window.saveButtonInterval = null;
-            }
-            
-            // Reset das flags de controle
-            window.formSubmitInProgress = false;
-            window.registroEmAndamento = false;
-            
-            // Reset do texto do botão
-            const buttonText = submitButton.querySelector('.button-text');
-            buttonText.textContent = 'Salvar';
-            
-            if (data.success) {
-                beep();
-                const notification = document.getElementById('notification');
-                notification.textContent = data.message;
-                notification.classList.add('show');
-                setTimeout(() => notification.classList.remove('show'), 3000);
-                
-                // Salvar estados dos checkboxes e outros valores de configuração
-                const fazerManejoChecked = fazerManejoCheckbox.checked;
-                const fazerApartacaoChecked = fazerApartacaoCheckbox.checked;
-                const manejoDesmameChecked = document.getElementById('manejo_desmame').checked;
-                
-                // Preservar os valores dos selectboxes de lote e pasto
-                const loteAcimaValue = document.getElementById('lote_acima').value;
-                const pastoAcimaValue = document.getElementById('pasto_acima').value;
-                const loteAbaixoValue = document.getElementById('lote_abaixo').value;
-                const pastoAbaixoValue = document.getElementById('pasto_abaixo').value;
-                
-                // Salvar valores atuais dos campos que devem ser preservados
-                const insumoValue = insumoInput.value;
-                const tipoManejoValue = tipoManejoInput.value;
-                const diasProximoValue = diasProximoManejoInput.value;
-                const observacaoValue = observacaoTextarea.value;
-                const pesoReferenciaValue = document.getElementById('peso_referencia') ? 
-                    document.getElementById('peso_referencia').value : '';
-                
-                // Limpar apenas o brinco e peso - os únicos campos que devem ser resetados
-                brincoInput.value = '';
-                pesoInput.value = '';
-                
-                // Restaurar estados dos checkboxes
-                fazerManejoCheckbox.checked = fazerManejoChecked;
-                fazerApartacaoCheckbox.checked = fazerApartacaoChecked;
-                document.getElementById('manejo_desmame').checked = manejoDesmameChecked;
-                
-                // Desabilitar apenas alguns campos
-                pesoInput.disabled = true;
-                submitButton.disabled = true;
-                
-                // Não desabilitar os checkboxes
-                fazerManejoCheckbox.disabled = false;
-                fazerApartacaoCheckbox.disabled = false;
-                
-                // Restaurar valores nos campos que devem ser preservados
-                insumoInput.value = insumoValue;
-                tipoManejoInput.value = tipoManejoValue;
-                diasProximoManejoInput.value = diasProximoValue;
-                observacaoTextarea.value = observacaoValue;
-                
-                // Restaurar valor do peso de referência
-                const pesoReferenciaInput = document.getElementById('peso_referencia');
-                if (pesoReferenciaInput) {
-                    pesoReferenciaInput.value = pesoReferenciaValue;
-                }
-                
-                // Esconder informações
-                document.getElementById('animalInfo').style.display = 'none';
-                document.getElementById('ultimaPesagem').style.display = 'none';
-                document.getElementById('gmdInfo').style.display = 'none';
-                document.getElementById('novoGMDInfo').style.display = 'none';
-                
-                // Manter visibilidade dos campos de manejo e apartação baseado no estado anterior
-                setTimeout(() => {
-                    // Garantir que os campos sejam exibidos após o reset do formulário
-                    // se as checkboxes correspondentes estiverem marcadas
-                    manejoSanitarioCampos.style.display = fazerManejoCheckbox.checked ? 'block' : 'none';
-                    apartacaoCampos.style.display = fazerApartacaoCheckbox.checked ? 'block' : 'none';
-                    
-                    // Se a checkbox de apartação estiver marcada, recarregar os lotes e pastos
-                    if (fazerApartacaoCheckbox.checked && document.getElementById('fazenda_id').value) {
-                        carregarLotesPastosMantendoSelecao(
-                            document.getElementById('fazenda_id').value,
-                            loteAcimaValue,
-                            pastoAcimaValue,
-                            loteAbaixoValue,
-                            pastoAbaixoValue
-                        );
-                    } else {
-                        // Se não tiver carregando novos lotes/pastos, restaurar diretamente
-                        setTimeout(() => {
-                            document.getElementById('lote_acima').value = loteAcimaValue;
-                            document.getElementById('pasto_acima').value = pastoAcimaValue;
-                            document.getElementById('lote_abaixo').value = loteAbaixoValue;
-                            document.getElementById('pasto_abaixo').value = pastoAbaixoValue;
-                        }, 100);
-                    }
-                }, 100);
-                
-                // Resetar variáveis de controle
-                autoPesoTriggered = false;
-                
-                // Se automação está ativa, focar no brinco
-                if (automationActive) {
-                    setTimeout(() => {
-                        brincoInput.focus();
-                        beep();
-                    }, 500);
-                }
-            } else {
-                beep();
-                const notification = document.getElementById('notification');
-                notification.textContent = data.message;
-                notification.classList.add('show');
-                setTimeout(() => notification.classList.remove('show'), 3000);
-            }
-        } catch (error) {
-            console.error('Erro ao registrar manejo:', error);
-            const notification = document.getElementById('notification');
-            notification.textContent = 'Erro ao registrar manejo';
-            notification.classList.add('show');
-            setTimeout(() => notification.classList.remove('show'), 3000);
-        }
-    }
-
-    // Função para carregar lotes e pastos mantendo a seleção atual
-    function carregarLotesPastosMantendoSelecao(fazendaId, loteAcimaValue, pastoAcimaValue, loteAbaixoValue, pastoAbaixoValue) {
-        // Primeiro carregar os lotes
-        fetch(`/api/buscar_lotes_por_fazenda/${fazendaId}/`)
-            .then(response => response.json())
-            .then(data => {
-                const loteAcimaSelect = document.getElementById('lote_acima');
-                const loteAbaixoSelect = document.getElementById('lote_abaixo');
-                
-                // Limpar opções atuais
-                loteAcimaSelect.innerHTML = '<option value="">Selecione</option>';
-                loteAbaixoSelect.innerHTML = '<option value="">Selecione</option>';
-                
-                // Adicionar novas opções
-                data.lotes.forEach(lote => {
-                    loteAcimaSelect.add(new Option(lote.nome, lote.id));
-                    loteAbaixoSelect.add(new Option(lote.nome, lote.id));
-                });
-                
-                // Restaurar valores selecionados
-                loteAcimaSelect.value = loteAcimaValue;
-                loteAbaixoSelect.value = loteAbaixoValue;
-            })
-            .catch(error => console.error('Erro ao carregar lotes:', error));
-        
-        // Depois carregar os pastos
-        fetch(`/api/buscar_pastos_por_fazenda/${fazendaId}/`)
-            .then(response => response.json())
-            .then(data => {
-                const pastoAcimaSelect = document.getElementById('pasto_acima');
-                const pastoAbaixoSelect = document.getElementById('pasto_abaixo');
-                
-                // Limpar opções atuais
-                pastoAcimaSelect.innerHTML = '<option value="">Selecione</option>';
-                pastoAbaixoSelect.innerHTML = '<option value="">Selecione</option>';
-                
-                // Adicionar novas opções
-                data.pastos.forEach(pasto => {
-                    pastoAcimaSelect.add(new Option(pasto.nome, pasto.id));
-                    pastoAbaixoSelect.add(new Option(pasto.nome, pasto.id));
-                });
-                
-                // Restaurar valores selecionados
-                pastoAcimaSelect.value = pastoAcimaValue;
-                pastoAbaixoSelect.value = pastoAbaixoValue;
-            })
-            .catch(error => console.error('Erro ao carregar pastos:', error));
-    }
-
-    // Função para mostrar notificações temporárias
-    function mostrarNotificacao(mensagem, tipo = 'info', duracao = 3000) {
-        // Criar elemento de notificação
-        const notificacao = document.createElement('div');
-        notificacao.className = `notificacao ${tipo}`;
-        notificacao.textContent = mensagem;
-        
-        // Adicionar ao corpo do documento
-        document.body.appendChild(notificacao);
-        
-        // Mostrar com animação
-        setTimeout(() => {
-            notificacao.classList.add('visivel');
-        }, 10);
-        
-        // Remover após a duração especificada
-        setTimeout(() => {
-            notificacao.classList.remove('visivel');
-            setTimeout(() => {
-                document.body.removeChild(notificacao);
-            }, 300); // Tempo da animação de saída
-        }, duracao);
-    }
-
-    // Variáveis para controle do Bluetooth
-    let bastaoDevice = null;
-    let balancaDevice = null;
-    let bastaoCharacteristic = null;
-    let balancaCharacteristic = null;
-    let bastaoNotificationsStarted = false;
-    let balancaNotificationsStarted = false;
-    let bastaoReadInterval = null;
-    let balancaReadInterval = null;
-    let ultimoBrincoLido = ''; // Armazenar o último brinco lido para evitar duplicatas
-    let ultimaLeituraBrinco = 0; // Timestamp da última leitura válida
-    let gattOperationInProgress = false; // Flag para controlar operações GATT
-    let gattOperationQueue = []; // Fila de operações GATT
-    let consecutiveGattErrors = 0; // Contador de erros GATT consecutivos
-    const MAX_CONSECUTIVE_GATT_ERRORS = 5; // Limite de erros antes de tentar reconectar
-    let lastReconnectAttempt = 0; // Timestamp da última tentativa de reconexão
+    // Mostrar com animação
+    setTimeout(() => {
+        notificacao.classList.add('visivel');
+    }, 10);
     
-    // Variáveis para controle do estado da balança
-    let pesoAtual = 0;
-    let statusBalanca = 'N';
-    let ultimoFrame = '';
+    // Remover após a duração especificada
+    setTimeout(() => {
+        notificacao.classList.remove('visivel');
+        setTimeout(() => {
+            document.body.removeChild(notificacao);
+        }, 300); // Tempo da animação de saída
+    }, duracao);
+}
 
-    // Função para executar operações GATT em fila com retry e exponential backoff
-    async function executeGattOperation(operation) {
-        return new Promise((resolve, reject) => {
-            gattOperationQueue.push({
-                operation: operation,
-                resolve: resolve,
-                reject: reject,
-                retryCount: 0,
-                maxRetries: 5, // Aumentado para 5 tentativas
-                initialBackoff: 100, // Backoff inicial em ms
-                currentBackoff: 100 // Backoff atual (será aumentado exponencialmente)
-            });
-            if (!gattOperationInProgress) {
-                processGattQueue();
-            }
+// Fila de operações GATT
+var gattOperationQueue = [];
+var gattOperationInProgress = false;
+
+// Função para executar operações GATT com fila e retry
+async function executeGattOperation(operation) {
+    return new Promise((resolve, reject) => {
+        gattOperationQueue.push({
+            operation: operation,
+            resolve: resolve,
+            reject: reject,
+            retryCount: 0,
+            maxRetries: 5,
+            initialBackoff: 100,
+            currentBackoff: 100
         });
+        if (!gattOperationInProgress) {
+            processGattQueue();
+        }
+    });
+}
+
+// Função para processar a fila de operações GATT
+async function processGattQueue() {
+    if (gattOperationQueue.length === 0) {
+        gattOperationInProgress = false;
+        return;
     }
     
-    // Função para processar a fila de operações GATT
-    async function processGattQueue() {
-        if (gattOperationQueue.length === 0) {
-            gattOperationInProgress = false;
+    gattOperationInProgress = true;
+    const nextOperation = gattOperationQueue.shift();
+    
+    try {
+        const result = await nextOperation.operation();
+        nextOperation.resolve(result);
+        errorCount = 0; // Resetar contador de erros em caso de sucesso
+    } catch (error) {
+        console.error('Erro na operação GATT:', error);
+        errorCount++;
+        
+        // Verificar se deve tentar novamente
+        if (nextOperation.retryCount < nextOperation.maxRetries) {
+            console.log(`Tentando novamente (${nextOperation.retryCount + 1}/${nextOperation.maxRetries}) após ${nextOperation.currentBackoff}ms...`);
+            
+            // Incrementar contador de tentativas e backoff
+            nextOperation.retryCount++;
+            nextOperation.currentBackoff = Math.min(nextOperation.currentBackoff * 2, 5000); // Backoff exponencial, máximo 5 segundos
+            
+            // Colocar de volta na fila
+            setTimeout(() => {
+                gattOperationQueue.unshift(nextOperation);
+                processGattQueue();
+            }, nextOperation.currentBackoff);
+            return;
+        } else {
+            console.error('Número máximo de tentativas excedido');
+            nextOperation.reject(error);
+        }
+    } finally {
+        // Processar próxima operação após um pequeno intervalo
+        setTimeout(() => {
+            processGattQueue();
+        }, 200);
+    }
+}
+
+// Função para conectar ao bastão Bluetooth
+async function conectarBastao() {
+    try {
+        const bastaoStatusDiv = document.getElementById('bastaoStatus');
+        bastaoStatusDiv.textContent = "Conectando...";
+        
+        // Verificar se já está conectado
+        if (bastaoDevice && bastaoDevice.gatt.connected) {
+            console.log('Bastão já está conectado');
+            bastaoStatusDiv.textContent = "Conectado a " + bastaoDevice.name;
             return;
         }
         
-        gattOperationInProgress = true;
-        const nextOperation = gattOperationQueue.shift();
-        
-        try {
-            // Executar a operação
-            const result = await nextOperation.operation();
-            nextOperation.resolve(result);
-            console.log('Operação GATT concluída com sucesso');
-            // Resetar contador de erros consecutivos após sucesso
-            consecutiveGattErrors = 0;
-        } catch (error) {
-            console.warn('Erro na operação GATT:', error.message);
-            consecutiveGattErrors++;
-            console.log(`Erros GATT consecutivos: ${consecutiveGattErrors}/${MAX_CONSECUTIVE_GATT_ERRORS}`);
-            
-            // Lista de erros que podem ser resolvidos com retry
-            const retryableErrors = [
-                'GATT operation already in progress',
-                'GATT operation failed for unknown reason',
-                'GATT Server is disconnected',
-                'Device went away',
-                'connection was lost',
-                'Service no longer exists',
-                'Characteristic no longer exists'
-            ];
-            
-            // Verificar se é um erro que pode ser resolvido com retry
-            const isRetryableError = retryableErrors.some(errMsg => 
-                error.message.includes(errMsg)
-            );
-            
-            if (isRetryableError) {
-                console.warn(`Erro de operação GATT que pode ser resolvido com retry: ${error.message}`);
-                consecutiveGattErrors++;
-                
-                // Se ainda não excedeu o número máximo de retries
-                if (nextOperation.retryCount < nextOperation.maxRetries) {
-                    nextOperation.retryCount++;
-                    
-                    // Calcular backoff exponencial com jitter
-                    const jitter = Math.random() * 0.3 + 0.85; // 0.85-1.15 para evitar sincronização
-                    const retryDelay = Math.min(500 * Math.pow(1.5, nextOperation.retryCount) * jitter, 10000);
-                    console.log(`Tentativa ${nextOperation.retryCount} de ${nextOperation.maxRetries}. Aguardando ${Math.floor(retryDelay)}ms antes de tentar novamente.`);
-                    
-                    // Colocar de volta na fila
-                    gattOperationQueue.unshift(nextOperation);
-                    
-                    // Aguardar com backoff exponencial antes de tentar novamente
-                    setTimeout(() => {
-                        processGattQueue();
-                    }, Math.floor(retryDelay));
-                    return;
-                }
-            }
-            
-            // Se chegou aqui, não é um erro que pode ser resolvido com retry ou excedeu o número de retries
-            nextOperation.reject(error);
-            
-            // Se tivermos muitos erros consecutivos, tentar reconectar o dispositivo
-            if (consecutiveGattErrors >= MAX_CONSECUTIVE_GATT_ERRORS) {
-                console.warn(`Atingido limite de ${MAX_CONSECUTIVE_GATT_ERRORS} erros GATT consecutivos. Tentando reconectar dispositivos...`);
-                
-                // Tentar reconectar os dispositivos
-                if (bastaoDevice && bastaoDevice.gatt && bastaoDevice.gatt.connected) {
-                    console.log('Reconectando bastão...');
-                    bastaoDevice.gatt.disconnect();
-                    setTimeout(() => {
-                        try {
-                            conectarBastao();
-                        } catch (e) {
-                            console.error('Falha ao reconectar bastão:', e);
-                        }
-                    }, 1000);
-                }
-                if (balancaDevice && balancaDevice.gatt && balancaDevice.gatt.connected) {
-                    console.log('Reconectando balança...');
-                    balancaDevice.gatt.disconnect();
-                    setTimeout(() => {
-                        try {
-                            conectarBalanca();
-                        } catch (e) {
-                            console.error('Falha ao reconectar balança:', e);
-                        }
-                    }, 2000);
-                }
-                consecutiveGattErrors = 0;
-            }
-        } finally {
-            // Se houve return no bloco catch para retry, não executamos o restante
-            // Caso contrário, continuamos processando a fila após um delay
-            setTimeout(() => {
-                processGattQueue();
-            }, 200); // Delay entre operações na fila
-        }
-    }
-
-    // Função para conectar ao bastão de leitura de brinco
-    async function conectarBastao() {
-        try {
-            const bastaoStatusDiv = document.getElementById('bastaoStatus');
-            bastaoStatusDiv.textContent = "Procurando dispositivos...";
-            
-            // Solicitar dispositivo Bluetooth com opções mais abrangentes
-            bastaoDevice = await navigator.bluetooth.requestDevice({
-                // Aceitar qualquer dispositivo Bluetooth disponível
-                acceptAllDevices: true,
-                // Incluir serviços SPP e outros comuns
-                optionalServices: [
-                    // Serviço UART padrão
-                    '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
-                    // Serviço SPP (Serial Port Profile)
-                    '00001101-0000-1000-8000-00805f9b34fb',
-                    // Outros serviços comuns
-                    'battery_service',
-                    '0000180a-0000-1000-8000-00805f9b34fb', // Device Information
-                    'device_information',
-                    // Serviços genéricos
-                    '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
-                    '00001801-0000-1000-8000-00805f9b34fb', // Generic Attribute
-                    // Serviço HID (Human Interface Device) - comum em leitores
-                    '00001812-0000-1000-8000-00805f9b34fb',
-                    // Serviços adicionais que podem estar presentes em leitores
-                    '0000ffe0-0000-1000-8000-00805f9b34fb',
-                    '0000ffe1-0000-1000-8000-00805f9b34fb',
-                    '0000fff0-0000-1000-8000-00805f9b34fb',
-                    '0000180f-0000-1000-8000-00805f9b34fb'  // Battery Service
-                ]
-            });
-            
-            bastaoStatusDiv.textContent = "Conectando ao bastão...";
-            const conectarBastaoBtn = document.getElementById('conectarBastao');
-            conectarBastaoBtn.classList.add('connected');
-            
-            // Adicionar listener para desconexão
-            bastaoDevice.addEventListener('gattserverdisconnected', onBastaoDisconnected);
-            
-            // Conectar ao GATT server
-            const server = await bastaoDevice.gatt.connect();
-            
-            // Obter todos os serviços disponíveis
-            const services = await executeGattOperation(async () => {
-                return await server.getPrimaryServices();
-            });
-            
-            console.log('Serviços disponíveis:', services.map(s => s.uuid));
-            
-            if (services.length === 0) {
-                throw new Error('Nenhum serviço disponível no dispositivo');
-            }
-            
-            // Lista de serviços a tentar, em ordem de prioridade
-            const servicesToTry = [
-                // Serviço SPP (Serial Port Profile)
-                '00001101-0000-1000-8000-00805f9b34fb',
-                // Serviço UART padrão
-                '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
-                // Serviços comuns em leitores
-                '0000ffe0-0000-1000-8000-00805f9b34fb',
-                '0000fff0-0000-1000-8000-00805f9b34fb',
-                // Serviço HID
-                '00001812-0000-1000-8000-00805f9b34fb',
-                // Outros serviços comuns
-                '0000180a-0000-1000-8000-00805f9b34fb',
-                'device_information'
-            ];
-            
-            // Tentar obter serviço em ordem de prioridade
-            let service = null;
-            
-            // Primeiro tenta os serviços conhecidos
-            for (const serviceUuid of servicesToTry) {
-                try {
-                    service = await executeGattOperation(async () => {
-                        return await server.getPrimaryService(serviceUuid);
-                    });
-                    console.log('Serviço encontrado:', serviceUuid);
-                    break;
-                } catch (err) {
-                    console.log('Serviço não encontrado:', serviceUuid);
-                }
-            }
-            
-            // Se não encontrou nenhum dos serviços conhecidos, usa o primeiro disponível
-            if (!service && services.length > 0) {
-                service = services[0];
-                console.log('Usando primeiro serviço disponível:', service.uuid);
-            }
-            
-            if (!service) {
-                throw new Error('Não foi possível obter um serviço utilizável');
-            }
-            
-            // Obter todas as características disponíveis
-            const characteristics = await executeGattOperation(async () => {
-                return await service.getCharacteristics();
-            });
-            
-            console.log('Características disponíveis:', characteristics.map(c => c.uuid));
-            
-            // Exibir propriedades de cada característica para depuração
-            for (const char of characteristics) {
-                console.log(`Propriedades da característica ${char.uuid}:`, {
-                    read: char.properties.read,
-                    write: char.properties.write,
-                    notify: char.properties.notify,
-                    indicate: char.properties.indicate,
-                    writeWithoutResponse: char.properties.writeWithoutResponse
-                });
-            }
-            
-            if (characteristics.length === 0) {
-                throw new Error('Nenhuma característica disponível no serviço');
-            }
-            
-            // Lista de características a tentar para RX, em ordem de prioridade
-            const rxCharacteristicsToTry = [
-                // Característica RX UART padrão
-                '6e400003-b5a3-f393-e0a9-e50e24dcca9e',
-                // Característica SPP
-                '00001101-0000-1000-8000-00805f9b34fb',
-                // Características comuns em leitores
-                '0000ffe1-0000-1000-8000-00805f9b34fb',
-                '0000fff1-0000-1000-8000-00805f9b34fb',
-                // Características de informação do dispositivo que podem conter dados úteis
-                '00002a23-0000-1000-8000-00805f9b34fb', // System ID
-                '00002a24-0000-1000-8000-00805f9b34fb', // Model Number
-                '00002a25-0000-1000-8000-00805f9b34fb', // Serial Number
-                '00002a26-0000-1000-8000-00805f9b34fb', // Firmware Revision
-                '00002a27-0000-1000-8000-00805f9b34fb', // Hardware Revision
-                '00002a28-0000-1000-8000-00805f9b34fb', // Software Revision
-                '00002a29-0000-1000-8000-00805f9b34fb'  // Manufacturer Name
-            ];
-            
-            // Tentar encontrar uma característica que suporte notificações primeiro
-            bastaoCharacteristic = null;
-            
-            // Primeiro tenta as características conhecidas
-            for (const charUuid of rxCharacteristicsToTry) {
-                try {
-                    bastaoCharacteristic = await executeGattOperation(async () => {
-                        return await service.getCharacteristic(charUuid);
-                    });
-                    console.log('Característica encontrada:', charUuid);
-                    break;
-                } catch (err) {
-                    console.log('Característica não encontrada:', charUuid);
-                }
-            }
-            
-            // Se não encontrou, procura por qualquer característica que suporte notificações
-            if (!bastaoCharacteristic) {
-                const notifyCharacteristics = characteristics.filter(
-                    char => char.properties.notify || char.properties.indicate
-                );
-                
-                if (notifyCharacteristics.length > 0) {
-                    bastaoCharacteristic = notifyCharacteristics[0];
-                    console.log('Usando característica com notificação:', bastaoCharacteristic.uuid);
-                } else {
-                    // Se não houver características com notificação, use uma que suporte leitura
-                    const readableCharacteristics = characteristics.filter(
-                        char => char.properties.read
-                    );
-                    
-                    if (readableCharacteristics.length > 0) {
-                        bastaoCharacteristic = readableCharacteristics[0];
-                        console.log('Usando característica com leitura:', bastaoCharacteristic.uuid);
-                    } else if (characteristics.length > 0) {
-                        bastaoCharacteristic = characteristics[0];
-                        console.log('Usando primeira característica disponível:', bastaoCharacteristic.uuid);
-                    }
-                }
-            }
-            
-            if (!bastaoCharacteristic) {
-                throw new Error('Não foi possível obter uma característica utilizável');
-            }
-            
-            // Configurar o modo de leitura baseado nas propriedades da característica
-            if (bastaoCharacteristic.properties.notify) {
-                // Modo de notificação
-                await executeGattOperation(async () => {
-                    await bastaoCharacteristic.startNotifications();
-                });
-                
-                bastaoNotificationsStarted = true;
-                bastaoCharacteristic.addEventListener('characteristicvaluechanged', handleBastaoValueChanged);
-                console.log('Modo de notificação ativado');
-                
-                // Limpar qualquer intervalo de leitura existente
-                if (bastaoReadInterval) {
-                    clearInterval(bastaoReadInterval);
-                    bastaoReadInterval = null;
-                }
-            } else if (bastaoCharacteristic.properties.read) {
-                // Modo de leitura periódica
-                bastaoNotificationsStarted = false;
-                console.log('Modo de leitura periódica ativado');
-                
-                // Configurar leitura periódica a cada 500ms (mais frequente para capturar leituras)
-                if (bastaoReadInterval) {
-                    clearInterval(bastaoReadInterval);
-                }
-                
-                // Contador de erros consecutivos para controle de reconexão
-                let errorCount = 0;
-                const MAX_ERRORS = 5;
-                
-                bastaoReadInterval = setInterval(async () => {
-                    try {
-                        // Verificar se o dispositivo ainda está conectado antes de tentar ler
-                        if (!bastaoDevice || !bastaoDevice.gatt || !bastaoDevice.gatt.connected) {
-                            console.warn('Dispositivo desconectado, tentando reconectar...');
-                            try {
-                                if (bastaoDevice) {
-                                    await bastaoDevice.gatt.connect();
-                                    console.log('Reconectado com sucesso');
-                                    // Resetar contador de erros após reconexão bem-sucedida
-                                    errorCount = 0;
-                                }
-                            } catch (reconnectError) {
-                                console.error('Falha na reconexão:', reconnectError);
-                                return; // Sair e tentar novamente no próximo intervalo
-                            }
-                        }
-                        
-                        // Tentar ler o valor com tratamento especial para "GATT operation failed"
-                        try {
-                            const value = await executeGattOperation(async () => {
-                                return await bastaoCharacteristic.readValue();
-                            });
-                            
-                            // Leitura bem-sucedida, resetar contador de erros
-                            errorCount = 0;
-                            handleBastaoValueChanged({ target: { value } });
-                        } catch (readError) {
-                            // Tratamento especial para "GATT operation failed"
-                            if (readError.message.includes('GATT operation failed')) {
-                                console.warn('Erro de operação GATT, tentando método alternativo...');
-                                
-                                // Tentar método alternativo: escrever um comando e depois ler
-                                try {
-                                    // Se a característica suporta escrita, enviar comando de leitura
-                                    if (bastaoCharacteristic.properties.write || 
-                                        bastaoCharacteristic.properties.writeWithoutResponse) {
-                                        
-                                        // Comando genérico para solicitar dados (0x01)
-                                        const cmd = new Uint8Array([0x01]);
-                                        
-                                        // Escrever comando
-                                        if (bastaoCharacteristic.properties.write) {
-                                            await executeGattOperation(async () => {
-                                                return await bastaoCharacteristic.writeValue(cmd);
-                                            });
-                                        } else {
-                                            await executeGattOperation(async () => {
-                                                return await bastaoCharacteristic.writeValueWithoutResponse(cmd);
-                                            });
-                                        }
-                                        
-                                        // Pequeno delay antes de ler
-                                        await new Promise(resolve => setTimeout(resolve, 200));
-                                        
-                                        // Tentar ler novamente
-                                        const value = await executeGattOperation(async () => {
-                                            return await bastaoCharacteristic.readValue();
-                                        });
-                                        
-                                        errorCount = 0;
-                                        handleBastaoValueChanged({ target: { value } });
-                                    } else {
-                                        throw new Error('Característica não suporta escrita');
-                                    }
-                                } catch (altError) {
-                                    // Se o método alternativo também falhar, incrementar contador de erros
-                                    errorCount++;
-                                    console.error('Método alternativo falhou:', altError);
-                                    
-                                    // Se excedeu o limite de erros, tentar reconectar completamente
-                                    if (errorCount >= MAX_ERRORS) {
-                                        console.warn(`Excedido limite de ${MAX_ERRORS} erros consecutivos, reconectando...`);
-                                        try {
-                                            // Desconectar e reconectar completamente
-                                            if (bastaoDevice && bastaoDevice.gatt) {
-                                                if (bastaoDevice.gatt.connected) {
-                                                    await bastaoDevice.gatt.disconnect();
-                                                }
-                                                await new Promise(resolve => setTimeout(resolve, 1000));
-                                                await conectarBastao(); // Reconectar usando a função completa
-                                                errorCount = 0;
-                                            }
-                                        } catch (reconnectError) {
-                                            console.error('Falha na reconexão completa:', reconnectError);
-                                        }
-                                    }
-                                }
-                            } else {
-                                // Outros erros
-                                console.error('Erro ao ler valor do bastão:', readError);
-                                console.log('Tipo de erro:', readError.name);
-                                console.log('Mensagem de erro:', readError.message);
-                                
-                                errorCount++;
-                                
-                                // Tratamento específico para diferentes tipos de erros
-                                if (readError.message.includes('GATT operation already in progress')) {
-                                    console.warn('Erro de operação GATT em andamento, será tratado pela fila');
-                                } else if (readError.name === 'NetworkError') {
-                                    console.warn('Erro de rede detectado');
-                                }
-                                
-                                // Se excedeu o limite de erros, tentar reconectar
-                                if (errorCount >= MAX_ERRORS) {
-                                    console.warn(`Excedido limite de ${MAX_ERRORS} erros consecutivos, reconectando...`);
-                                    try {
-                                        await conectarBastao(); // Reconectar usando a função completa
-                                        errorCount = 0;
-                                    } catch (reconnectError) {
-                                        console.error('Falha na reconexão completa:', reconnectError);
-                                    }
-                                }
-                            }
-                        }
-                    } catch (error) {
-                        // Erro geral no bloco principal
-                        console.error('Erro geral na leitura do bastão:', error);
-                        errorCount++;
-                    }
-                }, 1000); // Mantido em 1000ms para evitar sobrecarga de operações GATT
-            } else {
-                throw new Error('A característica não suporta notificações nem leitura');
-            }
-            
-            // Tentar fazer uma leitura inicial para ver se o dispositivo responde
-            // Mas com um pequeno delay para evitar colisão com outras operações GATT
-            // Atrasar a leitura inicial para dar tempo ao dispositivo de se estabilizar
-            setTimeout(async () => {
-                if (bastaoCharacteristic.properties.read) {
-                    try {
-                        console.log('Tentando leitura inicial...');
-                        
-                        // Verificar se o dispositivo ainda está conectado
-                        if (!bastaoDevice || !bastaoDevice.gatt || !bastaoDevice.gatt.connected) {
-                            console.warn('Dispositivo desconectado antes da leitura inicial, tentando reconectar...');
-                            try {
-                                if (bastaoDevice) {
-                                    await bastaoDevice.gatt.connect();
-                                    console.log('Reconectado com sucesso antes da leitura inicial');
-                                }
-                            } catch (reconnectError) {
-                                console.error('Falha na reconexão antes da leitura inicial:', reconnectError);
-                                return; // Sair e deixar o intervalo regular tentar depois
-                            }
-                        }
-                        
-                        // Tentar diferentes abordagens para a leitura inicial
-                        try {
-                            // 1. Primeiro, tentar leitura normal
-                            const value = await executeGattOperation(async () => {
-                                return await bastaoCharacteristic.readValue();
-                            });
-                            console.log('Leitura inicial bem-sucedida:', Array.from(new Uint8Array(value.buffer)));
-                            handleBastaoValueChanged({ target: { value } });
-                        } catch (readError) {
-                            console.error('Erro na primeira tentativa de leitura inicial:', readError);
-                            
-                            // 2. Se falhar, tentar com um comando de escrita primeiro (se suportado)
-                            if (bastaoCharacteristic.properties.write || 
-                                bastaoCharacteristic.properties.writeWithoutResponse) {
-                                
-                                try {
-                                    console.log('Tentando método alternativo com escrita...');
-                                    
-                                    // Comando genérico para solicitar dados (0x01)
-                                    const cmd = new Uint8Array([0x01]);
-                                    
-                                    // Escrever comando
-                                    if (bastaoCharacteristic.properties.write) {
-                                        await executeGattOperation(async () => {
-                                            return await bastaoCharacteristic.writeValue(cmd);
-                                        });
-                                    } else {
-                                        await executeGattOperation(async () => {
-                                            return await bastaoCharacteristic.writeValueWithoutResponse(cmd);
-                                        });
-                                    }
-                                    
-                                    // Pequeno delay antes de ler
-                                    await new Promise(resolve => setTimeout(resolve, 300));
-                                    
-                                    // Tentar ler novamente
-                                    const value = await executeGattOperation(async () => {
-                                        return await bastaoCharacteristic.readValue();
-                                    });
-                                    
-                                    console.log('Leitura inicial após escrita bem-sucedida:', 
-                                        Array.from(new Uint8Array(value.buffer)));
-                                    handleBastaoValueChanged({ target: { value } });
-                                } catch (writeReadError) {
-                                    console.error('Erro no método alternativo com escrita:', writeReadError);
-                                    
-                                    // 3. Última tentativa: apenas aguardar mais tempo e tentar novamente
-                                    setTimeout(async () => {
-                                        try {
-                                            console.log('Fazendo última tentativa de leitura inicial após delay maior...');
-                                            const value = await executeGattOperation(async () => {
-                                                return await bastaoCharacteristic.readValue();
-                                            });
-                                            console.log('Terceira tentativa de leitura bem-sucedida:', 
-                                                Array.from(new Uint8Array(value.buffer)));
-                                            handleBastaoValueChanged({ target: { value } });
-                                        } catch (thirdError) {
-                                            console.error('Todas as tentativas de leitura inicial falharam:', thirdError);
-                                            // Deixar o intervalo regular tentar depois
-                                        }
-                                    }, 1500); // Delay ainda maior para a terceira tentativa
-                                }
-                            } else {
-                                // Se não suporta escrita, apenas tentar novamente com delay maior
-                                setTimeout(async () => {
-                                    try {
-                                        console.log('Segunda tentativa de leitura inicial após delay maior...');
-                                        const value = await executeGattOperation(async () => {
-                                            return await bastaoCharacteristic.readValue();
-                                        });
-                                        console.log('Segunda tentativa de leitura bem-sucedida:', 
-                                            Array.from(new Uint8Array(value.buffer)));
-                                        handleBastaoValueChanged({ target: { value } });
-                                    } catch (secondError) {
-                                        console.error('Segunda tentativa de leitura falhou:', secondError);
-                                        // Deixar o intervalo regular tentar depois
-                                    }
-                                }, 1200); // Delay maior para a segunda tentativa
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Erro geral na leitura inicial:', error);
-                        // Deixar o intervalo regular tentar depois
-                    }
-                }
-            }, 1000); // Aumentado para 1000ms para dar mais tempo ao dispositivo
-            
-            bastaoStatusDiv.textContent = "Conectado a " + bastaoDevice.name;
-            mostrarNotificacao("Bastão conectado com sucesso!", "success");
-            
-        } catch (error) {
-            console.error('Erro ao conectar ao bastão:', error);
-            const bastaoStatusDiv = document.getElementById('bastaoStatus');
-            bastaoStatusDiv.textContent = "Erro: " + error.message;
-            const conectarBastaoBtn = document.getElementById('conectarBastao');
-            conectarBastaoBtn.classList.remove('connected');
-            conectarBastaoBtn.classList.add('error');
-            
-            // Limpar recursos
-            if (bastaoReadInterval) {
-                clearInterval(bastaoReadInterval);
-                bastaoReadInterval = null;
-            }
-            
-            setTimeout(() => {
-                conectarBastaoBtn.classList.remove('error');
-            }, 3000);
-            
-        try {
-            // Verificar se o navegador suporta Bluetooth
-            if (!navigator.bluetooth) {
-                throw new Error('Bluetooth não suportado neste navegador. Use Chrome, Edge ou Opera.');
-            }
-            
-            // Lista de serviços conhecidos para dispositivos de leitura
-            const knownServices = [
-                '00001101-0000-1000-8000-00805f9b34fb', // SPP (Serial Port Profile)
-                '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // UART (Nordic)
-                '0000ffe0-0000-1000-8000-00805f9b34fb', // Serviço comum em leitores BLE
-                '0000fff0-0000-1000-8000-00805f9b34fb', // Outro serviço comum
+        // Solicitar dispositivo Bluetooth
+        bastaoDevice = await navigator.bluetooth.requestDevice({
+            // Usar filtros para dispositivos específicos
+            filters: [
+                { namePrefix: 'RFID' },
+                { namePrefix: 'LEITOR' },
+                { namePrefix: 'READER' },
+                { namePrefix: 'HC-' },
+                { namePrefix: 'BT' }
+            ],
+            // Incluir serviços que não estão bloqueados
+            optionalServices: [
+                '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // UART
+                '0000ffe0-0000-1000-8000-00805f9b34fb', // FFE0
+                '0000fff0-0000-1000-8000-00805f9b34fb', // FFF0
+                '00001812-0000-1000-8000-00805f9b34fb', // HID
+                '0000180a-0000-1000-8000-00805f9b34fb', // Device Information
+                'device_information',
                 '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
                 '00001801-0000-1000-8000-00805f9b34fb', // Generic Attribute
-                '0000180a-0000-1000-8000-00805f9b34fb', // Device Information
-                '0000180f-0000-1000-8000-00805f9b34fb', // Battery Service
-                '00001812-0000-1000-8000-00805f9b34fb'  // HID (Human Interface Device)
-            ];
-            
-            // Solicitar dispositivo Bluetooth com filtros expandidos
-            bastaoDevice = await navigator.bluetooth.requestDevice({
-                filters: [
-                    { services: ['battery_service'] },
-                    { services: ['device_information'] },
-                    { services: ['00001101-0000-1000-8000-00805f9b34fb'] }, // SPP
-                    { services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] }, // UART
-                    { services: ['00001812-0000-1000-8000-00805f9b34fb'] }, // HID
-                    { namePrefix: 'HC-' },
-                    { namePrefix: 'HM-' },
-                    { namePrefix: 'BT' },
-                    { namePrefix: 'RFID' },
-                    { namePrefix: 'Scanner' },
-                    { namePrefix: 'Reader' },
-                    { namePrefix: 'Leitor' },
-                    { namePrefix: 'Bast' }
-                ],
-                optionalServices: knownServices
-            });
-            
-            console.log('Dispositivo selecionado:', bastaoDevice.name || 'Dispositivo sem nome');
-            mostrarNotificacao(`Conectando a ${bastaoDevice.name || 'Dispositivo sem nome'}...`);
-            
-            // Conectar ao GATT Server
-            const server = await bastaoDevice.gatt.connect();
-            console.log('Conectado ao GATT server');
-            
-            // Obter todos os serviços disponíveis
-            const services = await executeGattOperation(async () => {
-                return await server.getPrimaryServices();
-            });
-            console.log('Serviços disponíveis:', services.length);
-            
-            // Listar todos os serviços disponíveis
-            const serviceUUIDs = services.map(s => s.uuid);
-            console.log('Serviços encontrados:', serviceUUIDs);
-            
-            // Tentar encontrar serviços específicos na ordem de prioridade
-            let targetService = null;
-            
-            // Tentar serviços na ordem de prioridade
-            for (const serviceUUID of knownServices) {
-                if (serviceUUIDs.includes(serviceUUID)) {
-                    try {
-                        targetService = await executeGattOperation(async () => {
-                            return await server.getPrimaryService(serviceUUID);
-                        });
-                        console.log(`Serviço ${serviceUUID} selecionado`);
+                '0000180f-0000-1000-8000-00805f9b34fb'  // Battery Service
+            ]
+        });
+        
+        // Adicionar listener para desconexão
+        bastaoDevice.addEventListener('gattserverdisconnected', onBastaoDisconnected);
+        
+        // Conectar ao GATT server
+        console.log('Conectando ao GATT server do bastão...');
+        const server = await executeGattOperation(() => bastaoDevice.gatt.connect());
+        
+        // Descobrir serviços
+        console.log('Descobrindo serviços...');
+        const services = await executeGattOperation(() => server.getPrimaryServices());
+        console.log('Serviços descobertos:', services.map(s => s.uuid));
+        
+        // Procurar por características em cada serviço
+        let foundCharacteristic = false;
+        
+        for (const service of services) {
+            try {
+                console.log('Descobrindo características para serviço:', service.uuid);
+                const characteristics = await executeGattOperation(() => service.getCharacteristics());
+                console.log('Características descobertas:', characteristics.map(c => c.uuid));
+                
+                // Procurar por características conhecidas
+                const targetCharUUIDs = [
+                    '6e400003-b5a3-f393-e0a9-e50e24dcca9e', // UART RX
+                    '0000ffe1-0000-1000-8000-00805f9b34fb', // FFE1
+                    '0000fff1-0000-1000-8000-00805f9b34fb'  // FFF1
+                ];
+                
+                for (const uuid of targetCharUUIDs) {
+                    const char = characteristics.find(c => c.uuid === uuid);
+                    if (char) {
+                        bastaoCharacteristic = char;
+                        console.log('Encontrada característica alvo:', uuid);
+                        foundCharacteristic = true;
                         break;
-                    } catch (e) {
-                        console.warn(`Erro ao acessar serviço ${serviceUUID}:`, e);
                     }
                 }
+                
+                if (foundCharacteristic) break;
+                
+                // Se não encontrou características conhecidas, procurar por qualquer uma que suporte notificações
+                if (!bastaoCharacteristic) {
+                    const notifyChar = characteristics.find(c => c.properties.notify || c.properties.indicate);
+                    if (notifyChar) {
+                        bastaoCharacteristic = notifyChar;
+                        console.log('Usando característica com notificação:', notifyChar.uuid);
+                        foundCharacteristic = true;
+                        break;
+                    }
+                }
+                
+                // Se ainda não encontrou, procurar por qualquer uma que suporte leitura
+                if (!bastaoCharacteristic) {
+                    const readChar = characteristics.find(c => c.properties.read);
+                    if (readChar) {
+                        bastaoCharacteristic = readChar;
+                        console.log('Usando característica com leitura:', readChar.uuid);
+                        foundCharacteristic = true;
+                        break;
+                    }
+                }
+            } catch (error) {
+                console.warn('Erro ao descobrir características para serviço', service.uuid, error);
             }
-            
-            // Se nenhum serviço conhecido for encontrado, usar o primeiro disponível
-            if (!targetService && services.length > 0) {
-                targetService = services[0];
-                console.log('Usando o primeiro serviço disponível:', targetService.uuid);
-            }
-            
-            if (!targetService) {
-                throw new Error('Nenhum serviço compatível encontrado no dispositivo');
-            }
-            
-            // Obter todas as características do serviço
-            const characteristics = await executeGattOperation(async () => {
-                return await targetService.getCharacteristics();
-            });
-            console.log('Características disponíveis:', characteristics.length);
-            
-            // Listar todas as características disponíveis com suas propriedades
-            for (const characteristic of characteristics) {
-                console.log('Característica encontrada:', characteristic.uuid);
-                console.log('Propriedades:', {
-                    read: characteristic.properties.read,
-                    write: characteristic.properties.write,
-                    writeWithoutResponse: characteristic.properties.writeWithoutResponse,
-                    notify: characteristic.properties.notify,
-                    indicate: characteristic.properties.indicate
-                });
-            }
-            
-            // Mapeamento de serviços para características conhecidas
-            const serviceToCharacteristicMap = {
-                '00001101-0000-1000-8000-00805f9b34fb': null, // SPP não tem característica específica
-                '6e400001-b5a3-f393-e0a9-e50e24dcca9e': '6e400003-b5a3-f393-e0a9-e50e24dcca9e', // UART RX
-                '0000ffe0-0000-1000-8000-00805f9b34fb': '0000ffe1-0000-1000-8000-00805f9b34fb', // FFE1
-                '0000fff0-0000-1000-8000-00805f9b34fb': '0000fff1-0000-1000-8000-00805f9b34fb', // FFF1
-                '00001812-0000-1000-8000-00805f9b34fb': '00002a4d-0000-1000-8000-00805f9b34fb'  // HID Report
-            };
-            
-            // Tentar encontrar característica específica para o serviço selecionado
-            let targetCharacteristic = null;
-            const specificCharUUID = serviceToCharacteristicMap[targetService.uuid];
-            
-            if (specificCharUUID) {
+        }
+        
+        if (!bastaoCharacteristic) {
+            throw new Error('Não foi possível encontrar uma característica compatível no bastão');
+        }
+        
+        // Iniciar notificações ou leitura periódica
+        if (bastaoCharacteristic.properties.notify || bastaoCharacteristic.properties.indicate) {
+            console.log('Iniciando notificações para o bastão...');
+            await executeGattOperation(() => bastaoCharacteristic.startNotifications());
+            bastaoCharacteristic.addEventListener('characteristicvaluechanged', handleBastaoValueChanged);
+            bastaoNotificationsStarted = true;
+        } else if (bastaoCharacteristic.properties.read) {
+            console.log('Configurando leitura periódica para o bastão...');
+            // Ler imediatamente
+            setTimeout(async () => {
                 try {
-                    targetCharacteristic = await executeGattOperation(async () => {
-                        return await targetService.getCharacteristic(specificCharUUID);
-                    });
-                    console.log(`Característica específica ${specificCharUUID} encontrada`);
-                } catch (e) {
-                    console.log(`Característica específica ${specificCharUUID} não encontrada:`, e);
-                }
-            }
-            
-            // Se não encontrou característica específica, procurar por propriedades
-            if (!targetCharacteristic && characteristics.length > 0) {
-                // Priorizar características na seguinte ordem: notify > indicate > read
-                targetCharacteristic = characteristics.find(c => c.properties.notify) || 
-                                      characteristics.find(c => c.properties.indicate) || 
-                                      characteristics.find(c => c.properties.read);
-                
-                if (targetCharacteristic) {
-                    console.log('Usando característica com propriedades compatíveis:', targetCharacteristic.uuid);
-                }
-            }
-            
-            if (!targetCharacteristic) {
-                throw new Error('Nenhuma característica compatível encontrada no serviço');
-            }
-            
-            // Armazenar a característica para uso posterior
-            bastaoCharacteristic = targetCharacteristic;
-            
-            // Configurar notificações ou leitura periódica
-            if (bastaoCharacteristic.properties.notify) {
-                console.log('Iniciando notificações do bastão...');
-                await executeGattOperation(async () => {
-                    await bastaoCharacteristic.startNotifications();
-                });
-                bastaoCharacteristic.addEventListener('characteristicvaluechanged', handleBastaoValueChanged);
-                bastaoNotificationsStarted = true;
-            } else if (bastaoCharacteristic.properties.indicate) {
-                console.log('Iniciando indicações do bastão...');
-                await executeGattOperation(async () => {
-                    await bastaoCharacteristic.startNotifications();
-                });
-                bastaoCharacteristic.addEventListener('characteristicvaluechanged', handleBastaoValueChanged);
-                bastaoNotificationsStarted = true;
-            } else if (bastaoCharacteristic.properties.read) {
-                console.log('Configurando leitura periódica do bastão...');
-                
-                // Limpar intervalo anterior se existir
-                if (bastaoReadInterval) {
-                    clearInterval(bastaoReadInterval);
-                }
-                
-                // Contador de erros para controle de reconexão
-                let errorCount = 0;
-                const MAX_ERRORS = 5;
-                
-                // Fazer uma leitura inicial imediata
-                try {
-                    const value = await executeGattOperation(async () => {
-                        return await bastaoCharacteristic.readValue();
-                    });
+                    const value = await executeGattOperation(() => bastaoCharacteristic.readValue());
                     handleBastaoValueChanged({ target: { value } });
                 } catch (error) {
-                    console.warn('Erro na leitura inicial do bastão:', error);
+                    console.error('Erro na leitura inicial do bastão:', error);
                 }
-                
-                bastaoReadInterval = setInterval(async () => {
-                    try {
-                        // Verificar se o dispositivo ainda está conectado
-                        if (!bastaoDevice || !bastaoDevice.gatt || !bastaoDevice.gatt.connected) {
-                            console.warn('Bastão desconectado, tentando reconectar...');
-                            try {
-                                if (bastaoDevice) {
-                                    await bastaoDevice.gatt.connect();
-                                    console.log('Bastão reconectado com sucesso');
-                                    errorCount = 0;
-                                }
-                            } catch (reconnectError) {
-                                console.error('Falha na reconexão do bastão:', reconnectError);
-                                errorCount++;
-                                return;
-                            }
-                        }
-                        
-                        // Tentar ler o valor
-                        try {
-                            const value = await executeGattOperation(async () => {
-                                return await bastaoCharacteristic.readValue();
-                            });
-                            handleBastaoValueChanged({ target: { value } });
-                            errorCount = 0; // Resetar contador de erros após sucesso
-                        } catch (readError) {
-                            // Tratamento especial para "GATT operation failed"
-                            if (readError.message.includes('GATT operation failed')) {
-                                console.warn('Erro de operação GATT na balança, tentando método alternativo...');
-                                
-                                // Tentar método alternativo: escrever um comando e depois ler
-                                try {
-                                    // Se a característica suporta escrita, enviar comando de leitura
-                                    if (balancaCharacteristic.properties.write || 
-                                        balancaCharacteristic.properties.writeWithoutResponse) {
-                                        
-                                        // Comando genérico para solicitar dados (0x01)
-                                        const cmd = new Uint8Array([0x01]);
-                                        
-                                        // Escrever comando
-                                        if (balancaCharacteristic.properties.write) {
-                                            await executeGattOperation(async () => {
-                                                return await balancaCharacteristic.writeValue(cmd);
-                                            });
-                                        } else {
-                                            await executeGattOperation(async () => {
-                                                return await balancaCharacteristic.writeValueWithoutResponse(cmd);
-                                            });
-                                        }
-                                        
-                                        // Pequeno delay antes de ler
-                                        await new Promise(resolve => setTimeout(resolve, 200));
-                                        
-                                        // Tentar ler novamente
-                                        const value = await executeGattOperation(async () => {
-                                            return await balancaCharacteristic.readValue();
-                                        });
-                                        
-                                        errorCount = 0;
-                                        handleBalancaValueChanged({ target: { value } });
-                                    } else {
-                                        throw new Error('Característica da balança não suporta escrita');
-                                    }
-                                } catch (altError) {
-                                    // Se o método alternativo também falhar, incrementar contador de erros
-                                    errorCount++;
-                                    console.error('Método alternativo para balança falhou:', altError);
-                                    
-                                    // Se excedeu o limite de erros, tentar reconectar completamente
-                                    if (errorCount >= MAX_ERRORS) {
-                                        console.warn(`Excedido limite de ${MAX_ERRORS} erros consecutivos na balança, reconectando...`);
-                                        try {
-                                            // Desconectar e reconectar completamente
-                                            if (balancaDevice && balancaDevice.gatt) {
-                                                if (balancaDevice.gatt.connected) {
-                                                    await balancaDevice.gatt.disconnect();
-                                                }
-                                                await new Promise(resolve => setTimeout(resolve, 1000));
-                                                await conectarBalanca(); // Reconectar usando a função completa
-                                                errorCount = 0;
-                                            }
-                                        } catch (reconnectError) {
-                                            console.error('Falha na reconexão completa da balança:', reconnectError);
-                                        }
-                                    }
-                                }
-                            } else {
-                                // Outros erros
-                                console.error('Erro ao ler valor da balança:', readError);
-                                errorCount++;
-                                
-                                // Se excedeu o limite de erros, tentar reconectar
-                                if (errorCount >= MAX_ERRORS) {
-                                    console.warn(`Excedido limite de ${MAX_ERRORS} erros consecutivos na balança, reconectando...`);
-                                    try {
-                                        // Limpar intervalo atual
-                                        clearInterval(balancaReadInterval);
-                                        balancaReadInterval = null;
-                                        
-                                        // Tentar reconectar
-                                        await conectarBalanca();
-                                        errorCount = 0;
-                                    } catch (reconnectError) {
-                                        console.error('Falha na reconexão completa da balança:', reconnectError);
-                                    }
-                                }
-                            }
-                        }
-                    } catch (error) {
-                        // Erro geral no bloco principal
-                        console.error('Erro geral na leitura da balança:', error);
-                        errorCount++;
+            }, 500);
+            
+            // Configurar leitura periódica
+            bastaoReadInterval = setInterval(async () => {
+                try {
+                    const value = await executeGattOperation(() => bastaoCharacteristic.readValue());
+                    handleBastaoValueChanged({ target: { value } });
+                } catch (error) {
+                    console.error('Erro na leitura periódica do bastão:', error);
+                    errorCount++;
+                    
+                    if (errorCount > MAX_CONSECUTIVE_GATT_ERRORS) {
+                        clearInterval(bastaoReadInterval);
+                        bastaoReadInterval = null;
+                        console.error('Muitos erros consecutivos, interrompendo leitura periódica');
                     }
-                }, 500); // Mantido em 500ms para a balança que precisa de atualizações mais frequentes
-            } else {
-                throw new Error('A característica não suporta notificações nem leitura');
-            }
-            
-            balancaStatusDiv.textContent = "Conectado a " + balancaDevice.name;
-            mostrarNotificacao("Balança conectada com sucesso!");
-            
-            // Habilitar campo de peso
-            pesoInput.disabled = false;
-            
-        } catch (error) {
-            console.error('Erro ao conectar à balança:', error);
-            const balancaStatusDiv = document.getElementById('balancaStatus');
-            balancaStatusDiv.textContent = "Erro: " + error.message;
-            const conectarBalancaBtn = document.getElementById('conectarBalanca');
-            conectarBalancaBtn.classList.remove('connected');
-            conectarBalancaBtn.classList.add('error');
-            
-            // Limpar recursos
-            if (balancaReadInterval) {
-                clearInterval(balancaReadInterval);
-                balancaReadInterval = null;
-            }
-            
-            setTimeout(() => {
-                conectarBalancaBtn.classList.remove('error');
-            }, 2000);
-        }
-    }
-    
-    // Função para tratar desconexão da balança
-    function onBalancaDisconnected() {
-        balancaNotificationsStarted = false;
-        balancaCharacteristic = null;
-        
-        // Limpar intervalo de leitura se existir
-        if (balancaReadInterval) {
-            clearInterval(balancaReadInterval);
-            balancaReadInterval = null;
+                }
+            }, 1000); // Intervalo de 1 segundo para o bastão
+        } else {
+            throw new Error('A característica não suporta notificações nem leitura');
         }
         
-        const balancaStatusDiv = document.getElementById('balancaStatus');
-        balancaStatusDiv.textContent = "Desconectado";
-        const conectarBalancaBtn = document.getElementById('conectarBalanca');
-        conectarBalancaBtn.classList.remove('connected');
-        mostrarNotificacao("Balança desconectada");
+        bastaoStatusDiv.textContent = "Conectado a " + bastaoDevice.name;
+        mostrarNotificacao("Bastão conectado com sucesso!", "success");
         
-        // Desabilitar campo de peso
-        pesoInput.disabled = true;
+    } catch (error) {
+        console.error('Erro ao conectar ao bastão:', error);
+        const bastaoStatusDiv = document.getElementById('bastaoStatus');
+        bastaoStatusDiv.textContent = "Erro: " + error.message;
+        mostrarNotificacao("Erro ao conectar ao bastão: " + error.message, "error");
+        throw error;
     }
-    
-    // Função para processar dados recebidos da balança conforme documentação do fabricante
-    function handleBalancaValueChanged(event) {
+}
+
+// Função para processar as leituras do bastão
+function handleBastaoValueChanged(event) {
+    try {
         const value = event.target.value;
-        const decoder = new TextDecoder('utf-8');
-        const frameRecebido = decoder.decode(value).trim();
+        const brincoInput = document.getElementById('brinco');
         
         // Exibir dados brutos para depuração
-        console.log('Dados brutos da balança:', Array.from(new Uint8Array(value.buffer)));
-        console.log('Frame recebido da balança:', frameRecebido);
+        console.log('Dados brutos recebidos do bastão:', Array.from(new Uint8Array(value.buffer)).map(b => b.toString(16).padStart(2, '0')).join(' '));
         
-        // Atualizar o último frame recebido
-        ultimoFrame = frameRecebido;
+        // Tentar diferentes decodificações
+        const decoder = new TextDecoder('utf-8');
+        let brincoLido = decoder.decode(value).trim();
         
-        // Verificar se é um frame de peso válido (formato: "PESO      0 N")
-        if (frameRecebido.startsWith('PESO')) {
-            // Extrair o peso e o status conforme documentação do fabricante
-            // Formato: "PESO      0 N" onde N é o status
-            // Status: A - aguarde (aguarde)
-            //         N - nenhum (aguardando animal)
-            //         P - pronto (autoriza congela peso)
-            //         C - congelado (autoriza registrar o peso)
-            //         R - registrado (registrado)
+        // Se o brinco estiver vazio ou contiver apenas caracteres nulos, tente outras abordagens
+        if (!brincoLido || /^[\x00\s]*$/.test(brincoLido)) {
+            // Tentar extrair caracteres ASCII válidos
+            const bytes = new Uint8Array(value.buffer);
+            const asciiChars = [];
             
-            // Extrair o peso (7 bytes após a palavra PESO)
-            const pesoStr = frameRecebido.substring(4, 11).trim();
-            // O status é o último caractere
-            const statusBalanca = frameRecebido.charAt(frameRecebido.length - 1);
-            
-            // Converter para número
-            const pesoAtual = parseFloat(pesoStr);
-            
-            // Atualizar status da balança
-            let statusText = "";
-            switch(statusBalanca) {
-                case 'A': statusText = "Aguarde"; break;
-                case 'N': statusText = "Aguardando animal"; break;
-                case 'P': statusText = "Pronto para congelar"; break;
-                case 'C': statusText = "Peso congelado"; break;
-                case 'R': statusText = "Peso registrado"; break;
-                default: statusText = "Status desconhecido"; break;
+            for (let i = 0; i < bytes.length; i++) {
+                // Considerar apenas caracteres ASCII imprimíveis (32-126)
+                if (bytes[i] >= 32 && bytes[i] <= 126) {
+                    asciiChars.push(String.fromCharCode(bytes[i]));
+                }
             }
             
-            const balancaStatusDiv = document.getElementById('balancaStatus');
-            balancaStatusDiv.textContent = `Status: ${statusText} (${pesoAtual} kg)`;
-            
-            // Atualizar a interface com base no status
-            balancaStatusDiv.classList.remove('status-aguarde', 'status-pronto', 'status-congelado', 'status-registrado');
-            if (statusBalanca === 'A') {
-                balancaStatusDiv.classList.add('status-aguarde');
-            } else if (statusBalanca === 'P') {
-                balancaStatusDiv.classList.add('status-pronto');
-            } else if (statusBalanca === 'C') {
-                balancaStatusDiv.classList.add('status-congelado');
-            } else if (statusBalanca === 'R') {
-                balancaStatusDiv.classList.add('status-registrado');
+            if (asciiChars.length > 0) {
+                brincoLido = asciiChars.join('');
+                console.log('Brinco extraído de caracteres ASCII:', brincoLido);
             }
             
-            // Se o status for 'C' (congelado) ou 'R' (registrado), atualizar o campo de peso
-            if (statusBalanca === 'C' || statusBalanca === 'R') {
-                pesoInput.value = pesoAtual;
-                
-                // Destacar visualmente que o peso foi capturado
-                balancaStatusDiv.classList.add('peso-capturado');
-                setTimeout(() => {
-                    balancaStatusDiv.classList.remove('peso-capturado');
-                }, 2000);
-                
-                // Calcular GMD
-                calcularNovoGMD();
-                
-                // Se estiver no modo automação e o status for 'R', iniciar o processo de salvamento
-                if (automationActive && statusBalanca === 'R') {
-                    beep();
-                    autoPesoTriggered = true;
-                    animateSaveButton();
+            // Se ainda estiver vazio, tente interpretar como número
+            if (!brincoLido || /^[\x00\s]*$/.test(brincoLido)) {
+                // Tentar interpretar como número (big-endian e little-endian)
+                if (bytes.length >= 4) {
+                    const view = new DataView(value.buffer);
+                    const numBE = view.getUint32(0, false); // Big Endian
+                    const numLE = view.getUint32(0, true);  // Little Endian
                     
-                    // Habilitar os checkboxes se necessário
-                    fazerManejoCheckbox.disabled = false;
-                    fazerApartacaoCheckbox.disabled = false;
-                    submitButton.disabled = false;
+                    console.log('Possíveis interpretações numéricas:', {
+                        bigEndian: numBE,
+                        littleEndian: numLE
+                    });
+                    
+                    // Usar o número se for razoável (não zero e não muito grande)
+                    if (numBE > 0 && numBE < 1000000000) {
+                        brincoLido = numBE.toString();
+                        console.log('Usando interpretação numérica (BE):', brincoLido);
+                    } else if (numLE > 0 && numLE < 1000000000) {
+                        brincoLido = numLE.toString();
+                        console.log('Usando interpretação numérica (LE):', brincoLido);
+                    }
                 }
             }
         }
+        
+        console.log('Brinco lido após processamento:', brincoLido);
+        
+        // Verificar se o brinco é válido (não vazio e não contém apenas caracteres nulos)
+        const brincoValido = brincoLido && 
+                            !/^[\x00\s]*$/.test(brincoLido) && // Não contém apenas nulos ou espaços
+                            brincoLido.length > 1 && // Tem pelo menos 2 caracteres
+                            brincoLido.length < 30; // Não é muito longo (provavelmente erro)
+        
+        // Verificar se já passou tempo suficiente desde a última leitura (500ms)
+        const agora = Date.now();
+        const tempoSuficiente = (agora - ultimaLeituraBrinco) > 500;
+        
+        // Verificar se é diferente do último brinco lido
+        const brincoNovo = brincoLido !== ultimoBrincoLido;
+        
+        console.log('Dados recebidos do bastão:', {
+            bruto: brincoLido,
+            valido: brincoValido,
+            novo: brincoNovo,
+            tempoSuficiente: tempoSuficiente
+        });
+        
+        // Só processa se for um brinco válido, novo e tiver passado tempo suficiente
+        if (brincoValido && (brincoNovo || tempoSuficiente)) {
+            console.log('Brinco válido lido:', brincoLido);
+            
+            // Atualizar variáveis de controle
+            ultimoBrincoLido = brincoLido;
+            ultimaLeituraBrinco = agora;
+            
+            // Preencher o campo de brinco
+            brincoInput.value = brincoLido;
+            
+            // Disparar evento de busca de animal
+            buscarAnimal(brincoLido);
+            
+            // Reproduzir beep de confirmação
+            beep();
+            
+            // Focar no próximo campo se automação estiver ativa
+            if (automationActive) {
+                pesoInput.focus();
+            }
+            
+            // Mostrar notificação
+            mostrarNotificacao("Brinco lido: " + brincoLido, "success");
+        }
+    } catch (error) {
+        console.error('Erro ao processar leitura do bastão:', error);
     }
-
-    // Event Listeners
-    toggleAutomation.addEventListener('change', function() {
-        automationActive = this.checked;
-        beep();
-        
-        if (automationActive) {
-            // Mostrar popup de instruções
-            const popup = document.createElement('div');
-            popup.style.cssText = `
-                position: fixed;
-                top: 20px;
-                left: 50%;
-                transform: translateX(-50%);
-                background-color: #17a2b8;
-                color: #fff;
-                padding: 15px 30px;
-                border-radius: 5px;
-                z-index: 9999;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            `;
-            popup.innerHTML = `
-                <strong>Automação Ativada!</strong><br>
-                1. Use o bastão para ler o brinco<br>
-                2. Aguarde a balança enviar o peso<br>
-                3. O sistema calculará o GMD automaticamente<br>
-                4. O registro será salvo automaticamente
-            `;
-            document.body.appendChild(popup);
-            
-            setTimeout(() => popup.remove(), 5000);
-            brincoInput.focus();
-        }
-    });
-
-    brincoInput.addEventListener('input', function(e) {
-        const brinco = e.target.value.trim();
-        
-        // Se o brinco tiver pelo menos 3 caracteres, usar um debounce para busca
-        if (brinco.length >= 3) {
-            // Limpar timeout anterior se existir
-            if (window.brincoTimeout) {
-                clearTimeout(window.brincoTimeout);
-            }
-            
-            // Definir um novo timeout (300ms de delay)
-            window.brincoTimeout = setTimeout(() => {
-                buscarAnimal(brinco);
-            }, 300);
-        }
-    });
-
-    brincoInput.addEventListener('blur', function() {
-        const brinco = this.value.trim();
-        
-        if (brinco) {
-            buscarAnimal(brinco);
-        }
-    });
-
-    pesoInput.addEventListener('input', function() {
-        // Atualiza o GMD quando o peso for alterado
-        calcularNovoGMD();
-    });
-    
-    pesoInput.addEventListener('paste', function(e) {
-        // Permitir um pequeno delay para o valor ser inserido
-        setTimeout(() => {
-            console.log("Valor colado no campo de peso:", this.value);
-            calcularNovoGMD();
-            
-            if (automationActive && this.value.trim()) {
-                console.log("Modo de automação ativo e peso inserido. Iniciando processo automático.");
-                setTimeout(() => {
-                    beep();
-                    autoPesoTriggered = true;
-                    animateSaveButton();
-                }, 800);
-            }
-        }, 100);
-    });
-
-    fazerManejoCheckbox.addEventListener('change', function() {
-        // Mostrar ou esconder campos de manejo sanitário com base no estado do checkbox
-        manejoSanitarioCampos.style.display = this.checked ? 'block' : 'none';
-    });
-
-    fazerApartacaoCheckbox.addEventListener('change', function() {
-        // Mostrar ou esconder campos de apartação com base no estado do checkbox
-        apartacaoCampos.style.display = this.checked ? 'block' : 'none';
-        
-        if (this.checked && document.getElementById('fazenda_id').value) {
-            carregarLotesPorFazenda(document.getElementById('fazenda_id').value);
-            carregarPastosPorFazenda(document.getElementById('fazenda_id').value);
-        }
-    });
-
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        if (!window.registroEmAndamento) {
-            registrarManejo(new FormData(this));
-        }
-    });
-
-    // Event listeners para botões Bluetooth
-    const conectarBastaoBtn = document.getElementById('conectarBastao');
-    const conectarBalancaBtn = document.getElementById('conectarBalanca');
-    conectarBastaoBtn.addEventListener('click', conectarBastao);
-    conectarBalancaBtn.addEventListener('click', conectarBalanca);
-
-    // Inicializar campos
-    pesoInput.disabled = true;
-    fazerManejoCheckbox.disabled = true;
-    fazerApartacaoCheckbox.disabled = true;
-    submitButton.disabled = true;
-    document.getElementById('animalInfo').style.display = 'none';
-    manejoSanitarioCampos.style.display = 'none';
-    apartacaoCampos.style.display = 'none';
-});
+}
 
 // Função para tratar desconexão do bastão
 function onBastaoDisconnected() {
@@ -2376,112 +1091,298 @@ function onBastaoDisconnected() {
     
     const bastaoStatusDiv = document.getElementById('bastaoStatus');
     bastaoStatusDiv.textContent = "Desconectado";
-    const conectarBastaoBtn = document.getElementById('conectarBastao');
-    conectarBastaoBtn.classList.remove('connected');
-    mostrarNotificacao("Bastão desconectado");
+    const bastaoBtn = document.getElementById('conectarBastao');
+    if (bastaoBtn) {
+        bastaoBtn.textContent = "Reconectar";
+    }
 }
 
-// Função para processar dados recebidos do bastão
-function handleBastaoValueChanged(event) {
-    const value = event.target.value;
-    
-    // Exibir os dados brutos recebidos para depuração
-    console.log('Dados brutos recebidos do bastão:', Array.from(new Uint8Array(value.buffer)).map(b => b.toString(16).padStart(2, '0')).join(' '));
-    
-    // Tentar diferentes decodificações
-    const decoder = new TextDecoder('utf-8');
-    let brincoLido = decoder.decode(value).trim();
-    
-    // Se o brinco estiver vazio ou contiver apenas caracteres nulos, tente outras abordagens
-    if (!brincoLido || /^[\x00\s]*$/.test(brincoLido)) {
-        // Tentar extrair caracteres ASCII válidos
-        const bytes = new Uint8Array(value.buffer);
-        const asciiChars = [];
+// Função para conectar à balança Bluetooth
+async function conectarBalanca() {
+    try {
+        const balancaStatusDiv = document.getElementById('balancaStatus');
+        balancaStatusDiv.textContent = "Conectando...";
         
-        for (let i = 0; i < bytes.length; i++) {
-            // Considerar apenas caracteres ASCII imprimíveis (32-126)
-            if (bytes[i] >= 32 && bytes[i] <= 126) {
-                asciiChars.push(String.fromCharCode(bytes[i]));
+        // Verificar se já está conectado
+        if (balancaDevice && balancaDevice.gatt.connected) {
+            console.log('Balança já está conectada');
+            balancaStatusDiv.textContent = "Conectado a " + balancaDevice.name;
+            return;
+        }
+        
+        // Solicitar dispositivo Bluetooth
+        balancaDevice = await navigator.bluetooth.requestDevice({
+            // Usar filtros para dispositivos específicos
+            filters: [
+                { namePrefix: 'Balanca' },
+                { namePrefix: 'Scale' },
+                { namePrefix: 'Peso' },
+                { namePrefix: 'Weight' },
+                { namePrefix: 'BT' }
+            ],
+            // Incluir serviços que não estão bloqueados
+            optionalServices: [
+                '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // UART
+                '0000ffe0-0000-1000-8000-00805f9b34fb', // FFE0
+                '0000fff0-0000-1000-8000-00805f9b34fb', // FFF0
+                '00001812-0000-1000-8000-00805f9b34fb', // HID
+                '0000180a-0000-1000-8000-00805f9b34fb', // Device Information
+                'device_information',
+                '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
+                '00001801-0000-1000-8000-00805f9b34fb', // Generic Attribute
+                '0000180f-0000-1000-8000-00805f9b34fb'  // Battery Service
+            ]
+        });
+        
+        console.log('Conectando à balança:', balancaDevice.name);
+        balancaStatusDiv.textContent = "Conectando a " + balancaDevice.name + "...";
+        
+        // Conectar ao dispositivo GATT
+        const server = await executeGattOperation(() => balancaDevice.gatt.connect());
+        console.log('Conectado ao servidor GATT');
+        
+        // Descobrir serviços
+        const services = await executeGattOperation(() => server.getPrimaryServices());
+        console.log('Serviços descobertos:', services.length);
+        
+        // Procurar por características em todos os serviços
+        let characteristicFound = false;
+        
+        for (const service of services) {
+            console.log('Verificando serviço:', service.uuid);
+            
+            try {
+                const characteristics = await executeGattOperation(() => service.getCharacteristics());
+                console.log(`Serviço ${service.uuid}: ${characteristics.length} características`);
+                
+                for (const characteristic of characteristics) {
+                    console.log('Característica:', characteristic.uuid, 
+                                'Propriedades:', 
+                                'Read:', characteristic.properties.read,
+                                'Notify:', characteristic.properties.notify,
+                                'Write:', characteristic.properties.write);
+                    
+                    // Verificar se é uma característica que pode conter dados de peso
+                    if (characteristic.properties.read || characteristic.properties.notify) {
+                        balancaCharacteristic = characteristic;
+                        characteristicFound = true;
+                        console.log('Característica para leitura de peso encontrada:', characteristic.uuid);
+                        
+                        // Habilitar notificações se disponível
+                        if (characteristic.properties.notify) {
+                            await executeGattOperation(() => characteristic.startNotifications());
+                            balancaNotificationsStarted = true;
+                            console.log('Notificações iniciadas para a balança');
+                            
+                            characteristic.addEventListener('characteristicvaluechanged', handleBalancaValueChanged);
+                        } else if (characteristic.properties.read) {
+                            // Se não suportar notificações, configurar leitura periódica
+                            console.log('Configurando leitura periódica para a balança');
+                            
+                            // Primeira leitura após um pequeno delay
+                            setTimeout(async () => {
+                                try {
+                                    const value = await executeGattOperation(() => characteristic.readValue());
+                                    handleBalancaValueChanged({ target: { value } });
+                                } catch (error) {
+                                    console.error('Erro na leitura inicial da balança:', error);
+                                }
+                            }, 500);
+                            
+                            // Configurar leitura periódica a cada 500ms
+                            balancaReadInterval = setInterval(async () => {
+                                try {
+                                    if (balancaDevice && balancaDevice.gatt.connected && balancaCharacteristic) {
+                                        const value = await executeGattOperation(() => balancaCharacteristic.readValue());
+                                        handleBalancaValueChanged({ target: { value } });
+                                    } else {
+                                        console.log('Balança desconectada, parando leitura periódica');
+                                        clearInterval(balancaReadInterval);
+                                        balancaReadInterval = null;
+                                    }
+                                } catch (error) {
+                                    console.error('Erro na leitura periódica da balança:', error);
+                                    errorCount++;
+                                    if (errorCount > MAX_CONSECUTIVE_GATT_ERRORS) {
+                                        console.log('Máximo de erros consecutivos atingido, parando leitura periódica');
+                                        clearInterval(balancaReadInterval);
+                                        balancaReadInterval = null;
+                                        errorCount = 0;
+                                    }
+                                }
+                            }, 500); // Intervalo menor para a balança (500ms)
+                        }
+                        
+                        break; // Sair do loop de características
+                    }
+                }
+                
+                if (characteristicFound) {
+                    break; // Sair do loop de serviços
+                }
+            } catch (error) {
+                console.error(`Erro ao acessar características do serviço ${service.uuid}:`, error);
             }
         }
         
-        if (asciiChars.length > 0) {
-            brincoLido = asciiChars.join('');
-            console.log('Brinco extraído de caracteres ASCII:', brincoLido);
+        if (!characteristicFound) {
+            throw new Error('Não foi possível encontrar uma característica compatível na balança');
         }
         
-        // Se ainda estiver vazio, tente interpretar como número
-        if (!brincoLido || /^[\x00\s]*$/.test(brincoLido)) {
-            // Tentar interpretar como número (big-endian e little-endian)
-            if (bytes.length >= 4) {
-                const view = new DataView(value.buffer);
-                const numBE = view.getUint32(0, false); // Big Endian
-                const numLE = view.getUint32(0, true);  // Little Endian
+        // Configurar desconexão
+        balancaDevice.addEventListener('gattserverdisconnected', onBalancaDisconnected);
+        
+        // Atualizar status
+        balancaStatusDiv.textContent = "Conectado a " + balancaDevice.name;
+        document.getElementById('peso').disabled = false;
+        mostrarNotificacao("Balança conectada com sucesso!", "success");
+        
+        return balancaCharacteristic;
+    } catch (error) {
+        console.error('Erro ao conectar à balança:', error);
+        const balancaStatusDiv = document.getElementById('balancaStatus');
+        balancaStatusDiv.textContent = "Erro: " + error.message;
+        document.getElementById('peso').disabled = true;
+        throw error;
+    }
+}
+
+// Função para processar os dados recebidos da balança
+function handleBalancaValueChanged(event) {
+    try {
+        const value = event.target.value;
+        const decoder = new TextDecoder('utf-8');
+        let pesoStr = '';
+        
+        // Tentar diferentes formatos de dados
+        if (value.byteLength > 0) {
+            // Mostrar dados brutos para debug
+            let hexString = '';
+            const dataView = new DataView(value.buffer);
+            for (let i = 0; i < value.byteLength; i++) {
+                const byte = dataView.getUint8(i);
+                hexString += ('00' + byte.toString(16)).slice(-2) + ' ';
+            }
+            console.log('Dados brutos da balança (hex):', hexString.trim());
+            
+            // Tentar decodificar como texto
+            pesoStr = decoder.decode(value).trim();
+            console.log('Dados da balança (texto):', pesoStr);
+            
+            // Limpar dados e extrair apenas números
+            pesoStr = pesoStr.replace(/[^0-9.,]/g, '');
+            
+            // Se estiver vazio, tentar interpretar como número
+            if (!pesoStr && value.byteLength >= 4) {
+                // Tentar interpretar como float (little-endian e big-endian)
+                const floatLE = dataView.getFloat32(0, true); // little-endian
+                const floatBE = dataView.getFloat32(0, false); // big-endian
                 
-                console.log('Possíveis interpretações numéricas:', {
-                    bigEndian: numBE,
-                    littleEndian: numLE
-                });
+                // Escolher o valor mais provável (não negativo e menor que 10000)
+                if (floatLE >= 0 && floatLE < 10000) {
+                    pesoStr = floatLE.toFixed(2);
+                } else if (floatBE >= 0 && floatBE < 10000) {
+                    pesoStr = floatBE.toFixed(2);
+                }
                 
-                // Usar o número se for razoável (não zero e não muito grande)
-                if (numBE > 0 && numBE < 1000000000) {
-                    brincoLido = numBE.toString();
-                    console.log('Usando interpretação numérica (BE):', brincoLido);
-                } else if (numLE > 0 && numLE < 1000000000) {
-                    brincoLido = numLE.toString();
-                    console.log('Usando interpretação numérica (LE):', brincoLido);
+                console.log('Dados interpretados como float:', 'LE:', floatLE, 'BE:', floatBE);
+            }
+            
+            // Se ainda estiver vazio, tentar interpretar como inteiro
+            if (!pesoStr && value.byteLength >= 2) {
+                // Tentar interpretar como int16 (little-endian e big-endian)
+                const int16LE = dataView.getInt16(0, true); // little-endian
+                const int16BE = dataView.getInt16(0, false); // big-endian
+                
+                // Escolher o valor mais provável (não negativo e menor que 10000)
+                if (int16LE >= 0 && int16LE < 10000) {
+                    pesoStr = int16LE.toString();
+                } else if (int16BE >= 0 && int16BE < 10000) {
+                    pesoStr = int16BE.toString();
+                }
+                
+                console.log('Dados interpretados como int16:', 'LE:', int16LE, 'BE:', int16BE);
+            }
+        }
+        
+        // Validar e processar o peso
+        if (pesoStr) {
+            // Substituir vírgula por ponto para garantir formato numérico
+            pesoStr = pesoStr.replace(',', '.');
+            
+            // Converter para número
+            const peso = parseFloat(pesoStr);
+            
+            // Validar se é um número válido e dentro de um intervalo razoável
+            if (!isNaN(peso) && peso > 0 && peso < 10000) {
+                const agora = Date.now();
+                
+                // Verificar se é uma nova leitura ou se passou tempo suficiente
+                if (peso !== ultimoPesoLido || (agora - ultimaLeituraBalanca) > 2000) {
+                    console.log('Peso válido recebido:', peso);
+                    
+                    // Atualizar campo de peso
+                    const pesoInput = document.getElementById('peso');
+                    if (pesoInput) {
+                        pesoInput.value = peso.toFixed(2);
+                        pesoInput.dispatchEvent(new Event('change')); // Disparar evento de mudança
+                    }
+                    
+                    // Atualizar variáveis de controle
+                    ultimoPesoLido = peso;
+                    ultimaLeituraBalanca = agora;
                 }
             }
         }
-    }
-    
-    console.log('Brinco lido após processamento:', brincoLido);
-    
-    // Verificar se o brinco é válido (não vazio e não contém apenas caracteres nulos)
-    const brincoValido = brincoLido && 
-                        !/^[\x00\s]*$/.test(brincoLido) && // Não contém apenas nulos ou espaços
-                        brincoLido.length > 1 && // Tem pelo menos 2 caracteres
-                        brincoLido.length < 30; // Não é muito longo (provavelmente erro)
-    
-    // Verificar se já passou tempo suficiente desde a última leitura (500ms)
-    const agora = Date.now();
-    const tempoSuficiente = (agora - ultimaLeituraBrinco) > 500;
-    
-    // Verificar se é diferente do último brinco lido
-    const brincoNovo = brincoLido !== ultimoBrincoLido;
-    
-    console.log('Dados recebidos do bastão:', {
-        bruto: brincoLido,
-        valido: brincoValido,
-        novo: brincoNovo,
-        tempoSuficiente: tempoSuficiente
-    });
-    
-    // Só processa se for um brinco válido, novo e tiver passado tempo suficiente
-    if (brincoValido && (brincoNovo || tempoSuficiente)) {
-        console.log('Brinco válido lido:', brincoLido);
-        
-        // Atualizar variáveis de controle
-        ultimoBrincoLido = brincoLido;
-        ultimaLeituraBrinco = agora;
-        
-        // Preencher o campo de brinco
-        brincoInput.value = brincoLido;
-        
-        // Disparar evento de busca de animal
-        buscarAnimal(brincoLido);
-        
-        // Reproduzir beep de confirmação
-        beep();
-        
-        // Focar no próximo campo se automação estiver ativa
-        if (automationActive) {
-            pesoInput.focus();
-        }
-        
-        // Mostrar notificação
-        mostrarNotificacao("Brinco lido: " + brincoLido, "success");
+    } catch (error) {
+        console.error('Erro ao processar dados da balança:', error);
     }
 }
+
+// Função para lidar com a desconexão da balança
+function onBalancaDisconnected() {
+    balancaNotificationsStarted = false;
+    balancaCharacteristic = null;
+    if (balancaReadInterval) {
+        clearInterval(balancaReadInterval);
+        balancaReadInterval = null;
+    }
+    const balancaStatusDiv = document.getElementById('balancaStatus');
+    balancaStatusDiv.textContent = "Desconectado";
+    const balancaBtn = document.getElementById('conectarBalanca');
+    if (balancaBtn) {
+        balancaBtn.textContent = "Reconectar";
+    }
+    document.getElementById('peso').disabled = true;
+}
+
+// Adicionar event listeners para os botões de conexão Bluetooth
+document.addEventListener('DOMContentLoaded', function() {
+    // Event listener para o botão do bastão
+    const conectarBastaoBtn = document.getElementById('conectarBastao');
+    if (conectarBastaoBtn) {
+        conectarBastaoBtn.addEventListener('click', function() {
+            conectarBastao().catch(error => {
+                console.error('Erro ao conectar bastão:', error);
+                const bastaoStatusDiv = document.getElementById('bastaoStatus');
+                bastaoStatusDiv.textContent = "Erro: " + error.message;
+                mostrarNotificacao("Erro ao conectar bastão: " + error.message, "error");
+            });
+        });
+    }
+    
+    // Event listener para o botão da balança
+    const conectarBalancaBtn = document.getElementById('conectarBalanca');
+    if (conectarBalancaBtn) {
+        conectarBalancaBtn.addEventListener('click', function() {
+            conectarBalanca().catch(error => {
+                console.error('Erro ao conectar balança:', error);
+                const balancaStatusDiv = document.getElementById('balancaStatus');
+                balancaStatusDiv.textContent = "Erro: " + error.message;
+                mostrarNotificacao("Erro ao conectar balança: " + error.message, "error");
+            });
+        });
+    }
+});
 </script>
 {% endblock %}
