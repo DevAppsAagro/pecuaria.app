@@ -1215,25 +1215,27 @@ document.addEventListener('DOMContentLoaded', function() {
     let ultimaLeituraBrinco = 0; // Timestamp da última leitura válida
     let gattOperationInProgress = false; // Flag para controlar operações GATT
     let gattOperationQueue = []; // Fila de operações GATT
+    let consecutiveGattErrors = 0; // Contador de erros GATT consecutivos
+    const MAX_CONSECUTIVE_GATT_ERRORS = 5; // Limite de erros antes de tentar reconectar
+    let lastReconnectAttempt = 0; // Timestamp da última tentativa de reconexão
     
     // Variáveis para controle do estado da balança
     let pesoAtual = 0;
     let statusBalanca = 'N';
     let ultimoFrame = '';
 
-    // Função para executar operações GATT em fila
+    // Função para executar operações GATT em fila com retry e exponential backoff
     async function executeGattOperation(operation) {
         return new Promise((resolve, reject) => {
-            // Adicionar operação à fila
             gattOperationQueue.push({
                 operation: operation,
                 resolve: resolve,
                 reject: reject,
                 retryCount: 0,
-                maxRetries: 3
+                maxRetries: 5, // Aumentado para 5 tentativas
+                initialBackoff: 100, // Backoff inicial em ms
+                currentBackoff: 100 // Backoff atual (será aumentado exponencialmente)
             });
-            
-            // Se não houver operação em andamento, processa a fila
             if (!gattOperationInProgress) {
                 processGattQueue();
             }
@@ -1255,34 +1257,91 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await nextOperation.operation();
             nextOperation.resolve(result);
             console.log('Operação GATT concluída com sucesso');
+            // Resetar contador de erros consecutivos após sucesso
+            consecutiveGattErrors = 0;
         } catch (error) {
             console.warn('Erro na operação GATT:', error.message);
+            consecutiveGattErrors++;
+            console.log(`Erros GATT consecutivos: ${consecutiveGattErrors}/${MAX_CONSECUTIVE_GATT_ERRORS}`);
             
-            // Verificar se é um erro de "GATT operation already in progress"
-            if (error.message.includes('GATT operation already in progress') && 
-                nextOperation.retryCount < nextOperation.maxRetries) {
+            // Lista de erros que podem ser resolvidos com retry
+            const retryableErrors = [
+                'GATT operation already in progress',
+                'GATT operation failed for unknown reason',
+                'GATT Server is disconnected',
+                'Device went away',
+                'connection was lost',
+                'Service no longer exists',
+                'Characteristic no longer exists'
+            ];
+            
+            // Verificar se é um erro que pode ser resolvido com retry
+            const isRetryableError = retryableErrors.some(errMsg => 
+                error.message.includes(errMsg)
+            );
+            
+            if (isRetryableError) {
+                console.warn(`Erro de operação GATT que pode ser resolvido com retry: ${error.message}`);
+                consecutiveGattErrors++;
                 
-                console.log(`Tentando novamente operação GATT (${nextOperation.retryCount + 1}/${nextOperation.maxRetries})`);
-                nextOperation.retryCount++;
+                // Se ainda não excedeu o número máximo de retries
+                if (nextOperation.retryCount < nextOperation.maxRetries) {
+                    nextOperation.retryCount++;
+                    
+                    // Calcular backoff exponencial com jitter
+                    const jitter = Math.random() * 0.3 + 0.85; // 0.85-1.15 para evitar sincronização
+                    const retryDelay = Math.min(500 * Math.pow(1.5, nextOperation.retryCount) * jitter, 10000);
+                    console.log(`Tentativa ${nextOperation.retryCount} de ${nextOperation.maxRetries}. Aguardando ${Math.floor(retryDelay)}ms antes de tentar novamente.`);
+                    
+                    // Colocar de volta na fila
+                    gattOperationQueue.unshift(nextOperation);
+                    
+                    // Aguardar com backoff exponencial antes de tentar novamente
+                    setTimeout(() => {
+                        processGattQueue();
+                    }, Math.floor(retryDelay));
+                    return;
+                }
+            }
+            
+            // Se chegou aqui, não é um erro que pode ser resolvido com retry ou excedeu o número de retries
+            nextOperation.reject(error);
+            
+            // Se tivermos muitos erros consecutivos, tentar reconectar o dispositivo
+            if (consecutiveGattErrors >= MAX_CONSECUTIVE_GATT_ERRORS) {
+                console.warn(`Atingido limite de ${MAX_CONSECUTIVE_GATT_ERRORS} erros GATT consecutivos. Tentando reconectar dispositivos...`);
                 
-                // Colocar a operação de volta na fila (no início)
-                gattOperationQueue.unshift(nextOperation);
-                
-                // Aguardar um tempo maior antes de tentar novamente
-                setTimeout(() => {
-                    processGattQueue();
-                }, 500); // Aumentado para 500ms para dar mais tempo entre tentativas
-                return;
-            } else {
-                // Se excedeu o número de tentativas ou é outro tipo de erro, rejeita a promessa
-                nextOperation.reject(error);
+                // Tentar reconectar os dispositivos
+                if (bastaoDevice && bastaoDevice.gatt && bastaoDevice.gatt.connected) {
+                    console.log('Reconectando bastão...');
+                    bastaoDevice.gatt.disconnect();
+                    setTimeout(() => {
+                        try {
+                            conectarBastao();
+                        } catch (e) {
+                            console.error('Falha ao reconectar bastão:', e);
+                        }
+                    }, 1000);
+                }
+                if (balancaDevice && balancaDevice.gatt && balancaDevice.gatt.connected) {
+                    console.log('Reconectando balança...');
+                    balancaDevice.gatt.disconnect();
+                    setTimeout(() => {
+                        try {
+                            conectarBalanca();
+                        } catch (e) {
+                            console.error('Falha ao reconectar balança:', e);
+                        }
+                    }, 2000);
+                }
+                consecutiveGattErrors = 0;
             }
         } finally {
             // Se houve return no bloco catch para retry, não executamos o restante
             // Caso contrário, continuamos processando a fila após um delay
             setTimeout(() => {
                 processGattQueue();
-            }, 200); // Aumentado para 200ms para evitar sobrecarga
+            }, 200); // Delay entre operações na fila
         }
     }
 
@@ -1753,178 +1812,302 @@ document.addEventListener('DOMContentLoaded', function() {
                 conectarBastaoBtn.classList.remove('error');
             }, 3000);
             
-            mostrarNotificacao("Erro ao conectar ao bastão: " + error.message, "error");
-        }
-    }
-
-    // Função para conectar à balança
-    async function conectarBalanca() {
         try {
-            const balancaStatusDiv = document.getElementById('balancaStatus');
-            balancaStatusDiv.textContent = "Procurando balança...";
+            // Verificar se o navegador suporta Bluetooth
+            if (!navigator.bluetooth) {
+                throw new Error('Bluetooth não suportado neste navegador. Use Chrome, Edge ou Opera.');
+            }
             
-            // Solicitar dispositivo Bluetooth com opções mais abrangentes
-            balancaDevice = await navigator.bluetooth.requestDevice({
-                // Primeiro tenta filtrar pelo nome específico da balança
+            // Lista de serviços conhecidos para dispositivos de leitura
+            const knownServices = [
+                '00001101-0000-1000-8000-00805f9b34fb', // SPP (Serial Port Profile)
+                '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // UART (Nordic)
+                '0000ffe0-0000-1000-8000-00805f9b34fb', // Serviço comum em leitores BLE
+                '0000fff0-0000-1000-8000-00805f9b34fb', // Outro serviço comum
+                '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
+                '00001801-0000-1000-8000-00805f9b34fb', // Generic Attribute
+                '0000180a-0000-1000-8000-00805f9b34fb', // Device Information
+                '0000180f-0000-1000-8000-00805f9b34fb', // Battery Service
+                '00001812-0000-1000-8000-00805f9b34fb'  // HID (Human Interface Device)
+            ];
+            
+            // Solicitar dispositivo Bluetooth com filtros expandidos
+            bastaoDevice = await navigator.bluetooth.requestDevice({
                 filters: [
-                    { namePrefix: 'BT' }
+                    { services: ['battery_service'] },
+                    { services: ['device_information'] },
+                    { services: ['00001101-0000-1000-8000-00805f9b34fb'] }, // SPP
+                    { services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] }, // UART
+                    { services: ['00001812-0000-1000-8000-00805f9b34fb'] }, // HID
+                    { namePrefix: 'HC-' },
+                    { namePrefix: 'HM-' },
+                    { namePrefix: 'BT' },
+                    { namePrefix: 'RFID' },
+                    { namePrefix: 'Scanner' },
+                    { namePrefix: 'Reader' },
+                    { namePrefix: 'Leitor' },
+                    { namePrefix: 'Bast' }
                 ],
-                // Se não encontrar, aceita qualquer dispositivo
-                optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e', 'battery_service', '0000180a-0000-1000-8000-00805f9b34fb', 'device_information']
+                optionalServices: knownServices
             });
             
-            balancaStatusDiv.textContent = "Conectando à balança...";
-            const conectarBalancaBtn = document.getElementById('conectarBalanca');
-            conectarBalancaBtn.classList.add('connected');
+            console.log('Dispositivo selecionado:', bastaoDevice.name || 'Dispositivo sem nome');
+            mostrarNotificacao(`Conectando a ${bastaoDevice.name || 'Dispositivo sem nome'}...`);
             
-            // Adicionar listener para desconexão
-            balancaDevice.addEventListener('gattserverdisconnected', onBalancaDisconnected);
-            
-            // Conectar ao GATT server
-            const server = await balancaDevice.gatt.connect();
+            // Conectar ao GATT Server
+            const server = await bastaoDevice.gatt.connect();
+            console.log('Conectado ao GATT server');
             
             // Obter todos os serviços disponíveis
             const services = await executeGattOperation(async () => {
                 return await server.getPrimaryServices();
             });
+            console.log('Serviços disponíveis:', services.length);
             
-            console.log('Serviços disponíveis na balança:', services.map(s => s.uuid));
+            // Listar todos os serviços disponíveis
+            const serviceUUIDs = services.map(s => s.uuid);
+            console.log('Serviços encontrados:', serviceUUIDs);
             
-            if (services.length === 0) {
-                throw new Error('Nenhum serviço disponível na balança');
-            }
+            // Tentar encontrar serviços específicos na ordem de prioridade
+            let targetService = null;
             
-            // Tentar obter serviço UART primeiro
-            let service = null;
-            try {
-                service = await executeGattOperation(async () => {
-                    return await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
-                });
-                console.log('Serviço UART encontrado na balança');
-            } catch (e) {
-                // Se não encontrar, tente outros serviços conhecidos
-                for (const serviceUuid of ['0000180a-0000-1000-8000-00805f9b34fb', 'device_information']) {
+            // Tentar serviços na ordem de prioridade
+            for (const serviceUUID of knownServices) {
+                if (serviceUUIDs.includes(serviceUUID)) {
                     try {
-                        service = await executeGattOperation(async () => {
-                            return await server.getPrimaryService(serviceUuid);
+                        targetService = await executeGattOperation(async () => {
+                            return await server.getPrimaryService(serviceUUID);
                         });
-                        console.log('Usando serviço alternativo na balança:', serviceUuid);
+                        console.log(`Serviço ${serviceUUID} selecionado`);
                         break;
-                    } catch (err) {
-                        console.log('Serviço não encontrado na balança:', serviceUuid);
+                    } catch (e) {
+                        console.warn(`Erro ao acessar serviço ${serviceUUID}:`, e);
                     }
                 }
-                
-                // Se ainda não encontrou, use o primeiro serviço disponível
-                if (!service && services.length > 0) {
-                    service = services[0];
-                    console.log('Usando primeiro serviço disponível na balança:', service.uuid);
-                }
             }
             
-            if (!service) {
-                throw new Error('Não foi possível obter um serviço utilizável na balança');
+            // Se nenhum serviço conhecido for encontrado, usar o primeiro disponível
+            if (!targetService && services.length > 0) {
+                targetService = services[0];
+                console.log('Usando o primeiro serviço disponível:', targetService.uuid);
             }
             
-            // Obter todas as características disponíveis
+            if (!targetService) {
+                throw new Error('Nenhum serviço compatível encontrado no dispositivo');
+            }
+            
+            // Obter todas as características do serviço
             const characteristics = await executeGattOperation(async () => {
-                return await service.getCharacteristics();
+                return await targetService.getCharacteristics();
             });
+            console.log('Características disponíveis:', characteristics.length);
             
-            console.log('Características disponíveis na balança:', characteristics.map(c => ({
-                uuid: c.uuid,
-                properties: {
-                    read: c.properties.read,
-                    write: c.properties.write,
-                    notify: c.properties.notify,
-                    indicate: c.properties.indicate
-                }
-            })));
-            
-            if (characteristics.length === 0) {
-                throw new Error('Nenhuma característica disponível no serviço da balança');
-            }
-            
-            // Tentar encontrar uma característica que suporte notificações primeiro
-            balancaCharacteristic = null;
-            
-            // Procurar por características UART RX primeiro
-            try {
-                balancaCharacteristic = await executeGattOperation(async () => {
-                    return await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+            // Listar todas as características disponíveis com suas propriedades
+            for (const characteristic of characteristics) {
+                console.log('Característica encontrada:', characteristic.uuid);
+                console.log('Propriedades:', {
+                    read: characteristic.properties.read,
+                    write: characteristic.properties.write,
+                    writeWithoutResponse: characteristic.properties.writeWithoutResponse,
+                    notify: characteristic.properties.notify,
+                    indicate: characteristic.properties.indicate
                 });
-                console.log('Característica UART RX encontrada na balança');
-            } catch (e) {
-                // Procurar por qualquer característica que suporte notificações
-                const notifyCharacteristics = characteristics.filter(
-                    char => char.properties.notify || char.properties.indicate
-                );
-                
-                if (notifyCharacteristics.length > 0) {
-                    balancaCharacteristic = notifyCharacteristics[0];
-                    console.log('Usando característica com notificação na balança:', balancaCharacteristic.uuid);
-                } else {
-                    // Se não houver características com notificação, use uma que suporte leitura
-                    const readableCharacteristics = characteristics.filter(
-                        char => char.properties.read
-                    );
-                    
-                    if (readableCharacteristics.length > 0) {
-                        balancaCharacteristic = readableCharacteristics[0];
-                        console.log('Usando característica com leitura na balança:', balancaCharacteristic.uuid);
-                    } else if (characteristics.length > 0) {
-                        balancaCharacteristic = characteristics[0];
-                        console.log('Usando primeira característica disponível na balança:', balancaCharacteristic.uuid);
-                    }
+            }
+            
+            // Mapeamento de serviços para características conhecidas
+            const serviceToCharacteristicMap = {
+                '00001101-0000-1000-8000-00805f9b34fb': null, // SPP não tem característica específica
+                '6e400001-b5a3-f393-e0a9-e50e24dcca9e': '6e400003-b5a3-f393-e0a9-e50e24dcca9e', // UART RX
+                '0000ffe0-0000-1000-8000-00805f9b34fb': '0000ffe1-0000-1000-8000-00805f9b34fb', // FFE1
+                '0000fff0-0000-1000-8000-00805f9b34fb': '0000fff1-0000-1000-8000-00805f9b34fb', // FFF1
+                '00001812-0000-1000-8000-00805f9b34fb': '00002a4d-0000-1000-8000-00805f9b34fb'  // HID Report
+            };
+            
+            // Tentar encontrar característica específica para o serviço selecionado
+            let targetCharacteristic = null;
+            const specificCharUUID = serviceToCharacteristicMap[targetService.uuid];
+            
+            if (specificCharUUID) {
+                try {
+                    targetCharacteristic = await executeGattOperation(async () => {
+                        return await targetService.getCharacteristic(specificCharUUID);
+                    });
+                    console.log(`Característica específica ${specificCharUUID} encontrada`);
+                } catch (e) {
+                    console.log(`Característica específica ${specificCharUUID} não encontrada:`, e);
                 }
             }
             
-            if (!balancaCharacteristic) {
-                throw new Error('Não foi possível obter uma característica utilizável na balança');
+            // Se não encontrou característica específica, procurar por propriedades
+            if (!targetCharacteristic && characteristics.length > 0) {
+                // Priorizar características na seguinte ordem: notify > indicate > read
+                targetCharacteristic = characteristics.find(c => c.properties.notify) || 
+                                      characteristics.find(c => c.properties.indicate) || 
+                                      characteristics.find(c => c.properties.read);
+                
+                if (targetCharacteristic) {
+                    console.log('Usando característica com propriedades compatíveis:', targetCharacteristic.uuid);
+                }
             }
             
-            // Configurar o modo de leitura baseado nas propriedades da característica
-            if (balancaCharacteristic.properties.notify) {
-                // Modo de notificação
+            if (!targetCharacteristic) {
+                throw new Error('Nenhuma característica compatível encontrada no serviço');
+            }
+            
+            // Armazenar a característica para uso posterior
+            bastaoCharacteristic = targetCharacteristic;
+            
+            // Configurar notificações ou leitura periódica
+            if (bastaoCharacteristic.properties.notify) {
+                console.log('Iniciando notificações do bastão...');
                 await executeGattOperation(async () => {
-                    await balancaCharacteristic.startNotifications();
+                    await bastaoCharacteristic.startNotifications();
                 });
+                bastaoCharacteristic.addEventListener('characteristicvaluechanged', handleBastaoValueChanged);
+                bastaoNotificationsStarted = true;
+            } else if (bastaoCharacteristic.properties.indicate) {
+                console.log('Iniciando indicações do bastão...');
+                await executeGattOperation(async () => {
+                    await bastaoCharacteristic.startNotifications();
+                });
+                bastaoCharacteristic.addEventListener('characteristicvaluechanged', handleBastaoValueChanged);
+                bastaoNotificationsStarted = true;
+            } else if (bastaoCharacteristic.properties.read) {
+                console.log('Configurando leitura periódica do bastão...');
                 
-                balancaNotificationsStarted = true;
-                balancaCharacteristic.addEventListener('characteristicvaluechanged', handleBalancaValueChanged);
-                console.log('Modo de notificação ativado na balança');
-                
-                // Limpar qualquer intervalo de leitura existente
-                if (balancaReadInterval) {
-                    clearInterval(balancaReadInterval);
-                    balancaReadInterval = null;
-                }
-            } else if (balancaCharacteristic.properties.read) {
-                // Modo de leitura periódica
-                balancaNotificationsStarted = false;
-                console.log('Modo de leitura periódica ativado na balança');
-                
-                // Configurar leitura periódica a cada 500ms
-                if (balancaReadInterval) {
-                    clearInterval(balancaReadInterval);
+                // Limpar intervalo anterior se existir
+                if (bastaoReadInterval) {
+                    clearInterval(bastaoReadInterval);
                 }
                 
-                balancaReadInterval = setInterval(async () => {
+                // Contador de erros para controle de reconexão
+                let errorCount = 0;
+                const MAX_ERRORS = 5;
+                
+                // Fazer uma leitura inicial imediata
+                try {
+                    const value = await executeGattOperation(async () => {
+                        return await bastaoCharacteristic.readValue();
+                    });
+                    handleBastaoValueChanged({ target: { value } });
+                } catch (error) {
+                    console.warn('Erro na leitura inicial do bastão:', error);
+                }
+                
+                bastaoReadInterval = setInterval(async () => {
                     try {
-                        const value = await executeGattOperation(async () => {
-                            return await balancaCharacteristic.readValue();
-                        });
-                        handleBalancaValueChanged({ target: { value } });
-                    } catch (error) {
-                        console.error('Erro ao ler valor da balança:', error);
-                        // Se houver erro na leitura, tente reconectar
-                        if (error.message.includes('GATT operation failed')) {
-                            clearInterval(balancaReadInterval);
-                            balancaReadInterval = null;
-                            onBalancaDisconnected();
+                        // Verificar se o dispositivo ainda está conectado
+                        if (!bastaoDevice || !bastaoDevice.gatt || !bastaoDevice.gatt.connected) {
+                            console.warn('Bastão desconectado, tentando reconectar...');
+                            try {
+                                if (bastaoDevice) {
+                                    await bastaoDevice.gatt.connect();
+                                    console.log('Bastão reconectado com sucesso');
+                                    errorCount = 0;
+                                }
+                            } catch (reconnectError) {
+                                console.error('Falha na reconexão do bastão:', reconnectError);
+                                errorCount++;
+                                return;
+                            }
                         }
+                        
+                        // Tentar ler o valor
+                        try {
+                            const value = await executeGattOperation(async () => {
+                                return await bastaoCharacteristic.readValue();
+                            });
+                            handleBastaoValueChanged({ target: { value } });
+                            errorCount = 0; // Resetar contador de erros após sucesso
+                        } catch (readError) {
+                            // Tratamento especial para "GATT operation failed"
+                            if (readError.message.includes('GATT operation failed')) {
+                                console.warn('Erro de operação GATT na balança, tentando método alternativo...');
+                                
+                                // Tentar método alternativo: escrever um comando e depois ler
+                                try {
+                                    // Se a característica suporta escrita, enviar comando de leitura
+                                    if (balancaCharacteristic.properties.write || 
+                                        balancaCharacteristic.properties.writeWithoutResponse) {
+                                        
+                                        // Comando genérico para solicitar dados (0x01)
+                                        const cmd = new Uint8Array([0x01]);
+                                        
+                                        // Escrever comando
+                                        if (balancaCharacteristic.properties.write) {
+                                            await executeGattOperation(async () => {
+                                                return await balancaCharacteristic.writeValue(cmd);
+                                            });
+                                        } else {
+                                            await executeGattOperation(async () => {
+                                                return await balancaCharacteristic.writeValueWithoutResponse(cmd);
+                                            });
+                                        }
+                                        
+                                        // Pequeno delay antes de ler
+                                        await new Promise(resolve => setTimeout(resolve, 200));
+                                        
+                                        // Tentar ler novamente
+                                        const value = await executeGattOperation(async () => {
+                                            return await balancaCharacteristic.readValue();
+                                        });
+                                        
+                                        errorCount = 0;
+                                        handleBalancaValueChanged({ target: { value } });
+                                    } else {
+                                        throw new Error('Característica da balança não suporta escrita');
+                                    }
+                                } catch (altError) {
+                                    // Se o método alternativo também falhar, incrementar contador de erros
+                                    errorCount++;
+                                    console.error('Método alternativo para balança falhou:', altError);
+                                    
+                                    // Se excedeu o limite de erros, tentar reconectar completamente
+                                    if (errorCount >= MAX_ERRORS) {
+                                        console.warn(`Excedido limite de ${MAX_ERRORS} erros consecutivos na balança, reconectando...`);
+                                        try {
+                                            // Desconectar e reconectar completamente
+                                            if (balancaDevice && balancaDevice.gatt) {
+                                                if (balancaDevice.gatt.connected) {
+                                                    await balancaDevice.gatt.disconnect();
+                                                }
+                                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                                await conectarBalanca(); // Reconectar usando a função completa
+                                                errorCount = 0;
+                                            }
+                                        } catch (reconnectError) {
+                                            console.error('Falha na reconexão completa da balança:', reconnectError);
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Outros erros
+                                console.error('Erro ao ler valor da balança:', readError);
+                                errorCount++;
+                                
+                                // Se excedeu o limite de erros, tentar reconectar
+                                if (errorCount >= MAX_ERRORS) {
+                                    console.warn(`Excedido limite de ${MAX_ERRORS} erros consecutivos na balança, reconectando...`);
+                                    try {
+                                        // Limpar intervalo atual
+                                        clearInterval(balancaReadInterval);
+                                        balancaReadInterval = null;
+                                        
+                                        // Tentar reconectar
+                                        await conectarBalanca();
+                                        errorCount = 0;
+                                    } catch (reconnectError) {
+                                        console.error('Falha na reconexão completa da balança:', reconnectError);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        // Erro geral no bloco principal
+                        console.error('Erro geral na leitura da balança:', error);
+                        errorCount++;
                     }
-                }, 500); // Mais frequente para a balança
+                }, 500); // Mantido em 500ms para a balança que precisa de atualizações mais frequentes
             } else {
                 throw new Error('A característica não suporta notificações nem leitura');
             }
