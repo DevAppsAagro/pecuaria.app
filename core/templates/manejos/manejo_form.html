@@ -1101,15 +1101,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 nextOperation.reject(error);
             }
         } finally {
-            // Se não houve recolocação na fila (retry), continua processando
-            if (!error || (error && (nextOperation.retryCount >= nextOperation.maxRetries || 
-                !error.message.includes('GATT operation already in progress')))) {
-                
-                // Aguardar um delay maior antes da próxima operação
-                setTimeout(() => {
-                    processGattQueue();
-                }, 200); // Aumentado para 200ms para evitar sobrecarga
-            }
+            // Se houve return no bloco catch para retry, não executamos o restante
+            // Caso contrário, continuamos processando a fila após um delay
+            setTimeout(() => {
+                processGattQueue();
+            }, 200); // Aumentado para 200ms para evitar sobrecarga
         }
     }
 
