@@ -519,24 +519,47 @@ def obter_dados_financeiros(usuario, fazenda_id=None, data_inicio=None):
             saldo_total += conta.saldo
         
         # Obter despesas não pagas
-        despesas = Despesa.objects.filter(
-            situacao='PENDENTE',
-            **filtro_usuario
-        )
-        
-        # Não filtrar por fazenda, já que o modelo não tem esse campo
-        
-        total_despesas_pendentes = despesas.aggregate(total=Sum('valor'))['total'] or 0
+        # Verificar se o campo correto é 'situacao' ou 'status'
+        try:
+            despesas = Despesa.objects.filter(
+                status='PENDENTE',  # Usando 'status' em vez de 'situacao'
+                **filtro_usuario
+            )
+            
+            # Se tiver fazenda_id, filtrar pelos itens relacionados à fazenda
+            if fazenda_id and fazenda_id != 'null' and fazenda_id != '':
+                despesas = despesas.filter(itens__fazenda_destino_id=fazenda_id).distinct()
+                
+            total_despesas_pendentes = despesas.aggregate(total=Sum('itens__valor_total'))['total'] or 0
+        except Exception as despesa_error:
+            logger.error(f"Erro ao obter despesas: {despesa_error}")
+            total_despesas_pendentes = 0
         
         # Obter receitas pendentes
-        receitas = Receita.objects.filter(
-            situacao='PENDENTE',
-            **filtro_usuario
-        )
-        
-        # Não filtrar por fazenda, já que o modelo não tem esse campo
-        
-        total_receitas_pendentes = receitas.aggregate(total=Sum('valor'))['total'] or 0
+        try:
+            # Verificar se o modelo Receita existe
+            from django.apps import apps
+            if apps.is_installed('core') and apps.get_model('core', 'Receita'):
+                Receita = apps.get_model('core', 'Receita')
+                receitas = Receita.objects.filter(
+                    status='PENDENTE',  # Usando 'status' em vez de 'situacao'
+                    **filtro_usuario
+                )
+                
+                # Se tiver fazenda_id, filtrar pelas receitas relacionadas à fazenda
+                if fazenda_id and fazenda_id != 'null' and fazenda_id != '':
+                    # Verificar se o modelo Receita tem campo fazenda ou relacionamento similar
+                    try:
+                        receitas = receitas.filter(fazenda_id=fazenda_id)
+                    except Exception as filtro_error:
+                        logger.warning(f"Não foi possível filtrar receitas por fazenda: {filtro_error}")
+                
+                total_receitas_pendentes = receitas.aggregate(total=Sum('valor'))['total'] or 0
+            else:
+                total_receitas_pendentes = 0
+        except Exception as receita_error:
+            logger.error(f"Erro ao obter receitas: {receita_error}")
+            total_receitas_pendentes = 0
         
         return {
             'saldo_total': saldo_total,
@@ -639,7 +662,8 @@ def obter_entradas_saidas_12_meses(usuario, fazenda_id=None):
             )
             
             if fazenda_id and fazenda_id != 'null' and fazenda_id != '':
-                despesas = despesas.filter(**filtro_fazenda)
+                # Usar itens__fazenda_destino_id em vez de fazenda_id
+                despesas = despesas.filter(itens__fazenda_destino_id=fazenda_id).distinct()
             
             for despesa in despesas:
                 saida_mes += despesa.valor_final() or 0

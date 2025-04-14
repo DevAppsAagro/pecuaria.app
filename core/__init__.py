@@ -2,7 +2,7 @@
 Aplicativo core do sistema Pecuária.app
 """
 
-# Aplica o patch para correção do processamento de despesas relacionadas a estoque
+# Define o app_config padrão
 default_app_config = 'core.apps.CoreConfig'
 
 # Configuração para aplicar patches automaticamente
@@ -37,5 +37,23 @@ def aplicar_patches():
     except Exception as e:
         logger.error(f"Erro ao aplicar patches: {str(e)}")
 
-# Aplica os patches ao importar o módulo
-aplicar_patches()
+# Não aplicar os patches automaticamente na importação do módulo
+# Em vez disso, vamos usar o sistema de sinais do Django para aplicá-los quando o app estiver pronto
+
+# Registrar uma função para ser chamada quando o Django estiver pronto
+def ready_handler(sender, **kwargs):
+    # Importar aqui para evitar importações circulares
+    from django.apps import apps
+    if apps.is_installed('core'):
+        aplicar_patches()
+
+# Registrar o handler para o sinal 'ready' apenas se estiver em um contexto Django
+try:
+    from django.apps import AppConfig
+    from django.db.models.signals import post_migrate
+    
+    # Registrar o handler para ser chamado após a migração do banco de dados
+    post_migrate.connect(ready_handler, sender=AppConfig)
+except ImportError:
+    # Se não estiver em um contexto Django, não fazer nada
+    pass

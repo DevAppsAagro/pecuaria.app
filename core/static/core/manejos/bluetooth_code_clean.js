@@ -104,6 +104,42 @@ async function processGattQueue() {
             }, waitTime);
             return;
         }
+        
+        // Tratamento específico para erro "NotSupportedError: GATT operation failed for unknown reason"
+        if (error.name === 'NotSupportedError' && error.message.includes('GATT operation failed')) {
+            console.log('Detectado erro NotSupportedError em operação GATT');
+            bastaoErrorCount++;
+            
+            // Verificar se a operação é startNotifications
+            const isStartNotifications = nextOperation.operation.toString().includes('startNotifications');
+            
+            if (isStartNotifications) {
+                console.log('Erro ocorreu ao tentar iniciar notificações - este dispositivo pode não suportar notificações');
+                // Rejeitar a operação com um erro específico para que o código de chamada possa lidar com isso
+                nextOperation.reject(new Error('NOTIFICATIONS_NOT_SUPPORTED'));
+            } else {
+                // Para outras operações, tentar novamente com backoff
+                const waitTime = Math.min(1000 * (nextOperation.retryCount + 1), 5000); // Máximo de 5 segundos
+                console.log(`Erro GATT operation failed. Tentando novamente em ${waitTime}ms...`);
+                
+                // Incrementar contador de tentativas
+                nextOperation.retryCount++;
+                
+                if (nextOperation.retryCount < nextOperation.maxRetries) {
+                    // Colocar de volta na fila com um atraso
+                    setTimeout(() => {
+                        gattOperationQueue.unshift(nextOperation);
+                        processGattQueue();
+                    }, waitTime);
+                } else {
+                    console.log(`Excedido número máximo de tentativas (${nextOperation.maxRetries}) para operação GATT`);
+                    nextOperation.reject(error);
+                    // Continuar processando a fila
+                    setTimeout(processGattQueue, 500);
+                }
+            }
+            return;
+        }
         // Tratamento para erro "GATT operation failed for unknown reason"
         else if (error.message && error.message.includes('GATT operation failed for unknown reason')) {
             bastaoErrorCount++;
@@ -296,8 +332,11 @@ async function conectarBastao() {
         
         // Iniciar notificações ou leitura periódica com sistema de fallback
         if (bastaoCharacteristic.properties && (bastaoCharacteristic.properties.notify || bastaoCharacteristic.properties.indicate)) {
-            console.log('Iniciando notificações para o bastão...');
+            console.log('Configurando notificações para o bastão...');
             try {
+                // Adicionar um pequeno delay antes de iniciar notificações (ajuda em alguns dispositivos)
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
                 await executeGattOperation(() => bastaoCharacteristic.startNotifications());
                 bastaoCharacteristic.addEventListener('characteristicvaluechanged', handleBastaoValueChanged);
                 bastaoNotificationsStarted = true;
@@ -314,7 +353,46 @@ async function conectarBastao() {
                 }, 500);
             } catch (error) {
                 console.warn('Falha ao iniciar notificações, usando fallback para leitura periódica:', error);
-                configurarLeituraPeriodica();
+                
+                // Tratamento específico para o erro "NotSupportedError: GATT operation failed for unknown reason"
+                if (error.name === 'NotSupportedError' && error.message.includes('GATT operation failed')) {
+                    console.log('Detectado erro NotSupportedError comum em alguns leitores de brinco');
+                    mostrarNotificacao("Usando modo de compatibilidade para o leitor", "info");
+                    
+                    // Tentar uma abordagem alternativa: desativar e reativar as notificações
+                    setTimeout(async () => {
+                        try {
+                            // Alguns dispositivos precisam de um comando específico para ativar as notificações
+                            if (bastaoCharacteristic.properties && 
+                                (bastaoCharacteristic.properties.write || bastaoCharacteristic.properties.writeWithoutResponse)) {
+                                console.log('Tentando ativar notificações via comando de escrita...');
+                                const activationCommand = new Uint8Array([0x01]);
+                                await executeGattOperation(() => bastaoCharacteristic.writeValue(activationCommand));
+                                console.log('Comando de ativação enviado com sucesso');
+                                
+                                // Aguardar um pouco e tentar iniciar notificações novamente
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                try {
+                                    await executeGattOperation(() => bastaoCharacteristic.startNotifications());
+                                    bastaoCharacteristic.addEventListener('characteristicvaluechanged', handleBastaoValueChanged);
+                                    bastaoNotificationsStarted = true;
+                                    console.log('Notificações iniciadas com sucesso após comando de ativação');
+                                    return; // Sair se conseguiu ativar as notificações
+                                } catch (e) {
+                                    console.log('Segunda tentativa de iniciar notificações falhou:', e);
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Erro ao tentar abordagem alternativa:', e);
+                        }
+                        
+                        // Se todas as tentativas falharem, usar leitura periódica como último recurso
+                        configurarLeituraPeriodica();
+                    }, 500);
+                } else {
+                    // Para outros tipos de erro, usar leitura periódica diretamente
+                    configurarLeituraPeriodica();
+                }
             }
         } else if (bastaoCharacteristic.properties && bastaoCharacteristic.properties.read) {
             console.log('Característica não suporta notificações, usando leitura periódica');
